@@ -19,19 +19,16 @@ function AppContent({ children }: { children: React.ReactNode }) {
       const userDocRef = doc(firestore, 'users', user.uid);
       getDoc(userDocRef).then((docSnap) => {
         if (!docSnap.exists()) {
-          // If user is authenticated but has no profile, send to onboarding
           router.replace('/onboarding');
         } else {
-          // User has a profile, allow access
           setIsCheckingProfile(false);
         }
       });
     } else {
-      // Not logged in, can view public pages
       setIsCheckingProfile(false);
     }
   }, [user, isUserLoading, firestore, router]);
-  
+
   if (isUserLoading || isCheckingProfile) {
     return (
       <div className="flex h-screen items-center justify-center bg-background">
@@ -43,13 +40,36 @@ function AppContent({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
+function ClientOnly({ children }: { children: React.ReactNode }) {
+  const [hasMounted, setHasMounted] = useState(false);
 
-export default function MainLayout({ children }: { children: React.ReactNode }) {
+  useEffect(() => {
+    setHasMounted(true);
+  }, []);
+
+  if (!hasMounted) {
+    return (
+       <div className="flex h-screen items-center justify-center bg-background">
+        <Loader2 className="h-12 w-12 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  return <>{children}</>;
+}
+
+export default function MainLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
   return (
     <main>
-        <AppContent>
-            {children}
-        </AppContent>
+        <ClientOnly>
+            <AppContent>
+                {children}
+            </AppContent>
+        </ClientOnly>
     </main>
   );
 }
