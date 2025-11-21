@@ -67,35 +67,36 @@ export function AppSidebar() {
         <SidebarMenu>
           {navItems.map((item) => (
             <SidebarMenuItem key={item.label}>
-              <Link href={item.href} passHref legacyBehavior>
-                <SidebarMenuButton
-                  isActive={
-                    item.href === '/'
-                      ? pathname === item.href
-                      : pathname.startsWith(item.href)
-                  }
-                  tooltip={{ children: item.label, side: 'right' }}
-                  className="justify-start"
-                >
+              <SidebarMenuButton
+                asChild
+                isActive={
+                  item.href === '/'
+                    ? pathname === item.href
+                    : pathname.startsWith(item.href)
+                }
+                tooltip={{ children: item.label, side: 'right' }}
+                className="justify-start"
+              >
+                <Link href={item.href}>
                   <item.icon className="shrink-0" />
                   <span className="truncate">{item.label}</span>
-                </SidebarMenuButton>
-              </Link>
+                </Link>
+              </SidebarMenuButton>
             </SidebarMenuItem>
           ))}
         </SidebarMenu>
       </SidebarContent>
       <SidebarFooter>
         {currentUser && (
-          <Link href={`/profile/${currentUser.userId}`} passHref legacyBehavior>
-             <SidebarMenuButton tooltip={{ children: 'Profile', side: 'right' }}>
-                <Avatar className="h-8 w-8">
-                  <AvatarImage src={currentUser.profilePhotoUrl} alt={currentUser.username} />
-                  <AvatarFallback>{currentUser.username.charAt(0)}</AvatarFallback>
-                </Avatar>
-                <span className="truncate">{currentUser.username}</span>
-              </SidebarMenuButton>
-          </Link>
+           <SidebarMenuButton asChild tooltip={{ children: 'Profile', side: 'right' }}>
+            <Link href={`/profile/${currentUser.userId}`}>
+              <Avatar className="h-8 w-8">
+                <AvatarImage src={currentUser.profilePhotoUrl} alt={currentUser.username} />
+                <AvatarFallback>{currentUser.username.charAt(0)}</AvatarFallback>
+              </Avatar>
+              <span className="truncate">{currentUser.username}</span>
+            </Link>
+            </SidebarMenuButton>
         )}
       </SidebarFooter>
     </Sidebar>
