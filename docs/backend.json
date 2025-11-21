@@ -226,6 +226,50 @@
             "targetUrl": { "type": "string", "format": "uri", "description": "URL the ad links to." }
         },
         "required": ["title", "content", "imageUrl", "targetUrl"]
+    },
+    "MarketplaceProduct": {
+        "title": "Marketplace Product",
+        "description": "A product listed for sale in the marketplace.",
+        "type": "object",
+        "properties": {
+            "sellerId": { "type": "string", "description": "The wallet address of the seller (Firebase Auth UID)." },
+            "name": { "type": "string", "description": "The name of the product." },
+            "description": { "type": "string", "description": "The description of the product." },
+            "price": { "type": "number", "description": "The price of the product." },
+            "stock": { "type": "number", "description": "The available stock of the product." },
+            "status": { "type": "string", "enum": ["active", "inactive", "sold_out"], "description": "The status of the product." },
+            "imageUrl": { "type": "string", "format": "uri", "description": "URL of the product image." },
+            "createdAt": { "type": "string", "format": "date-time", "description": "Timestamp of when the product was created." }
+        },
+        "required": ["sellerId", "name", "price", "stock", "status", "imageUrl", "createdAt"]
+    },
+    "MarketplaceOrder": {
+        "title": "Marketplace Order",
+        "description": "An order placed in the marketplace.",
+        "type": "object",
+        "properties": {
+            "buyerId": { "type": "string", "description": "The wallet address of the buyer (Firebase Auth UID)." },
+            "sellerId": { "type": "string", "description": "The wallet address of the seller." },
+            "productId": { "type": "string", "description": "The ID of the product being ordered." },
+            "quantity": { "type": "number", "description": "The quantity of the product ordered." },
+            "totalPrice": { "type": "number", "description": "The total price of the order." },
+            "status": { "type": "string", "enum": ["pending", "processing", "shipped", "completed", "disputed", "refunded"], "description": "The status of the order." },
+            "createdAt": { "type": "string", "format": "date-time", "description": "Timestamp of when the order was created." }
+        },
+        "required": ["buyerId", "sellerId", "productId", "quantity", "totalPrice", "status", "createdAt"]
+    },
+    "MarketplaceReview": {
+        "title": "Marketplace Review",
+        "description": "A review for a product in the marketplace.",
+        "type": "object",
+        "properties": {
+            "productId": { "type": "string", "description": "The ID of the product being reviewed." },
+            "buyerId": { "type": "string", "description": "The wallet address of the reviewer (Firebase Auth UID)." },
+            "rating": { "type": "number", "description": "The rating value (1-5)." },
+            "comment": { "type": "string", "description": "The content of the review." },
+            "createdAt": { "type": "string", "format": "date-time", "description": "Timestamp of when the review was created." }
+        },
+        "required": ["productId", "buyerId", "rating", "comment", "createdAt"]
     }
   },
   "auth": {
@@ -314,6 +358,30 @@
               "entityName": "GossipServiceAd",
               "schema": { "$ref": "#/backend/entities/GossipServiceAd" },
               "description": "Stores sponsored ads for the gossip feed."
+          }
+      },
+      {
+          "path": "/marketplace_products/{productId}",
+          "definition": {
+              "entityName": "MarketplaceProduct",
+              "schema": { "$ref": "#/backend/entities/MarketplaceProduct" },
+              "description": "Stores products listed in the marketplace."
+          }
+      },
+      {
+          "path": "/marketplace_orders/{orderId}",
+          "definition": {
+              "entityName": "MarketplaceOrder",
+              "schema": { "$ref": "#/backend/entities/MarketplaceOrder" },
+              "description": "Stores orders placed in the marketplace."
+          }
+      },
+      {
+          "path": "/marketplace_reviews/{reviewId}",
+          "definition": {
+              "entityName": "MarketplaceReview",
+              "schema": { "$ref": "#/backend/entities/MarketplaceReview" },
+              "description": "Stores reviews for products in the marketplace."
           }
       }
     ],
