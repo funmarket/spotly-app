@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useDevapp } from '@/hooks/use-devapp';
 import { doc, getDoc } from 'firebase/firestore';
 import { Loader2 } from 'lucide-react';
-import { UserButton } from '@devfunlabs/web-sdk';
+// import { UserButton } from '@devfunlabs/web-sdk';
 
 // Main Role Choice Button Component
 function RoleChoiceButton({
@@ -95,7 +95,7 @@ function WalletConnectPrompt({ accountType, onBack }: { accountType: string, onB
           <div className="flex flex-col items-center gap-6">
             <div className="w-full flex justify-center">
               <div className="scale-110">
-                <UserButton height="48px" primaryColor="#ec4899" radius="24px" />
+                {/* <UserButton height="48px" primaryColor="#ec4899" radius="24px" /> */}
               </div>
             </div>
             <p className="text-white/60 text-center text-sm">

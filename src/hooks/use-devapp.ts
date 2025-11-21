@@ -1,4 +1,4 @@
-import { useDevapp as useDevappSDK, DevbaseClient } from '@devfunlabs/web-sdk';
+// import { useDevapp as useDevappSDK, DevbaseClient } from '@devfunlabs/web-sdk';
 import { useFirestore } from '@/firebase'; // Using firebase library for firestore
 import { Firestore } from 'firebase/firestore';
 
@@ -17,20 +17,20 @@ interface UseDevappHook {
  */
 export function useDevapp(): UseDevappHook {
   // Get the original hook's return values
-  const {
-    userWallet,
-    sendTransaction,
-    signMessage,
-  } = useDevappSDK();
+  // const {
+  //   userWallet,
+  //   sendTransaction,
+  //   signMessage,
+  // } = useDevappSDK();
 
   // Get the firestore instance from our firebase setup
   const firestore = useFirestore();
 
   // Return a combined object that matches the specified interface
   return {
-    userWallet,
+    userWallet: undefined,
     firestore,
-    sendTransaction,
-    signMessage,
+    sendTransaction: undefined,
+    signMessage: undefined,
   };
 }

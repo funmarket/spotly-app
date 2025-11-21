@@ -48,7 +48,7 @@ export function AuthHandler({ children }: { children: React.ReactNode }) {
         setIsLoadingUser(false);
       }
     };
-    ensureUserProfile();
+    // ensureUserProfile();
   }, [userWallet, firestore]);
 
   if (isLoadingUser && userWallet) {
