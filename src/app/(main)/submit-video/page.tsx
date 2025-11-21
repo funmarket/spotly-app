@@ -28,6 +28,7 @@ import { useToast } from '@/hooks/use-toast';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import type { User } from '@/lib/types';
+import { useRouter } from 'next/navigation';
 
 const videoSchema = z.object({
   rawVideoInput: z.string().url({ message: 'Please enter a valid video URL.' }),
@@ -38,6 +39,7 @@ const videoSchema = z.object({
 export default function SubmitVideoPage() {
   const { user, isUserLoading, firestore } = useFirebase();
   const { toast } = useToast();
+  const router = useRouter();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [userProfile, setUserProfile] = useState<User | null>(null);
   const [isProfileLoading, setIsProfileLoading] = useState(true);
@@ -96,8 +98,9 @@ export default function SubmitVideoPage() {
         artistId: user.uid,
         rawVideoInput: values.rawVideoInput,
         description: values.description,
-        videoCategory: values.videoCategory,
-        videoUrl: '', 
+        videoCategory: values.videoCategory.toLowerCase().trim(),
+        // Backend/cloud function will process rawVideoInput into a normalized videoUrl
+        videoUrl: values.rawVideoInput, // Placeholder, to be replaced by backend
         status: 'pending',
         isBanned: false,
         hiddenFromFeed: false,
@@ -118,6 +121,7 @@ export default function SubmitVideoPage() {
         description: 'Your video is being processed and will be live shortly.',
       });
       form.reset();
+      router.push('/');
 
     } catch (error: any) {
        toast({
@@ -218,9 +222,6 @@ export default function SubmitVideoPage() {
                         <SelectItem value="music">Music</SelectItem>
                         <SelectItem value="acting">Acting</SelectItem>
                         <SelectItem value="creator">Creator</SelectItem>
-                        <SelectItem value="comedy">Comedy</SelectItem>
-                        <SelectItem value="dance">Dance</SelectItem>
-                        <SelectItem value="other">Other</SelectItem>
                       </SelectContent>
                     </Select>
                     <FormMessage />
