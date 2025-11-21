@@ -1,7 +1,8 @@
+
 'use client';
 import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
+import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
 import { useFirebase } from '@/firebase';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -106,6 +107,18 @@ const profileSchema = z.object({
 
 type ProfileFormValues = z.infer<typeof profileSchema>;
 
+const ClientOnlyWalletButton = () => {
+  const [hasMounted, setHasMounted] = useState(false);
+  useEffect(() => {
+    setHasMounted(true);
+  }, []);
+
+  if (!hasMounted) {
+    return null;
+  }
+  return <WalletMultiButton />;
+};
+
 export default function CreateProfilePage() {
   const { firestore, user } = useFirebase();
   const { publicKey, connected } = useWallet();
@@ -136,19 +149,6 @@ export default function CreateProfilePage() {
   const { watch, setValue } = form;
   const isArtist = watch('isArtist');
   const talentCategory = watch('talentCategory');
-  
-  useEffect(() => {
-    const checkExistingProfile = async () => {
-      if (publicKey && firestore && accountType) {
-        const userDocRef = doc(firestore, 'users', publicKey.toBase58());
-        const userSnap = await getDoc(userDocRef);
-        if (userSnap.exists()) {
-          router.push(`/profile/${publicKey.toBase58()}`);
-        }
-      }
-    };
-    checkExistingProfile();
-  }, [publicKey, firestore, accountType, router]);
   
   const onSubmit = async (values: ProfileFormValues) => {
     if (!publicKey || !firestore) return;
@@ -223,7 +223,7 @@ export default function CreateProfilePage() {
             <CardDescription>Connect your Solana wallet to create your profile.</CardDescription>
           </CardHeader>
           <CardContent>
-            <WalletMultiButton />
+            <ClientOnlyWalletButton />
           </CardContent>
         </Card>
       </div>
@@ -481,3 +481,5 @@ export default function CreateProfilePage() {
     </div>
   );
 }
+
+    
