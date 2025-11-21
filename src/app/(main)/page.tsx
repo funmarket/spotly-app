@@ -1,5 +1,5 @@
 'use client';
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState } from 'react';
 import { VideoFeed } from '@/components/feed/video-feed';
 import { useFirebase, useMemoFirebase } from '@/firebase';
 import { collection, query, where, orderBy, getDoc, doc, limit } from 'firebase/firestore';
@@ -43,7 +43,8 @@ function Feed() {
     if (activeFeedTab === 'rising') {
        return query(videosCollection, orderBy('rankingScore', 'desc'), limit(50));
     } else {
-       return query(videosCollection, where('videoCategory', '==', activeFeedTab), orderBy('createdAt', 'desc'), limit(50));
+        // Simplified query to avoid index error. Filtering will be done client-side.
+       return query(videosCollection, orderBy('createdAt', 'desc'), limit(100));
     }
   }, [firestore, activeFeedTab]);
 
@@ -60,8 +61,13 @@ function Feed() {
       
       const userCache = new Map<string, User>();
 
+      // Client-side filtering
+      const filteredVideos = activeFeedTab === 'rising' 
+        ? videos 
+        : videos.filter(v => v.videoCategory === activeFeedTab);
+
       const enriched = await Promise.all(
-        videos
+        filteredVideos
         .filter(v => v.status === 'active' && !v.isBanned && !v.hiddenFromFeed)
         .map(async (video) => {
           let artist: User | undefined = userCache.get(video.artistId);
@@ -86,7 +92,7 @@ function Feed() {
     };
 
     enrichVideos();
-  }, [videos, firestore, areVideosLoading]);
+  }, [videos, firestore, areVideosLoading, activeFeedTab]);
 
   const isLoading = isUserLoading || areVideosLoading || isEnriching;
 
