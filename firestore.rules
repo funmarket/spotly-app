@@ -222,5 +222,31 @@ service cloud.firestore {
       // However, allowing create if the recipient is the one creating it can be a fallback.
       allow create: if isSignedIn() && isOwner(request.resource.data.recipientWallet);
     }
+
+    // ----------------------------------------------------------------------
+    // Engagement Rules (Tips, Votes, Favorites)
+    // ----------------------------------------------------------------------
+    
+    match /tips/{tipId} {
+      allow read: if true;
+      allow create: if isSignedIn() && request.resource.data.fromWallet == request.auth.uid;
+    }
+
+    match /user_votes/{voteId} {
+      allow read: if true;
+      // Note: To enforce one vote per user per video, a composite index on userId and videoId
+      // should be created in Firestore, and a Cloud Function trigger or more complex rules
+      // would be needed to check for existence before creation.
+      allow create: if isSignedIn() && request.resource.data.userId == request.auth.uid;
+      allow delete: if isOwner(resource.data.userId);
+    }
+    
+    match /favorites/{favoriteId} {
+       allow read, create, delete: if isSignedIn() && request.auth.uid == request.resource.data.userId;
+       // A user can only manage their own favorites.
+       // The rule for create and delete needs to check the incoming data.
+       allow create: if isSignedIn() && request.resource.data.userId == request.auth.uid;
+       allow delete: if isSignedIn() && resource.data.userId == request.auth.uid;
+    }
   }
 }

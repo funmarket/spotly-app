@@ -80,3 +80,19 @@ export interface GossipServiceAd {
   imageUrl: string;
   targetUrl: string;
 }
+
+export interface UserVote {
+  id?: string;
+  videoId: string;
+  userId: string;
+  isPositive: boolean;
+  createdAt: Timestamp;
+}
+
+export interface Favorite {
+  id?: string;
+  itemId: string;
+  itemType: 'video' | 'product';
+  userId: string;
+  createdAt: Timestamp;
+}

@@ -286,6 +286,43 @@
         "data": { "type": "string", "description": "JSON string containing additional data for the notification." }
       },
       "required": ["recipientWallet", "message", "type", "read", "createdAt"]
+    },
+    "Tip": {
+      "title": "Tip",
+      "description": "Represents a tip from one user to another.",
+      "type": "object",
+      "properties": {
+        "amount": { "type": "number", "description": "The amount of the tip." },
+        "videoId": { "type": "string", "description": "The ID of the video being tipped for." },
+        "toWallet": { "type": "string", "description": "The wallet address of the artist receiving the tip." },
+        "fromWallet": { "type": "string", "description": "The wallet address of the user giving the tip." },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Timestamp of when the tip was created." }
+      },
+      "required": ["amount", "videoId", "toWallet", "fromWallet", "createdAt"]
+    },
+    "UserVote": {
+      "title": "User Vote",
+      "description": "Represents a Top or Flop vote on a video by a user.",
+      "type": "object",
+      "properties": {
+        "videoId": { "type": "string", "description": "The ID of the video being voted on." },
+        "userId": { "type": "string", "description": "The ID of the user who voted." },
+        "isPositive": { "type": "boolean", "description": "True for a 'Top' vote, false for a 'Flop' vote." },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Timestamp of when the vote was cast." }
+      },
+      "required": ["videoId", "userId", "isPositive", "createdAt"]
+    },
+    "Favorite": {
+      "title": "Favorite",
+      "description": "Represents a user's favorited item (video or product).",
+      "type": "object",
+      "properties": {
+        "itemId": { "type": "string", "description": "The ID of the favorited item (e.g., videoId, productId)." },
+        "itemType": { "type": "string", "enum": ["video", "product"], "description": "The type of the favorited item." },
+        "userId": { "type": "string", "description": "The ID of the user who favorited the item." },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Timestamp of when the item was favorited." }
+      },
+      "required": ["itemId", "itemType", "userId", "createdAt"]
     }
   },
   "auth": {
@@ -406,6 +443,30 @@
           "entityName": "Notification",
           "schema": { "$ref": "#/backend/entities/Notification" },
           "description": "Stores user notifications for various events."
+        }
+      },
+       {
+        "path": "/tips/{tipId}",
+        "definition": {
+          "entityName": "Tip",
+          "schema": { "$ref": "#/backend/entities/Tip" },
+          "description": "Stores tips from users to artists."
+        }
+      },
+      {
+        "path": "/user_votes/{voteId}",
+        "definition": {
+          "entityName": "UserVote",
+          "schema": { "$ref": "#/backend/entities/UserVote" },
+          "description": "Stores individual user votes on videos to prevent duplicate voting."
+        }
+      },
+      {
+        "path": "/favorites/{favoriteId}",
+        "definition": {
+          "entityName": "Favorite",
+          "schema": { "$ref": "#/backend/entities/Favorite" },
+          "description": "Stores items favorited by users."
         }
       }
     ],
