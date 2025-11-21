@@ -9,107 +9,95 @@ service cloud.firestore {
     }
 
     // ---------------------------------------------------------------------
-    // STRICT AND UNAMBIGUOUS RULE BLOCK FOR 'videos' COLLECTION
-    // Allows public read, secure writes based on Devbase schema.
+    // VIDEOS: Public read for feeds, secure writes.
+    // THIS IS THE FINAL FIX FOR THE PUBLIC VIDEO FEED.
     // ---------------------------------------------------------------------
+    match /videos {
+      // Rule for querying the entire collection. Allows ANYONE to list videos.
+      allow list: if true;
+    }
+
     match /videos/{videoId} {
-      // Allow anyone (authenticated or unauthenticated) to read (list or get) videos.
-      // This directly addresses "FirebaseError: Missing or insufficient permissions" for 'list' with 'auth: null'.
-      allow read: if true;
+      // Rule for reading a single document. Allows ANYONE to get a video.
+      allow get: if true;
 
-      // Allow creation only if the authenticated user's UID matches the new video's artistId.
+      // Secure write/delete rules
       allow create: if request.auth != null && request.auth.uid == request.resource.data.artistId;
-
-      // Allow update for anyone. This matches your Devbase schema's "update": "true".
-      // Be aware: This is highly permissive. If you intend to restrict updates (e.g., only for voting,
-      // or only by the artist), this rule needs to be tightened.
-      // For example, to allow only the artist or admin to update:
-      // allow update: if request.auth != null && (request.auth.uid == resource.data.artistId || isAdmin());
-      // For now, following Devbase's "true":
-      allow update: if true;
-
-      // Allow deletion only if the authenticated user's UID matches the video's artistId, or if the user is an admin.
+      allow update: if true; // Matches Devbase schema "update: true". Highly permissive.
       allow delete: if request.auth != null && (request.auth.uid == resource.data.artistId || isAdmin());
     }
-    
-    match /videos {
-        allow list: if true;
-    }
 
     // ---------------------------------------------------------------------
-    // OTHER COLLECTIONS (from previous conversations and Devbase schema)
+    // OTHER COLLECTIONS
     // ---------------------------------------------------------------------
 
     // Users Collection
     match /users/{userId} {
-      allow read: if true; // Devbase: "get": "true", "list": "true"
-      allow create: if request.auth != null && request.auth.uid == request.resource.data.walletAddress; // Devbase: "$USER_ID === $newData.walletAddress"
-      allow update: if request.auth != null && (request.auth.uid == resource.data.walletAddress || isAdmin()); // Devbase: "$USER_ID === $data.walletAddress"
-      allow delete: if request.auth != null && (request.auth.uid == resource.data.walletAddress || isAdmin()); // Devbase: "$USER_ID === $data.walletAddress"
+      allow read: if true;
+      allow create: if request.auth != null && request.auth.uid == request.resource.data.walletAddress;
+      allow update: if request.auth != null && (request.auth.uid == resource.data.walletAddress || isAdmin());
+      allow delete: if request.auth != null && (request.auth.uid == resource.data.walletAddress || isAdmin());
     }
 
     // Tips Collection
     match /tips/{tipId} {
-      allow read: if true; // Assuming public read for transparency/stats
-      allow create: if request.auth != null && request.auth.uid == request.resource.data.fromWallet; // Devbase: "$USER_ID === $newData.fromWallet"
-      allow update, delete: if isAdmin(); // Admin can manage tips
+      allow read: if true;
+      allow create: if request.auth != null && request.auth.uid == request.resource.data.fromWallet;
+      allow update, delete: if isAdmin();
     }
 
     // Bookings Collection
     match /bookings/{bookingId} {
-      allow list: if true; // Devbase: "list": "true"
+      allow list: if true;
       allow get: if request.auth != null && (request.auth.uid == resource.data.businessId || request.auth.uid == resource.data.artistId || isAdmin());
-      allow create: if request.auth != null && request.auth.uid == request.resource.data.businessId; // Devbase: "$USER_ID === $newData.businessId"
-      allow update: if true; // Devbase: "update": "true" (e.g., for status updates by Cloud Functions or admin)
-      allow delete: if isAdmin(); // Admin can manage bookings
+      allow create: if request.auth != null && request.auth.uid == request.resource.data.businessId;
+      allow update: if true;
+      allow delete: if isAdmin();
     }
 
     // Adoptions Collection
     match /adoptions/{adoptionId} {
-      allow list: if true; // Devbase: "list": "true"
+      allow list: if true;
       allow get: if request.auth != null && (request.auth.uid == resource.data.businessId || request.auth.uid == resource.data.artistId || isAdmin());
-      allow create: if request.auth != null && request.auth.uid == request.resource.data.businessId; // Devbase: "$USER_ID === $newData.businessId"
-      allow update, delete: if isAdmin(); // Admin can manage adoptions
+      allow create: if request.auth != null && request.auth.uid == request.resource.data.businessId;
+      allow update, delete: if isAdmin();
     }
     
     // Favorites Collection
     match /favorites/{favoriteId} {
-       allow read, create, delete: if request.auth != null && request.auth.uid == request.resource.data.userId;
-       // A user can only manage their own favorites.
-       // The rule for create and delete needs to check the incoming data.
        allow create: if request.auth != null && request.auth.uid == request.resource.data.userId;
-       allow delete: if request.auth != null && resource.data.userId == request.auth.uid;
-       allow update: if isAdmin(); // Only admin can update
+       allow read, delete: if request.auth != null && request.auth.uid == resource.data.userId;
+       allow update: if isAdmin();
     }
 
     // User Votes Collection
     match /user_votes/{voteId} {
-      allow read: if true; // Assuming public read for analytics
+      allow read: if true;
       allow create: if request.auth != null && request.auth.uid == request.resource.data.userId;
-      allow update, delete: if isAdmin(); // Admin can manage votes
+      allow update, delete: if isAdmin();
     }
     
     // Video Views Collection
     match /video_views/{viewId} {
-        allow read: if true; // Public read for analytics
-        allow create: if request.auth != null; // Any authenticated user can create a view
+        allow read: if true;
+        allow create: if request.auth != null;
         allow update, delete: if isAdmin();
     }
 
     // Gossip Posts Collection
     match /gossip_posts/{postId} {
-      allow read: if true; // Devbase: "list": "true"
+      allow read: if true;
       allow create: if request.auth != null && request.auth.uid == request.resource.data.authorId;
-      allow update: if true; // For comment count updates
+      allow update: if true;
       allow delete: if request.auth != null && (request.auth.uid == resource.data.authorId || isAdmin());
     }
 
     // Gossip Comments Collection
     match /gossip_comments/{commentId} {
-      allow read: if true; // Devbase: "list": "true"
+      allow read: if true;
       allow create: if request.auth != null && request.auth.uid == request.resource.data.authorId;
       allow delete: if request.auth != null && (request.auth.uid == resource.data.authorId || isAdmin());
-      allow update: if isAdmin(); // Only admin can update
+      allow update: if isAdmin();
     }
 
     // Gossip Messages Collection
@@ -117,7 +105,7 @@ service cloud.firestore {
       allow read: if request.auth != null && (request.auth.uid == resource.data.fromId || request.auth.uid == resource.data.toId || isAdmin());
       allow create: if request.auth != null && request.auth.uid == request.resource.data.fromId;
       allow delete: if request.auth != null && (request.auth.uid == resource.data.fromId || isAdmin());
-      allow update: if isAdmin(); // Only admin can update
+      allow update: if isAdmin();
     }
     
     // Gossip Ratings Collection
@@ -130,25 +118,25 @@ service cloud.firestore {
     // Notifications Collection
     match /notifications/{notificationId} {
       allow read, update: if request.auth != null && (request.auth.uid == resource.data.recipientWallet || isAdmin());
-      allow create: if isAdmin(); // Only Cloud Functions or admin should create notifications
-      allow delete: if isAdmin(); // Admin can manage notifications
+      allow create: if isAdmin();
+      allow delete: if isAdmin();
     }
 
     // Admin Ads Collection
     match /admin_ads/{adId} {
-      allow read: if true; // Devbase: "list": "true"
-      allow create, update, delete: if isAdmin(); // Only by Admin
+      allow read: if true;
+      allow create, update, delete: if isAdmin();
     }
 
     // Gossip Service Ads Collection
     match /gossip_service_ads/{adId} {
-      allow read: if true; // Devbase: "list": "true"
-      allow create, update, delete: if isAdmin(); // Only by Admin
+      allow read: if true;
+      allow create, update, delete: if isAdmin();
     }
 
     // Marketplace Products Collection
     match /marketplace_products/{productId} {
-      allow read: if true; // Devbase: "list": "true"
+      allow read: if true;
       allow create: if request.auth != null && request.auth.uid == request.resource.data.sellerId;
       allow update: if request.auth != null && (request.auth.uid == resource.data.sellerId || isAdmin());
       allow delete: if request.auth != null && (request.auth.uid == resource.data.sellerId || isAdmin());
@@ -158,8 +146,8 @@ service cloud.firestore {
     match /marketplace_orders/{orderId} {
       allow read: if request.auth != null && (request.auth.uid == resource.data.buyerId || request.auth.uid == resource.data.sellerId || isAdmin());
       allow create: if request.auth != null && request.auth.uid == request.resource.data.buyerId;
-      allow update: if true; // For Cloud Function updates
-      allow delete: if isAdmin(); // Admin can manage orders
+      allow update: if true;
+      allow delete: if isAdmin();
     }
     
     // Marketplace Reviews Collection
@@ -173,19 +161,19 @@ service cloud.firestore {
     match /marketplace_disputes/{disputeId} {
         allow read: if request.auth != null && (request.auth.uid == resource.data.reporterWallet || resource.data.counterpartyWallet == request.auth.uid || isAdmin());
         allow create: if request.auth != null && request.auth.uid == request.resource.data.reporterWallet;
-        allow update: if true; // for status updates by Cloud Functions or admin
+        allow update: if true;
         allow delete: if isAdmin();
     }
     
     // Marketplace Escrow Releases Collection
     match /marketplace_escrow_releases/{releaseId} {
-      allow create: if request.auth != null; // Triggered by buyer or admin
+      allow create: if request.auth != null;
       allow read, update, delete: if isAdmin();
     }
     
     // Marketplace Escrow Refunds Collection
     match /marketplace_escrow_refunds/{refundId} {
-      allow create: if request.auth != null; // Triggered by admin
+      allow create: if request.auth != null;
       allow read, update, delete: if isAdmin();
     }
 
@@ -197,7 +185,7 @@ service cloud.firestore {
     // Referrals Collection
     match /referrals/{referralId} {
       allow read: if request.auth != null && (request.auth.uid == resource.data.referrerWallet || isAdmin());
-      allow create: if request.auth != null; // Can be created by user or Cloud Function
+      allow create: if request.auth != null;
       allow update, delete: if isAdmin();
     }
   }
