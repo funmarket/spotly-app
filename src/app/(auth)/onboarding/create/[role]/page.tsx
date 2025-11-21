@@ -153,8 +153,10 @@ export default function CreateProfilePage() {
       form.setValue('isBusiness', false);
     } else if(accountType === 'artist') {
       form.setValue('isArtist', true);
+      form.setValue('isBusiness', false);
     } else if(accountType === 'business') {
       form.setValue('isBusiness', true);
+      form.setValue('isArtist', false);
     }
   }, [accountType, form]);
 
@@ -167,18 +169,21 @@ export default function CreateProfilePage() {
     
     setIsSubmitting(true);
     try {
-        let role: string = accountType;
-        if (accountType !== 'fan') {
-            if (values.isArtist && values.isBusiness) role = 'artist'; // Artist role takes precedence if both selected
-            else if (values.isArtist) role = 'artist';
-            else if (values.isBusiness) role = 'business';
+        let role: 'fan' | 'artist' | 'business' = 'fan';
+         if (accountType !== 'fan') {
+            if (values.isArtist && values.isBusiness) {
+                role = 'artist'; // Artist role takes precedence
+            } else if (values.isArtist) {
+                role = 'artist';
+            } else if (values.isBusiness) {
+                role = 'business';
+            }
         }
 
         const userDocRef = doc(firestore, 'users', publicKey.toBase58());
         
         await setDoc(userDocRef, {
             walletAddress: publicKey.toBase58(),
-            userId: publicKey.toBase58(), // Set userId to match walletAddress
             username: values.username,
             bio: values.bio || '',
             role: role,
@@ -197,7 +202,7 @@ export default function CreateProfilePage() {
             updatedAt: serverTimestamp(),
         });
         
-        if (role === 'artist' && (accountType === 'artist' || values.isArtist)) {
+        if (role === 'artist') {
             setStep(2);
         } else {
             router.push('/');
