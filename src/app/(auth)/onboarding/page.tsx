@@ -1,208 +1,124 @@
 'use client';
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { doc, getDoc, setDoc, serverTimestamp, signInWithCustomToken } from 'firebase/firestore';
-import { useFirebase } from '@/firebase';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
-import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
-import { zodResolver } from '@hookform/resolvers/zod';
-import { useForm } from 'react-hook-form';
-import { z } from 'zod';
-import { Loader2 } from 'lucide-react';
 import { useWallet } from '@solana/wallet-adapter-react';
 import { WalletMultiButton } from '@solana/wallet-adapter-react-ui';
 
-const profileSchema = z.object({
-  username: z.string().min(3, 'Username must be at least 3 characters').max(20, 'Username must be 20 characters or less'),
-  bio: z.string().max(160, 'Bio must be 160 characters or less').optional(),
-  role: z.enum(['fan', 'artist', 'business'], {
-    required_error: 'You need to select a role.',
-  }),
-});
+function RoleChoiceButton({
+  label,
+  subLabel,
+  gradient,
+  onClick,
+}: {
+  label: string;
+  subLabel: string;
+  gradient: string;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      className={`group relative w-full rounded-full py-4 px-6 
+        transform transition-all duration-200 ease-out
+        hover:scale-[1.02] active:scale-[0.98]
+        shadow-[inset_0_1px_0_rgba(255,255,255,0.2),0_4px_15px_rgba(0,0,0,0.3)] 
+        border border-white/20 ${gradient}`}
+    >
+      <div className="relative z-10 text-left">
+        <h3 className="text-lg font-extrabold text-white mb-1 tracking-tight">
+          {label}
+        </h3>
+        <p className="text-xs text-white/90 font-medium">{subLabel}</p>
+      </div>
+    </button>
+  );
+}
 
-export default function OnboardingPage() {
-  const { firestore, auth, isUserLoading, user } = useFirebase();
-  const { publicKey, connected, signMessage } = useWallet();
+export default function OnboardingRoleSelectionPage() {
+  const { publicKey } = useWallet();
   const router = useRouter();
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [authStatus, setAuthStatus] = useState<'idle' | 'authenticating' | 'authenticated'>('idle');
+  const [showWalletConnect, setShowWalletConnect] = useState<string | null>(
+    null
+  );
 
-  const form = useForm<z.infer<typeof profileSchema>>({
-    resolver: zodResolver(profileSchema),
-    defaultValues: {
-      username: '',
-      bio: '',
-    },
-  });
-
-  useEffect(() => {
-    // This effect handles the sign-in process with Solana and Firebase
-    const authenticateWithSolana = async () => {
-      if (connected && publicKey && !user && authStatus === 'idle') {
-        setAuthStatus('authenticating');
-        try {
-          // In a real app, you would get this from a secure backend
-          // For this example, we'll assume anonymous sign-in or a custom token flow
-          // Here, we just need to ensure a Firebase user exists.
-          // A simple anonymous user is sufficient for now.
-          if (!auth.currentUser) {
-             // A real implementation would securely generate a custom token on the backend
-             // after verifying wallet ownership.
-             // For now, we'll just check if a profile exists for this wallet.
-             const userDocRef = doc(firestore, 'users', publicKey.toBase58());
-             const docSnap = await getDoc(userDocRef);
-             if (docSnap.exists()) {
-                 router.replace('/');
-             }
-          }
-          setAuthStatus('authenticated');
-        } catch (error) {
-          console.error('Firebase authentication error:', error);
-          setAuthStatus('idle');
-        }
-      }
-    };
-    authenticateWithSolana();
-  }, [connected, publicKey, user, authStatus, auth, firestore, router]);
-
-
-  async function onSubmit(values: z.infer<typeof profileSchema>) {
-    if (!publicKey || !firestore) return;
-
-    setIsSubmitting(true);
-    try {
-      // Use the Solana wallet's public key as the document ID in Firestore
-      const userDocRef = doc(firestore, 'users', publicKey.toBase58());
-      
-      await setDoc(userDocRef, {
-        walletAddress: publicKey.toBase58(),
-        username: values.username,
-        bio: values.bio,
-        role: values.role,
-        profilePhotoUrl: `https://picsum.photos/seed/${publicKey.toBase58()}/400`,
-        bannerPhotoUrl: `https://picsum.photos/seed/banner-${publicKey.toBase58()}/1200/400`,
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp(),
-      }, { merge: true });
-
-      router.push('/');
-    } catch (error) {
-      console.error('Error creating profile:', error);
-    } finally {
-      setIsSubmitting(false);
+  const handleRoleClick = (role: string) => {
+    if (!publicKey) {
+      setShowWalletConnect(role);
+      return;
     }
+    router.push(`/onboarding/create/${role}`);
+  };
+  
+  const getWalletConnectText = () => {
+      switch (showWalletConnect) {
+          case 'fan': return 'Connect your wallet to create a free Fan account';
+          case 'artist': return 'Artists need a wallet to receive tips and payments';
+          case 'business': return 'Connect your wallet to create a business account';
+          default: return 'Please connect your wallet to continue';
+      }
   }
 
-  if (!connected || !publicKey) {
+
+  if (showWalletConnect) {
     return (
-      <div className="flex min-h-screen items-center justify-center p-4">
-        <Card className="w-full max-w-md text-center">
-          <CardHeader>
-            <CardTitle className="font-headline text-3xl">Welcome to TalentVerse!</CardTitle>
-            <CardDescription>Connect your Solana wallet to create a profile.</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <WalletMultiButton />
-          </CardContent>
-        </Card>
+      <div className="flex min-h-screen items-center justify-center bg-background p-4">
+        <div className="w-full max-w-md rounded-2xl bg-card p-8 text-center">
+            <h1 className="text-2xl font-headline font-bold mb-3">Connect Your Wallet</h1>
+            <p className="text-muted-foreground mb-6">
+             {getWalletConnectText()}
+            </p>
+            <div className="flex flex-col items-center gap-6">
+              <WalletMultiButton />
+              <button
+                onClick={() => setShowWalletConnect(null)}
+                className="mt-2 text-sm text-muted-foreground hover:text-foreground"
+              >
+                Go Back
+              </button>
+            </div>
+        </div>
       </div>
     );
   }
 
-  if (isUserLoading || authStatus === 'authenticating') {
-      return (
-        <div className="flex h-screen items-center justify-center">
-          <Loader2 className="h-12 w-12 animate-spin" />
-        </div>
-      );
-  }
-
   return (
-    <div className="flex min-h-screen items-center justify-center p-4">
-      <Card className="w-full max-w-md">
-        <CardHeader>
-          <CardTitle className="font-headline text-3xl">Create Your Profile</CardTitle>
-          <CardDescription>You're almost there! Just a few more details.</CardDescription>
-        </CardHeader>
-        <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)}>
-            <CardContent className="space-y-6">
-              <FormField
-                control={form.control}
-                name="username"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Username</FormLabel>
-                    <FormControl>
-                      <Input placeholder="Your cool username" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="bio"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Bio</FormLabel>
-                    <FormControl>
-                      <Textarea placeholder="Tell us about yourself" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-              <FormField
-                control={form.control}
-                name="role"
-                render={({ field }) => (
-                  <FormItem className="space-y-3">
-                    <FormLabel>Choose Your Role</FormLabel>
-                    <FormControl>
-                      <RadioGroup
-                        onValueChange={field.onChange}
-                        defaultValue={field.value}
-                        className="flex flex-col space-y-1"
-                      >
-                        <FormItem className="flex items-center space-x-3 space-y-0">
-                          <FormControl>
-                            <RadioGroupItem value="fan" />
-                          </FormControl>
-                          <FormLabel className="font-normal">Fan - Discover and support talent.</FormLabel>
-                        </FormItem>
-                        <FormItem className="flex items-center space-x-3 space-y-0">
-                          <FormControl>
-                            <RadioGroupItem value="artist" />
-                          </FormControl>
-                          <FormLabel className="font-normal">Artist - Showcase your work.</FormLabel>
-                        </FormItem>
-                        <FormItem className="flex items-center space-x-3 space-y-0">
-                          <FormControl>
-                            <RadioGroupItem value="business" />
-                          </FormControl>
-                          <FormLabel className="font-normal">Business - Find and hire talent.</FormLabel>
-                        </FormItem>
-                      </RadioGroup>
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            </CardContent>
-            <CardFooter>
-              <Button type="submit" className="w-full" disabled={isSubmitting}>
-                {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                Create Profile
-              </Button>
-            </CardFooter>
-          </form>
-        </Form>
-      </Card>
+    <div className="flex min-h-screen items-center justify-center bg-background p-4">
+      <div className="w-full max-w-md">
+        <div className="text-center mb-8">
+          <h1 className="text-4xl md:text-5xl font-bold mb-3 bg-gradient-to-r from-primary via-purple-500 to-accent bg-clip-text text-transparent">
+            Join TalentVerse
+          </h1>
+          <p className="text-muted-foreground text-lg">
+            Create your profile to get started.
+          </p>
+        </div>
+
+        <div className="space-y-4">
+          <RoleChoiceButton
+            label="Fan (Free Account)"
+            subLabel="Unlimited voting, messaging, and favorites"
+            gradient="bg-gradient-to-br from-green-500 via-cyan-500 to-blue-400"
+            onClick={() => handleRoleClick('fan')}
+          />
+          <RoleChoiceButton
+            label="Artist / Talent"
+            subLabel="Showcase your talent and get discovered"
+            gradient="bg-gradient-to-br from-pink-500 via-purple-500 to-primary"
+            onClick={() => handleRoleClick('artist')}
+          />
+          <RoleChoiceButton
+            label="Business / Producer"
+            subLabel="Discover, book, and hire talent"
+            gradient="bg-gradient-to-br from-yellow-500 via-orange-500 to-yellow-600"
+            onClick={() => handleRoleClick('business')}
+          />
+          <div className="text-center pt-4">
+              <button onClick={() => router.push('/')} className="text-muted-foreground hover:text-foreground transition-colors">
+                  Or, just browse as a guest
+              </button>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
