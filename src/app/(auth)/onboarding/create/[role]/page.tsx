@@ -1,4 +1,3 @@
-
 'use client';
 import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
@@ -74,7 +73,7 @@ const ClientOnlyWalletButton = () => {
 };
 
 export default function CreateProfilePage() {
-  const { firestore, user } = useFirebase();
+  const { firestore } = useFirebase();
   const { publicKey, connected } = useWallet();
   const router = useRouter();
   const params = useParams();
@@ -93,7 +92,7 @@ export default function CreateProfilePage() {
     isBusiness: z.boolean().default(false),
     talentCategory: z.string().optional(),
     talentSubcategories: z.array(z.string()).optional(),
-    subRole: z.string().optional(),
+    subRole: z.string().optional(), // Legacy Talent Type
     tags: z.string().optional(),
     location: z.string().optional(),
     socialLinks: z.object({
@@ -101,13 +100,16 @@ export default function CreateProfilePage() {
       twitter: z.string().optional(),
       instagram: z.string().optional(),
       tiktok: z.string().optional(),
+      facebook: z.string().optional(),
+      telegram: z.string().optional(),
+      website: z.string().optional(),
     }).optional(),
     extraLinks: z.array(z.object({
       label: z.string().min(1, "Label is required"),
       url: z.string().url("Must be a valid URL"),
     })).optional(),
   }).refine(data => {
-      if (accountType !== 'fan') {
+      if (accountType === 'artist' || accountType === 'business') {
         return data.isArtist || data.isBusiness;
       }
       return true;
@@ -115,7 +117,7 @@ export default function CreateProfilePage() {
       message: 'Please select at least one account type (Artist or Business).',
       path: ['isArtist'],
   }).refine(data => {
-      if (accountType !== 'fan' && data.isArtist) {
+      if (data.isArtist) {
           return !!data.talentCategory;
       }
       return true;
@@ -137,10 +139,24 @@ export default function CreateProfilePage() {
       isBusiness: accountType === 'business',
       talentCategory: '',
       talentSubcategories: [],
-      socialLinks: { youtube: '', twitter: '', instagram: '', tiktok: '' },
+      subRole: '',
+      tags: '',
+      location: '',
+      socialLinks: { youtube: '', twitter: '', instagram: '', tiktok: '', facebook: '', telegram: '', website: '' },
       extraLinks: [],
     },
   });
+  
+  useEffect(() => {
+    if(accountType === 'fan') {
+      form.setValue('isArtist', false);
+      form.setValue('isBusiness', false);
+    } else if(accountType === 'artist') {
+      form.setValue('isArtist', true);
+    } else if(accountType === 'business') {
+      form.setValue('isBusiness', true);
+    }
+  }, [accountType, form]);
 
   const { watch, setValue } = form;
   const isArtist = watch('isArtist');
@@ -153,7 +169,7 @@ export default function CreateProfilePage() {
     try {
         let role: string = accountType;
         if (accountType !== 'fan') {
-            if (values.isArtist && values.isBusiness) role = 'artist'; // Artist role takes precedence
+            if (values.isArtist && values.isBusiness) role = 'artist'; // Artist role takes precedence if both selected
             else if (values.isArtist) role = 'artist';
             else if (values.isBusiness) role = 'business';
         }
@@ -162,23 +178,26 @@ export default function CreateProfilePage() {
         
         await setDoc(userDocRef, {
             walletAddress: publicKey.toBase58(),
+            userId: publicKey.toBase58(), // Set userId to match walletAddress
             username: values.username,
             bio: values.bio || '',
             role: role,
             profilePhotoUrl: values.profilePhotoUrl || `https://picsum.photos/seed/${publicKey.toBase58()}/400`,
             bannerPhotoUrl: values.bannerPhotoUrl || `https://picsum.photos/seed/banner-${publicKey.toBase58()}/1200/400`,
-            talentCategory: values.talentCategory || null,
-            talentSubcategories: values.talentSubcategories || [],
-            subRole: values.subRole || null,
+            talentCategory: values.isArtist ? values.talentCategory : null,
+            talentSubcategories: values.isArtist ? values.talentSubcategories : [],
+            subRole: values.isArtist ? values.subRole : null,
             tags: values.tags || '',
             location: values.location || '',
             socialLinks: values.socialLinks || {},
             extraLinks: values.extraLinks || [],
+            rankingScore: 0,
+            escrowBalance: 0,
             createdAt: serverTimestamp(),
             updatedAt: serverTimestamp(),
         });
         
-        if (role === 'artist' && accountType !== 'fan') {
+        if (role === 'artist' && (accountType === 'artist' || values.isArtist)) {
             setStep(2);
         } else {
             router.push('/');
@@ -228,7 +247,7 @@ export default function CreateProfilePage() {
 
   const PageTitle = {
       fan: "Create Fan Profile",
-      artist: "Create Artist Profile",
+      artist: "Create Artist/Talent Profile",
       business: "Create Business Profile"
   }[accountType] || "Create Profile";
 
@@ -341,8 +360,7 @@ export default function CreateProfilePage() {
                   </FormItem>
               )}/>
               
-            {/* ARTIST-SPECIFIC FIELDS */}
-            { isArtist && (
+            {isArtist && (
                 <>
                 <FormField control={form.control} name="talentCategory"
                     render={({ field }) => (
@@ -361,7 +379,7 @@ export default function CreateProfilePage() {
                     </FormItem>
                 )}/>
 
-                {talentCategory && (
+                {talentCategory && TALENT_CATEGORIES[talentCategory as keyof typeof TALENT_CATEGORIES]?.subcategories.length > 0 && (
                     <FormField control={form.control} name="talentSubcategories"
                         render={({ field }) => (
                         <FormItem>
@@ -430,6 +448,15 @@ export default function CreateProfilePage() {
                    <FormField control={form.control} name="socialLinks.tiktok" render={({ field }) => (
                         <FormItem><FormControl><Input placeholder="TikTok URL" {...field} /></FormControl><FormMessage /></FormItem>
                    )}/>
+                   <FormField control={form.control} name="socialLinks.facebook" render={({ field }) => (
+                        <FormItem><FormControl><Input placeholder="Facebook URL" {...field} /></FormControl><FormMessage /></FormItem>
+                   )}/>
+                   <FormField control={form.control} name="socialLinks.telegram" render={({ field }) => (
+                        <FormItem><FormControl><Input placeholder="Telegram URL" {...field} /></FormControl><FormMessage /></FormItem>
+                   )}/>
+                   <FormField control={form.control} name="socialLinks.website" render={({ field }) => (
+                        <FormItem><FormControl><Input placeholder="Website/Portfolio URL" {...field} /></FormControl><FormMessage /></FormItem>
+                   )}/>
                 </div>
 
                 <div className="space-y-4 rounded-lg border bg-background p-4">
@@ -468,7 +495,7 @@ export default function CreateProfilePage() {
               <Button type="button" variant="ghost" onClick={() => router.back()}>Back</Button>
               <Button type="submit" disabled={isSubmitting}>
                 {isSubmitting && <Loader2 className="mr-2 animate-spin" />}
-                {isArtist && accountType !== 'fan' ? 'Continue' : 'Create Profile'}
+                {isArtist && accountType === 'artist' ? 'Continue' : 'Create Profile'}
               </Button>
             </CardFooter>
           </form>

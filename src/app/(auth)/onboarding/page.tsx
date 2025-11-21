@@ -1,8 +1,11 @@
 'use client';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useWallet } from '@solana/wallet-adapter-react';
 import { WalletMultiButton } from '@solana/wallet-adapter-react-ui';
+import { useFirebase } from '@/firebase';
+import { doc, getDoc } from 'firebase/firestore';
+import { Loader2 } from 'lucide-react';
 
 function RoleChoiceButton({
   label,
@@ -35,47 +38,76 @@ function RoleChoiceButton({
 }
 
 export default function OnboardingRoleSelectionPage() {
-  const { publicKey } = useWallet();
+  const { publicKey, connected } = useWallet();
+  const { firestore } = useFirebase();
   const router = useRouter();
-  const [showWalletConnect, setShowWalletConnect] = useState<string | null>(
-    null
-  );
+  const [showWalletConnect, setShowWalletConnect] = useState<string | null>(null);
+  const [isCheckingProfile, setIsCheckingProfile] = useState(false);
+
+  useEffect(() => {
+    const checkProfileAndRedirect = async () => {
+      if (connected && publicKey && firestore && showWalletConnect) {
+        setIsCheckingProfile(true);
+        const userDocRef = doc(firestore, 'users', publicKey.toBase58());
+        const userDoc = await getDoc(userDocRef);
+        if (userDoc.exists()) {
+          // Profile exists, redirect to their profile page
+          router.push(`/profile/${publicKey.toBase58()}`);
+        } else {
+          // No profile, proceed to creation page
+          router.push(`/onboarding/create/${showWalletConnect}`);
+        }
+        setIsCheckingProfile(false);
+      }
+    };
+    checkProfileAndRedirect();
+  }, [connected, publicKey, firestore, router, showWalletConnect]);
+
 
   const handleRoleClick = (role: string) => {
-    if (role !== 'fan' && !publicKey) {
+    if (!connected) {
       setShowWalletConnect(role);
       return;
     }
+    // If wallet is connected, just navigate
     router.push(`/onboarding/create/${role}`);
   };
-  
-  const getWalletConnectText = () => {
-      switch (showWalletConnect) {
-          case 'fan': return 'Connect your wallet to create a free Fan account';
-          case 'artist': return 'Artists need a wallet to receive tips and payments';
-          case 'business': return 'Connect your wallet to create a business account';
-          default: return 'Please connect your wallet to continue';
-      }
-  }
 
+  const getWalletConnectText = () => {
+    switch (showWalletConnect) {
+      case 'fan': return 'Connect your wallet to create a free Fan account';
+      case 'artist': return 'Artists need a wallet to receive tips and payments';
+      case 'business': return 'Connect your wallet to create a business account';
+      default: return 'Please connect your wallet to continue';
+    }
+  }
 
   if (showWalletConnect) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-background p-4">
         <div className="w-full max-w-md rounded-2xl bg-card p-8 text-center">
-            <h1 className="text-2xl font-headline font-bold mb-3">Connect Your Wallet</h1>
-            <p className="text-muted-foreground mb-6">
-             {getWalletConnectText()}
-            </p>
-            <div className="flex flex-col items-center gap-6">
-              <WalletMultiButton />
-              <button
-                onClick={() => setShowWalletConnect(null)}
-                className="mt-2 text-sm text-muted-foreground hover:text-foreground"
-              >
-                Go Back
-              </button>
-            </div>
+          {isCheckingProfile ? (
+             <>
+                <h1 className="text-2xl font-headline font-bold mb-3">Checking for existing profile...</h1>
+                <Loader2 className="h-10 w-10 animate-spin mx-auto text-primary" />
+            </>
+          ) : (
+            <>
+              <h1 className="text-2xl font-headline font-bold mb-3">Connect Your Wallet</h1>
+              <p className="text-muted-foreground mb-6">
+                {getWalletConnectText()}
+              </p>
+              <div className="flex flex-col items-center gap-6">
+                <WalletMultiButton />
+                <button
+                  onClick={() => setShowWalletConnect(null)}
+                  className="mt-2 text-sm text-muted-foreground hover:text-foreground"
+                >
+                  Go Back
+                </button>
+              </div>
+            </>
+          )}
         </div>
       </div>
     );
@@ -113,9 +145,9 @@ export default function OnboardingRoleSelectionPage() {
             onClick={() => handleRoleClick('business')}
           />
           <div className="text-center pt-4">
-              <button onClick={() => router.push('/')} className="text-muted-foreground hover:text-foreground transition-colors">
-                  Or, just browse as a guest
-              </button>
+            <button onClick={() => router.push('/')} className="text-muted-foreground hover:text-foreground transition-colors">
+              Or, just browse as a guest
+            </button>
           </div>
         </div>
       </div>
