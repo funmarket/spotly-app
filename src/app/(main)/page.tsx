@@ -17,6 +17,8 @@ export default function HomePage() {
   const [enrichedVideos, setEnrichedVideos] = useState<EnrichedVideo[]>([]);
   const [isEnriching, setIsEnriching] = useState(true);
 
+  // The query no longer needs to wait for `isUserLoading` because the parent
+  // provider now handles the auth-gating.
   const videosQuery = useMemoFirebase(() => {
     if (!firestore) return null;
     return query(
@@ -69,9 +71,8 @@ export default function HomePage() {
     enrichVideos();
   }, [videos, firestore, areVideosLoading]);
 
-  // This combined loading state is the key fix. It ensures we wait for both
-  // the initial Firebase auth check AND the video data to be fetched and enriched.
-  const isLoading = isUserLoading || areVideosLoading || isEnriching;
+  // The combined loading state is now simpler. We just wait for video fetching & enriching.
+  const isLoading = areVideosLoading || isEnriching;
 
   if (isLoading) {
     return (
