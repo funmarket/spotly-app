@@ -17,7 +17,8 @@ import {
 import { Avatar, AvatarFallback, AvatarImage } from '../ui/avatar';
 import { Badge } from '../ui/badge';
 
-function formatCount(num: number): string {
+function formatCount(num: number | undefined): string {
+  if (num === undefined) return '0';
   if (num >= 1000000) {
     return (num / 1000000).toFixed(1) + 'M';
   }
@@ -63,21 +64,21 @@ export function VideoCard({ video }: { video: EnrichedVideo }) {
 
       <div className="absolute bottom-5 left-5 right-[100px] text-white">
         <Link
-          href={`/profile/${video.user.userId}`}
+          href={`/profile/${video.user.walletAddress}`}
           className="flex items-center gap-3 mb-2 group"
         >
           <Avatar className="h-12 w-12 border-2 border-primary">
             <AvatarImage src={video.user.profilePhotoUrl} alt={video.user.username} />
-            <AvatarFallback>{video.user.username.slice(1, 3)}</AvatarFallback>
+            <AvatarFallback>{video.user.username?.slice(1, 3)}</AvatarFallback>
           </Avatar>
           <div>
             <h3 className="font-bold text-lg group-hover:underline">{video.user.username}</h3>
-            <p className="text-sm font-light text-white/80">{video.user.bio.substring(0,40)}...</p>
+            <p className="text-sm font-light text-white/80">{video.user.bio?.substring(0,40)}...</p>
           </div>
         </Link>
         <p className="font-body text-base">{video.description}</p>
         <div className="mt-2">
-            <Badge variant="secondary" className="font-bold">#music</Badge>
+            {video.videoCategory && <Badge variant="secondary" className="font-bold capitalize">#{video.videoCategory}</Badge>}
         </div>
       </div>
 
@@ -92,3 +93,5 @@ export function VideoCard({ video }: { video: EnrichedVideo }) {
     </div>
   );
 }
+
+    

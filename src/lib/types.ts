@@ -1,3 +1,5 @@
+import type { Timestamp } from 'firebase/firestore';
+
 export interface User {
   userId: string;
   walletAddress: string;
@@ -19,9 +21,25 @@ export interface Video {
   flopCount: number;
   shareCount: number;
   commentCount: number;
-  createdAt: string;
+  status?: 'active' | 'pending' | 'archived';
+  duration?: number;
+  isBanned?: boolean;
+  adminFlag?: boolean;
+  banReason?: string;
+  bookCount?: number;
+  adoptCount?: number;
+  adminReason?: string;
+  rankingScore?: number;
+  rawVideoInput?: string;
+  videoCategory?: string;
+  hiddenFromFeed?: boolean;
+  createdAt: Timestamp | string; // Allow string for mock data
+  updatedAt?: Timestamp | string;
 }
 
-export type EnrichedVideo = Video & {
+
+export type EnrichedVideo = Omit<Video, 'videoId'> & {
+  id: string; // Document ID from Firestore
   user: User;
 };
+    

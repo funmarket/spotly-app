@@ -117,23 +117,43 @@
         "role",
         "bio",
         "profilePhotoUrl",
-        "bannerPhotoUrl",
-        "socialLinks",
-        "extraLinks",
-        "skills",
-        "tags",
-        "location",
-        "rankingScore",
-        "escrowBalance",
-        "isBanned",
-        "isSuspended",
-        "suspensionReason",
-        "warnings",
-        "adminNotes",
-        "isDeleted",
-        "talentCategory",
-        "talentSubcategories",
-        "subRole",
+        "bannerPhotoUrl"
+      ]
+    },
+    "Video": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "Video",
+      "type": "object",
+      "description": "Represents a video uploaded by an artist.",
+      "properties": {
+        "status": { "type": "string", "enum": ["active", "pending", "archived"], "description": "The status of the video." },
+        "artistId": { "type": "string", "description": "The wallet address of the artist (Firebase Auth UID)." },
+        "duration": { "type": "number", "description": "The duration of the video in seconds." },
+        "isBanned": { "type": "boolean", "description": "Indicates if the video is banned." },
+        "topCount": { "type": "number", "description": "The number of 'Top' votes." },
+        "videoUrl": { "type": "string", "description": "Embeddable URL of the video.", "format": "uri" },
+        "adminFlag": { "type": "boolean", "description": "Flag for admin review." },
+        "banReason": { "type": "string", "description": "Reason for the ban." },
+        "bookCount": { "type": "number", "description": "Number of times the artist was booked from this video." },
+        "flopCount": { "type": "number", "description": "The number of 'Flop' votes." },
+        "commentCount": { "type": "number", "description": "The number of comments on the video." },
+        "shareCount": { "type": "number", "description": "The number of times the video has been shared." },
+        "adoptCount": { "type": "number", "description": "Number of times this video was adopted." },
+        "adminReason": { "type": "string", "description": "Reason for admin flag." },
+        "rankingScore": { "type": "number", "description": "Score used for ranking the video." },
+        "rawVideoInput": { "type": "string", "description": "Original user-provided URL for the video." },
+        "videoCategory": { "type": "string", "description": "Category of the video (e.g., 'music', 'acting')." },
+        "hiddenFromFeed": { "type": "boolean", "description": "Whether the video is hidden from the main feed." },
+        "description": { "type": "string", "description": "The description of the video." },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Timestamp of when the video was created." },
+        "updatedAt": { "type": "string", "format": "date-time", "description": "Timestamp of when the video was last updated." }
+      },
+      "required": [
+        "artistId",
+        "videoUrl",
+        "rawVideoInput",
+        "videoCategory",
+        "description",
         "createdAt",
         "updatedAt"
       ]
@@ -162,8 +182,26 @@
             }
           ]
         }
+      },
+      {
+        "path": "/videos/{videoId}",
+        "definition": {
+          "entityName": "Video",
+          "schema": {
+            "$ref": "#/backend/entities/Video"
+          },
+          "description": "Stores video data. Each document is a unique video.",
+          "params": [
+            {
+              "name": "videoId",
+              "description": "The auto-generated ID for the video document."
+            }
+          ]
+        }
       }
     ],
-    "reasoning": "This Firestore structure is designed to manage user authentication and profiles using Firebase, focusing on replacing the existing Devbase user management system with Firebase Auth and Firestore. It prioritizes Authorization Independence by avoiding hierarchical `get()` calls in security rules. The `users` collection stores user profiles, with the document ID matching the Firebase Auth `uid` (Solana wallet address), ensuring direct access and simplifying security rules based on user ownership. All data in `users` collection has the same security requirements. The structure enables secure `list` operations (QAPs) by storing user data directly in the `users` collection, avoiding the need to filter based on parent document data.  Specifically, this structure avoids hierarchical dependencies, enabling atomic operations. Roles are stored directly in the database (DBAC), relying solely on `request.auth.uid` for authorization."
+    "reasoning": "This Firestore structure is designed to manage user authentication, profiles and videos using Firebase, focusing on replacing the existing Devbase user management system with Firebase Auth and Firestore. It prioritizes Authorization Independence by avoiding hierarchical `get()` calls in security rules. The `users` collection stores user profiles, with the document ID matching the Firebase Auth `uid` (Solana wallet address), ensuring direct access and simplifying security rules based on user ownership. The `videos` collection stores all video data, with `artistId` linking back to a user. All data in `users` and `videos` collections have the same security requirements. The structure enables secure `list` operations (QAPs) by storing user and video data directly in their respective collections, avoiding the need to filter based on parent document data.  Specifically, this structure avoids hierarchical dependencies, enabling atomic operations. Roles are stored directly in the database (DBAC), relying solely on `request.auth.uid` for authorization."
   }
 }
+
+    
