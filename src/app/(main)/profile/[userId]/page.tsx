@@ -87,8 +87,7 @@ function ProfileVideos({ userId }: { userId: string }) {
   )
 }
 
-export default function ProfilePage({ params }: { params: { userId: string } }) {
-  const { userId } = params;
+export default function ProfilePage({ params: { userId } }: { params: { userId: string } }) {
   const { user: authUser } = useUser();
   const firestore = useFirestore();
   const router = useRouter();
