@@ -86,7 +86,7 @@ export default function SubmitVideoPage() {
   }, [userWallet, firestore]);
 
   async function onSubmit(values: z.infer<typeof videoSchema>) {
-    if (!userWallet || !firestore || !userProfile) {
+    if (!userWallet || !userProfile) {
       toast({
         variant: 'destructive',
         title: 'Authentication Error',
@@ -163,7 +163,7 @@ export default function SubmitVideoPage() {
     );
   }
   
-  if (!userWallet || !userProfile || userProfile.role !== 'artist') {
+  if (!userWallet) {
     return (
       <div className="flex flex-1 items-center justify-center h-full p-4">
         <Card className="w-[380px] text-center">
@@ -171,19 +171,40 @@ export default function SubmitVideoPage() {
             <div className="mx-auto bg-primary/20 p-3 rounded-full mb-4 w-fit">
               <PlusSquare className="h-8 w-8 text-primary" />
             </div>
-            <CardTitle className="font-headline">Submit Video</CardTitle>
+            <CardTitle className="font-headline">Submit Your Video</CardTitle>
             <CardDescription>
-              This feature is available for artists only. Please ensure you have an artist profile to submit videos.
+              To share your talent, you need an account first.
             </CardDescription>
-             {!userWallet && (
-                <CardFooter>
-                    <Button onClick={() => router.push('/onboarding')} className="w-full mt-4">Create a Profile</Button>
-                </CardFooter>
-             )}
+             <CardFooter>
+                <Button onClick={() => router.push('/onboarding')} className="w-full mt-4">Create a Profile</Button>
+             </CardFooter>
           </CardHeader>
         </Card>
       </div>
     );
+  }
+
+  if (userProfile && userProfile.role !== 'artist') {
+      return (
+        <div className="flex flex-1 items-center justify-center h-full p-4">
+            <Card className="w-[380px] text-center">
+                <CardHeader>
+                    <div className="mx-auto bg-primary/20 p-3 rounded-full mb-4 w-fit">
+                    <PlusSquare className="h-8 w-8 text-primary" />
+                    </div>
+                    <CardTitle className="font-headline">Artist Feature Only</CardTitle>
+                    <CardDescription>
+                        This feature is available for artists. Upgrade your account to start uploading videos.
+                    </CardDescription>
+                    <CardFooter>
+                        <Button onClick={() => router.push('/onboarding/create/artist')} className="w-full mt-4">
+                            Upgrade to Artist Profile
+                        </Button>
+                    </CardFooter>
+                </CardHeader>
+            </Card>
+        </div>
+      )
   }
 
   return (
