@@ -29,11 +29,10 @@ export default function HomePage() {
   // The query will be null until Firebase has resolved its auth state.
   const videosQuery = useMemoFirebase(() => {
     if (!firestore || isUserLoading) return null;
+    // SIMPLIFIED QUERY: Removed multiple 'where' clauses to avoid needing a composite index.
+    // This is a temporary fix to unblock development.
     return query(
       collection(firestore, 'videos'),
-      where('status', '==', 'active'),
-      where('isBanned', '==', false),
-      where('hiddenFromFeed', '==', false),
       orderBy('createdAt', 'desc')
     );
   }, [firestore, isUserLoading]);
