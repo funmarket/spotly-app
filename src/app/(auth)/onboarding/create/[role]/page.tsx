@@ -149,10 +149,14 @@ export default function CreateProfilePage() {
         alert("Username is required");
         return;
     }
-    if (accountType !== 'fan' && !values.isArtist && !values.isBusiness) {
-        alert("Please select an account type (Artist or Business).");
-        return;
+    
+    if (accountType !== 'fan') {
+        if (!values.isArtist && !values.isBusiness) {
+            alert("Please select an account type (Artist or Business).");
+            return;
+        }
     }
+   
     if (values.isArtist && !values.talentCategory) {
         alert("Please select a talent category for artists.");
         return;
@@ -160,9 +164,10 @@ export default function CreateProfilePage() {
 
     setIsSubmitting(true);
     try {
-        let role: 'fan' | 'artist' | 'business' = 'fan'; // Default to fan
+        let role: 'fan' | 'artist' | 'business';
         if (values.isArtist) role = 'artist';
         else if (values.isBusiness) role = 'business';
+        else role = 'fan';
 
         // For fans without a wallet, generate a unique ID.
         // For artists/businesses, the wallet public key is the ID.
@@ -172,11 +177,11 @@ export default function CreateProfilePage() {
         const sanitizeUrl = (url?: string) => {
             if (!url) return '';
             const trimmedUrl = url.trim();
+            if (!trimmedUrl.startsWith('http://') && !trimmedUrl.startsWith('https://')) {
+                return ''; // Reject non-http(s) protocols
+            }
             try {
-                const urlObj = new URL(trimmedUrl);
-                if (urlObj.protocol !== 'http:' && urlObj.protocol !== 'https:') {
-                    return ''; // Reject non-http(s) protocols
-                }
+                new URL(trimmedUrl);
                 return trimmedUrl;
             } catch (error) {
                 return ''; // Invalid URL format

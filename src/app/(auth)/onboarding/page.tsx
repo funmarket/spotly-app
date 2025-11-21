@@ -72,7 +72,7 @@ export default function OnboardingRoleSelectionPage() {
     }
     
     // Artists and Businesses require a wallet
-    if (connected && publicKey) {
+    if (connected && publicKey && firestore) {
         // If already connected, check for profile and redirect
         setIsCheckingProfile(true);
         const userDocRef = doc(firestore, 'users', publicKey.toBase58());
