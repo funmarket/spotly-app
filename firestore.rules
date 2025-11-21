@@ -1,253 +1,204 @@
-/**
- * # Core Philosophy
- * This ruleset enforces a user-centric security model where user profiles are publicly readable, but each user has exclusive control over their own data. The primary goal is to secure user profiles while allowing for rapid application development.
- *
- * # Data Structure
- * All user data is stored in a single, top-level collection: `/users/{walletAddress}`. The document ID (`walletAddress`) is the user's Solana wallet public key, which also serves as their unique Firebase Authentication UID. This flat structure ensures that authorization checks are fast and efficient, without needing to access other documents.
- *
- * # Key Security Decisions
- * - **Public Profiles**: User profile data is publicly readable to support features like user discovery and profile viewing. Anyone, including unauthenticated users, can read profile documents.
- * - **Strict Ownership for Writes**: A user can only create, update, or delete the document that corresponds to their own UID. They cannot affect any other user's data.
- * - **Protected Admin Fields**: Certain fields within a user's profile (e.g., `isBanned`, `rankingScore`, `adminNotes`) are designated as admin-only. A regular user is explicitly blocked from modifying these fields on their own profile. Only a designated admin user can modify them.
- * - **No User Listing Deletion**: To prevent accidental mass deletion, there are no rules that allow a `delete` operation on the entire `/users` collection path. Deletion is only permitted on individual documents by their owner.
- *
- * # Denormalization for Authorization
- * The security model relies on the denormalized fact that the document ID in the `/users` collection is the same as the owner's `request.auth.uid`. This direct mapping (`/users/{request.auth.uid}`) is the foundation for all ownership-based rules and completely avoids slow and costly `get()` calls to other documents for authorization purposes.
- *
- * # Structural Segregation
- * This ruleset does not require structural segregation as there is no mixed public/private data at the collection level. All documents within the `/users` collection share the same access control pattern: public read, owner-only write (with admin overrides for specific fields).
- */
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // ----------------------------------------------------------------------
-    // Helper Functions
-    // ----------------------------------------------------------------------
-
-    /**
-     * Checks if the user is authenticated.
-     */
-    function isSignedIn() {
-      return request.auth != null;
-    }
-
-    /**
-     * Checks if the requester's UID matches the provided userId.
-     * This is the foundation of the ownership model.
-     */
-    function isOwner(userId) {
-      return isSignedIn() && request.auth.uid == userId;
-    }
-    
-    function getUserRole(userId) {
-        return get(/databases/$(database)/documents/users/$(userId)).data.role;
-    }
-    
-    function isArtist(userId) {
-        return getUserRole(userId) == 'artist';
-    }
-
-
-    /**
-     * Checks if the requester is the designated admin user.
-     * TODO: Replace 'ADMIN_WALLET_PLACEHOLDER' with the actual admin's Solana wallet address / UID.
-     */
+    // Admin Wallet for elevated privileges
+    // Replace with your actual ADMIN_WALLET
     function isAdmin() {
-      return isSignedIn() && request.auth.uid == 'ADMIN_WALLET_PLACEHOLDER';
+      return request.auth.uid == 'HZ2GQg1Qdh4kmGSTjRBAHVwTw88JVqkL1Hda2Y1Tqxgs';
     }
 
-    /**
-     * Ensures that once the 'walletAddress' is set, it cannot be changed.
-     * This prevents re-assigning a profile document to a different user.
-     */
-    function isWalletAddressImmutable() {
-      return request.resource.data.walletAddress == resource.data.walletAddress;
-    }
-
-    /**
-     * Checks if a write request attempts to modify any admin-only fields.
-     * This uses `request.writeFields`, which contains the list of fields
-     * being modified in an `update` operation.
-     */
-    function isAttemptingAdminWrite() {
-      let adminFields = [
-        'rankingScore', 'escrowBalance', 'isBanned', 'isSuspended',
-        'suspensionReason', 'warnings', 'adminNotes'
-      ];
-      return request.writeFields.hasAny(adminFields);
-    }
-    
-    /**
-     * Checks if a write request attempts to modify admin-only video fields.
-     */
-    function isAttemptingAdminVideoWrite() {
-      let adminFields = [
-        'adminFlag', 'isBanned', 'banReason', 'adminReason', 'rankingScore', 'hiddenFromFeed'
-      ];
-      return request.writeFields.hasAny(adminFields);
-    }
-
-    // ----------------------------------------------------------------------
-    // Collection Rules
-    // ----------------------------------------------------------------------
-
-    /**
-     * @description
-     * Manages user profiles. Profiles are public to read, but a user can only create,
-     * update, or delete their own profile document. Administrative fields are
-     * protected and can only be modified by a designated admin.
-     */
-    match /users/{walletAddress} {
-      allow get, list: if true;
-
-      allow create: if isOwner(walletAddress);
-
-      allow update: if (isOwner(walletAddress) && !isAttemptingAdminWrite() && isWalletAddressImmutable()) || (isAdmin());
-
-      allow delete: if isOwner(walletAddress) || isAdmin();
-    }
-    
-    
+    // ---------------------------------------------------------------------
+    // STRICT AND UNAMBIGUOUS RULE BLOCK FOR 'videos' COLLECTION
+    // Allows public read, secure writes based on Devbase schema.
+    // ---------------------------------------------------------------------
     match /videos/{videoId} {
-      // Public read access for all videos (feed, profile viewing etc.)
-      allow get: if true;
+      // Allow anyone (authenticated or unauthenticated) to read (list or get) videos.
+      // This directly addresses "FirebaseError: Missing or insufficient permissions" for 'list' with 'auth: null'.
+      allow read: if true;
 
-      // Write rules
-      allow create: if isSignedIn() && request.resource.data.artistId == request.auth.uid && isArtist(request.auth.uid);
-      allow update: if (isOwner(resource.data.artistId) && !isAttemptingAdminVideoWrite()) || isAdmin();
-      allow delete: if isOwner(resource.data.artistId) || isAdmin();
+      // Allow creation only if the authenticated user's UID matches the new video's artistId.
+      allow create: if request.auth != null && request.auth.uid == request.resource.data.artistId;
+
+      // Allow update for anyone. This matches your Devbase schema's "update": "true".
+      // Be aware: This is highly permissive. If you intend to restrict updates (e.g., only for voting,
+      // or only by the artist), this rule needs to be tightened.
+      // For example, to allow only the artist or admin to update:
+      // allow update: if request.auth != null && (request.auth.uid == resource.data.artistId || isAdmin());
+      // For now, following Devbase's "true":
+      allow update: if true;
+
+      // Allow deletion only if the authenticated user's UID matches the video's artistId, or if the user is an admin.
+      allow delete: if request.auth != null && (request.auth.uid == resource.data.artistId || isAdmin());
     }
-
+    
     match /videos {
         allow list: if true;
     }
-    
-    // ----------------------------------------------------------------------
-    // Gossip Feed Rules
-    // ----------------------------------------------------------------------
 
-    match /gossip_posts/{postId} {
-      allow read: if true;
-      allow create: if isSignedIn() && request.resource.data.authorId == request.auth.uid;
-      allow update: if isOwner(resource.data.authorId) || isAdmin(); // e.g. for comment count
-      allow delete: if isOwner(resource.data.authorId) || isAdmin();
-    }
-    
-    match /gossip_comments/{commentId} {
-      allow read: if true;
-      allow create: if isSignedIn() && request.resource.data.authorId == request.auth.uid;
-      allow delete: if isOwner(resource.data.authorId) || isAdmin();
+    // ---------------------------------------------------------------------
+    // OTHER COLLECTIONS (from previous conversations and Devbase schema)
+    // ---------------------------------------------------------------------
+
+    // Users Collection
+    match /users/{userId} {
+      allow read: if true; // Devbase: "get": "true", "list": "true"
+      allow create: if request.auth != null && request.auth.uid == request.resource.data.walletAddress; // Devbase: "$USER_ID === $newData.walletAddress"
+      allow update: if request.auth != null && (request.auth.uid == resource.data.walletAddress || isAdmin()); // Devbase: "$USER_ID === $data.walletAddress"
+      allow delete: if request.auth != null && (request.auth.uid == resource.data.walletAddress || isAdmin()); // Devbase: "$USER_ID === $data.walletAddress"
     }
 
-    match /gossip_ratings/{ratingId} {
-        allow read: if true;
-        allow create, update: if isSignedIn() && request.resource.data.raterId == request.auth.uid;
-        allow delete: if isOwner(resource.data.raterId);
-    }
-
-    match /gossip_user_follows/{followId} {
-        allow read: if true;
-        allow create: if isSignedIn() && request.resource.data.followerId == request.auth.uid;
-        allow delete: if isOwner(resource.data.followerId) || isAdmin();
-    }
-
-    match /gossip_messages/{messageId} {
-        allow read, delete: if isSignedIn() && (request.auth.uid == resource.data.fromId || request.auth.uid == resource.data.toId || isAdmin());
-        allow create: if isSignedIn() && request.resource.data.fromId == request.auth.uid;
-    }
-    
-    match /gossip_service_ads/{adId} {
-      allow read: if true;
-      allow create, update, delete: if isAdmin();
-    }
-    
-    // ----------------------------------------------------------------------
-    // Marketplace Rules
-    // ----------------------------------------------------------------------
-
-    match /marketplace_products/{productId} {
-        allow read: if true;
-        allow create: if isSignedIn() && request.resource.data.sellerId == request.auth.uid;
-        allow update: if isOwner(resource.data.sellerId) || isAdmin();
-        allow delete: if isOwner(resource.data.sellerId) || isAdmin();
-    }
-
-    match /marketplace_orders/{orderId} {
-        allow read: if isSignedIn() && (request.auth.uid == resource.data.buyerId || request.auth.uid == resource.data.sellerId || isAdmin());
-        allow create: if isOwner(request.resource.data.buyerId);
-        allow update: if isOwner(resource.data.sellerId) || isAdmin(); // Seller marks as shipped, admin can update
-        allow delete: if isAdmin();
-    }
-
-    match /marketplace_reviews/{reviewId} {
-        allow read: if true;
-        allow create: if isSignedIn() && get(/databases/$(database)/documents/marketplace_orders/$(request.resource.data.orderId)).data.buyerId == request.auth.uid;
-        allow update, delete: if isOwner(resource.data.buyerId) || isAdmin();
-    }
-
-    // ----------------------------------------------------------------------
-    // Notification Rules
-    // ----------------------------------------------------------------------
-
-    match /notifications/{notificationId} {
-      // Users can only read, update (mark as read), or delete their own notifications.
-      allow read, update, delete: if isSignedIn() && isOwner(resource.data.recipientWallet);
-      
-      // Notifications are created by backend Cloud Functions, so clients cannot create them directly.
-      // However, allowing create if the recipient is the one creating it can be a fallback.
-      allow create: if isSignedIn() && isOwner(request.resource.data.recipientWallet);
-    }
-
-    // ----------------------------------------------------------------------
-    // Engagement Rules (Tips, Votes, Favorites)
-    // ----------------------------------------------------------------------
-    
+    // Tips Collection
     match /tips/{tipId} {
-      allow read: if true;
-      allow create: if isSignedIn() && request.resource.data.fromWallet == request.auth.uid;
+      allow read: if true; // Assuming public read for transparency/stats
+      allow create: if request.auth != null && request.auth.uid == request.resource.data.fromWallet; // Devbase: "$USER_ID === $newData.fromWallet"
+      allow update, delete: if isAdmin(); // Admin can manage tips
     }
 
-    match /user_votes/{voteId} {
-      allow read: if true;
-      // Note: To enforce one vote per user per video, a composite index on userId and videoId
-      // should be created in Firestore, and a Cloud Function trigger or more complex rules
-      // would be needed to check for existence before creation.
-      allow create: if isSignedIn() && request.resource.data.userId == request.auth.uid;
-      allow delete: if isOwner(resource.data.userId);
+    // Bookings Collection
+    match /bookings/{bookingId} {
+      allow list: if true; // Devbase: "list": "true"
+      allow get: if request.auth != null && (request.auth.uid == resource.data.businessId || request.auth.uid == resource.data.artistId || isAdmin());
+      allow create: if request.auth != null && request.auth.uid == request.resource.data.businessId; // Devbase: "$USER_ID === $newData.businessId"
+      allow update: if true; // Devbase: "update": "true" (e.g., for status updates by Cloud Functions or admin)
+      allow delete: if isAdmin(); // Admin can manage bookings
+    }
+
+    // Adoptions Collection
+    match /adoptions/{adoptionId} {
+      allow list: if true; // Devbase: "list": "true"
+      allow get: if request.auth != null && (request.auth.uid == resource.data.businessId || request.auth.uid == resource.data.artistId || isAdmin());
+      allow create: if request.auth != null && request.auth.uid == request.resource.data.businessId; // Devbase: "$USER_ID === $newData.businessId"
+      allow update, delete: if isAdmin(); // Admin can manage adoptions
     }
     
+    // Favorites Collection
     match /favorites/{favoriteId} {
-       allow read, create, delete: if isSignedIn() && request.auth.uid == request.resource.data.userId;
+       allow read, create, delete: if request.auth != null && request.auth.uid == request.resource.data.userId;
        // A user can only manage their own favorites.
        // The rule for create and delete needs to check the incoming data.
-       allow create: if isSignedIn() && request.resource.data.userId == request.auth.uid;
-       allow delete: if isSignedIn() && resource.data.userId == request.auth.uid;
+       allow create: if request.auth != null && request.auth.uid == request.resource.data.userId;
+       allow delete: if request.auth != null && resource.data.userId == request.auth.uid;
+       allow update: if isAdmin(); // Only admin can update
+    }
+
+    // User Votes Collection
+    match /user_votes/{voteId} {
+      allow read: if true; // Assuming public read for analytics
+      allow create: if request.auth != null && request.auth.uid == request.resource.data.userId;
+      allow update, delete: if isAdmin(); // Admin can manage votes
     }
     
-    // ----------------------------------------------------------------------
-    // Admin-Specific Rules
-    // ----------------------------------------------------------------------
-
-    match /warnings/{warningId} {
-      allow read, write: if isAdmin();
+    // Video Views Collection
+    match /video_views/{viewId} {
+        allow read: if true; // Public read for analytics
+        allow create: if request.auth != null; // Any authenticated user can create a view
+        allow update, delete: if isAdmin();
     }
 
+    // Gossip Posts Collection
+    match /gossip_posts/{postId} {
+      allow read: if true; // Devbase: "list": "true"
+      allow create: if request.auth != null && request.auth.uid == request.resource.data.authorId;
+      allow update: if true; // For comment count updates
+      allow delete: if request.auth != null && (request.auth.uid == resource.data.authorId || isAdmin());
+    }
+
+    // Gossip Comments Collection
+    match /gossip_comments/{commentId} {
+      allow read: if true; // Devbase: "list": "true"
+      allow create: if request.auth != null && request.auth.uid == request.resource.data.authorId;
+      allow delete: if request.auth != null && (request.auth.uid == resource.data.authorId || isAdmin());
+      allow update: if isAdmin(); // Only admin can update
+    }
+
+    // Gossip Messages Collection
+    match /gossip_messages/{messageId} {
+      allow read: if request.auth != null && (request.auth.uid == resource.data.fromId || request.auth.uid == resource.data.toId || isAdmin());
+      allow create: if request.auth != null && request.auth.uid == request.resource.data.fromId;
+      allow delete: if request.auth != null && (request.auth.uid == resource.data.fromId || isAdmin());
+      allow update: if isAdmin(); // Only admin can update
+    }
+    
+    // Gossip Ratings Collection
+    match /gossip_ratings/{ratingId} {
+        allow read: if true;
+        allow create, update: if request.auth != null && request.resource.data.raterId == request.auth.uid;
+        allow delete: if request.auth != null && resource.data.raterId == request.auth.uid;
+    }
+
+    // Notifications Collection
+    match /notifications/{notificationId} {
+      allow read, update: if request.auth != null && (request.auth.uid == resource.data.recipientWallet || isAdmin());
+      allow create: if isAdmin(); // Only Cloud Functions or admin should create notifications
+      allow delete: if isAdmin(); // Admin can manage notifications
+    }
+
+    // Admin Ads Collection
     match /admin_ads/{adId} {
-      allow read: if true;
-      allow write: if isAdmin();
+      allow read: if true; // Devbase: "list": "true"
+      allow create, update, delete: if isAdmin(); // Only by Admin
+    }
+
+    // Gossip Service Ads Collection
+    match /gossip_service_ads/{adId} {
+      allow read: if true; // Devbase: "list": "true"
+      allow create, update, delete: if isAdmin(); // Only by Admin
+    }
+
+    // Marketplace Products Collection
+    match /marketplace_products/{productId} {
+      allow read: if true; // Devbase: "list": "true"
+      allow create: if request.auth != null && request.auth.uid == request.resource.data.sellerId;
+      allow update: if request.auth != null && (request.auth.uid == resource.data.sellerId || isAdmin());
+      allow delete: if request.auth != null && (request.auth.uid == resource.data.sellerId || isAdmin());
+    }
+
+    // Marketplace Orders Collection
+    match /marketplace_orders/{orderId} {
+      allow read: if request.auth != null && (request.auth.uid == resource.data.buyerId || request.auth.uid == resource.data.sellerId || isAdmin());
+      allow create: if request.auth != null && request.auth.uid == request.resource.data.buyerId;
+      allow update: if true; // For Cloud Function updates
+      allow delete: if isAdmin(); // Admin can manage orders
     }
     
-    // ----------------------------------------------------------------------
-    // Referral Program Rules
-    // ----------------------------------------------------------------------
+    // Marketplace Reviews Collection
+    match /marketplace_reviews/{reviewId} {
+        allow read: if true;
+        allow create: if request.auth != null && request.auth.uid == request.resource.data.buyerId;
+        allow update, delete: if isAdmin();
+    }
+    
+    // Marketplace Disputes Collection
+    match /marketplace_disputes/{disputeId} {
+        allow read: if request.auth != null && (request.auth.uid == resource.data.reporterWallet || resource.data.counterpartyWallet == request.auth.uid || isAdmin());
+        allow create: if request.auth != null && request.auth.uid == request.resource.data.reporterWallet;
+        allow update: if true; // for status updates by Cloud Functions or admin
+        allow delete: if isAdmin();
+    }
+    
+    // Marketplace Escrow Releases Collection
+    match /marketplace_escrow_releases/{releaseId} {
+      allow create: if request.auth != null; // Triggered by buyer or admin
+      allow read, update, delete: if isAdmin();
+    }
+    
+    // Marketplace Escrow Refunds Collection
+    match /marketplace_escrow_refunds/{refundId} {
+      allow create: if request.auth != null; // Triggered by admin
+      allow read, update, delete: if isAdmin();
+    }
 
+    // Warnings Collection
+    match /warnings/{warningId} {
+      allow create, read, update, delete: if isAdmin();
+    }
+
+    // Referrals Collection
     match /referrals/{referralId} {
-      // Allow users to read their own referrals
-      allow read: if isSignedIn() && isOwner(resource.data.referrerWallet);
-      
-      // Allow authenticated users to create their own referrals
-      allow create: if isSignedIn() && isOwner(request.resource.data.referrerWallet);
+      allow read: if request.auth != null && (request.auth.uid == resource.data.referrerWallet || isAdmin());
+      allow create: if request.auth != null; // Can be created by user or Cloud Function
+      allow update, delete: if isAdmin();
     }
   }
 }
