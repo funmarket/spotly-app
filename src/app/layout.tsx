@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import './globals.css';
 import { Toaster } from '@/components/ui/toaster';
 import { FirebaseClientProvider } from '@/firebase';
+import { SolanaProvider } from '@/firebase/solana-provider';
 
 export const metadata: Metadata = {
   title: 'TalentVerse',
@@ -28,10 +29,12 @@ export default function RootLayout({
         />
       </head>
       <body className="font-body antialiased">
-        <FirebaseClientProvider>
-            {children}
-            <Toaster />
-        </FirebaseClientProvider>
+        <SolanaProvider>
+          <FirebaseClientProvider>
+              {children}
+              <Toaster />
+          </FirebaseClientProvider>
+        </SolanaProvider>
       </body>
     </html>
   );

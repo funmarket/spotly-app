@@ -117,18 +117,11 @@ service cloud.firestore {
       allow delete: if isExistingOwner(walletAddress) || isAdmin();
     }
     
-    /**
-     * @description
-     * Manages video content. Videos are publicly readable. Write operations are restricted.
-     */
     match /videos/{videoId} {
-        // PUBLIC READ ACCESS: Anyone can read video data. This is essential for the feed.
-        allow get, list: if true;
-
-        // WRITE ACCESS: Restricted to owners and admins.
-        allow create: if isSignedIn() && request.resource.data.artistId == request.auth.uid;
-        allow update: if (isOwner(resource.data.artistId) && !isAttemptingAdminVideoWrite()) || isAdmin();
-        allow delete: if isOwner(resource.data.artistId) || isAdmin();
+      allow get, list: if true;
+      allow create: if isSignedIn() && request.resource.data.artistId == request.auth.uid;
+      allow update: if (isOwner(resource.data.artistId) && !isAttemptingAdminVideoWrite()) || isAdmin();
+      allow delete: if isOwner(resource.data.artistId) || isAdmin();
     }
     
     // ----------------------------------------------------------------------
