@@ -39,12 +39,21 @@ function ProfileVideos({ userId, canEdit }: { userId: string, canEdit: boolean }
     if (!firestore) return null;
     return query(
       collection(firestore, 'videos'),
-      where('artistId', '==', userId),
-      orderBy('createdAt', 'desc')
+      where('artistId', '==', userId)
     );
   }, [firestore, userId]);
 
-  const { data: videos, isLoading } = useCollection<Video>(videosQuery);
+  const { data: rawVideos, isLoading } = useCollection<Video>(videosQuery);
+  
+  const videos = useMemo(() => {
+    if (!rawVideos) return [];
+    return rawVideos.sort((a, b) => {
+      const aTime = a.createdAt ? (a.createdAt as any).seconds : 0;
+      const bTime = b.createdAt ? (b.createdAt as any).seconds : 0;
+      return bTime - aTime;
+    });
+  }, [rawVideos]);
+
 
   const handleDeleteClick = (e: React.MouseEvent, video: Video) => {
     e.preventDefault();
