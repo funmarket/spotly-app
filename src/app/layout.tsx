@@ -1,9 +1,10 @@
 import type { Metadata } from 'next';
 import './globals.css';
 import { Toaster } from '@/components/ui/toaster';
-// import { DevappProvider } from '@devfunlabs/web-sdk';
 import { AuthHandler } from '@/components/AuthHandler';
 import { FirebaseClientProvider } from '@/firebase/client-provider';
+import { SolanaProvider } from '@/firebase/solana-provider';
+import '@solana/wallet-adapter-react-ui/styles.css';
 
 export const metadata: Metadata = {
   title: 'SPOTLY',
@@ -30,19 +31,14 @@ export default function RootLayout({
         />
       </head>
       <body className="font-body antialiased">
-        <FirebaseClientProvider>
-          {/* <DevappProvider
-            rpcEndpoint="https://rpc.dev.fun/8ebc36bb1b2a0bb1139d"
-            devbaseEndpoint="https://devbase.dev.fun"
-            appId="8ebc36bb1b2a0bb1139d"
-            autoConnect={false}
-          > */}
+        <SolanaProvider>
+          <FirebaseClientProvider>
             <AuthHandler>
               {children}
               <Toaster />
             </AuthHandler>
-          {/* </DevappProvider> */}
-        </FirebaseClientProvider>
+          </FirebaseClientProvider>
+        </SolanaProvider>
       </body>
     </html>
   );

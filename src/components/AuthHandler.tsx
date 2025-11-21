@@ -18,7 +18,7 @@ export function AuthHandler({ children }: { children: React.ReactNode }) {
 
           if (!userDoc.exists()) {
             console.log(`Creating new user profile for wallet: ${userWallet}`);
-            await setDoc(userDocRef, {
+            const newUser = {
               walletAddress: userWallet,
               username: `User_${userWallet.substring(0, 4)}...${userWallet.substring(userWallet.length - 4)}`,
               bio: '',
@@ -27,13 +27,14 @@ export function AuthHandler({ children }: { children: React.ReactNode }) {
               bannerPhotoUrl: `https://picsum.photos/seed/banner-${userWallet}/1200/400`,
               createdAt: serverTimestamp(),
               updatedAt: serverTimestamp(),
-            });
+            };
+            await setDoc(userDocRef, newUser);
+
             console.log('User profile created successfully.');
           } else {
             const existingUser = userDoc.data();
             console.log('Existing user profile found:', existingUser);
 
-            // Ensure userId is set correctly (for legacy data)
             if (!existingUser.userId || existingUser.userId !== userDoc.id) {
               console.log('Updating userId for existing user...');
               await setDoc(userDocRef, { userId: userDoc.id }, { merge: true });
@@ -48,7 +49,7 @@ export function AuthHandler({ children }: { children: React.ReactNode }) {
         setIsLoadingUser(false);
       }
     };
-    // ensureUserProfile();
+    ensureUserProfile();
   }, [userWallet, firestore]);
 
   if (isLoadingUser && userWallet) {

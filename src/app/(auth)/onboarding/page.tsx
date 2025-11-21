@@ -5,9 +5,8 @@ import { useRouter } from 'next/navigation';
 import { useDevapp } from '@/hooks/use-devapp';
 import { doc, getDoc } from 'firebase/firestore';
 import { Loader2 } from 'lucide-react';
-// import { UserButton } from '@devfunlabs/web-sdk';
+import { WalletMultiButton } from '@solana/wallet-adapter-react-ui';
 
-// Main Role Choice Button Component
 function RoleChoiceButton({
   label,
   subLabel,
@@ -38,7 +37,6 @@ function RoleChoiceButton({
   );
 }
 
-// Wallet Connection Prompt Component
 function WalletConnectPrompt({ accountType, onBack }: { accountType: string, onBack: () => void }) {
   const { userWallet, firestore } = useDevapp();
   const router = useRouter();
@@ -56,7 +54,6 @@ function WalletConnectPrompt({ accountType, onBack }: { accountType: string, onB
             router.push(`/onboarding/create/${accountType}`);
           } else {
              const user = userDoc.data();
-             // If profile exists with matching role, go to profile, otherwise allow creation of new type
              if (user.role === accountType) {
                 router.push(`/profile/${userWallet}`);
              } else {
@@ -95,7 +92,7 @@ function WalletConnectPrompt({ accountType, onBack }: { accountType: string, onB
           <div className="flex flex-col items-center gap-6">
             <div className="w-full flex justify-center">
               <div className="scale-110">
-                {/* <UserButton height="48px" primaryColor="#ec4899" radius="24px" /> */}
+                <WalletMultiButton style={{ backgroundColor: '#ec4899', borderRadius: '24px', height: '48px' }} />
               </div>
             </div>
             <p className="text-white/60 text-center text-sm">
@@ -115,22 +112,18 @@ function WalletConnectPrompt({ accountType, onBack }: { accountType: string, onB
   );
 }
 
-// Main Onboarding Page Component
 export default function OnboardingRoleSelectionPage() {
   const { userWallet, firestore } = useDevapp();
   const router = useRouter();
   const [showWalletConnectForRole, setShowWalletConnectForRole] = useState<string | null>(null);
 
   const handleRoleClick = async (role: string) => {
-    // Fans do not need to connect a wallet to create a profile, as per the spec.
     if (role === 'fan') {
       router.push(`/onboarding/create/fan`);
       return;
     }
     
-    // For Artists and Businesses, check wallet connection.
     if (userWallet && firestore) {
-      // If already connected, check for profile and redirect immediately.
       const userDocRef = doc(firestore, 'users', userWallet);
       const userDoc = await getDoc(userDocRef);
       if (userDoc.exists()) {
@@ -144,7 +137,6 @@ export default function OnboardingRoleSelectionPage() {
         router.push(`/onboarding/create/${role}`);
       }
     } else {
-      // If not connected, show the wallet connection prompt.
       setShowWalletConnectForRole(role);
     }
   };

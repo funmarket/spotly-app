@@ -1,36 +1,25 @@
-// import { useDevapp as useDevappSDK, DevbaseClient } from '@devfunlabs/web-sdk';
-import { useFirestore } from '@/firebase'; // Using firebase library for firestore
+'use client';
+import { useWallet } from '@solana/wallet-adapter-react';
+import { useFirestore } from '@/firebase';
 import { Firestore } from 'firebase/firestore';
 
-// Define a type for the hook's return value for clarity
 interface UseDevappHook {
   userWallet: string | undefined;
   firestore: Firestore | undefined;
-  sendTransaction: ((transaction: any, connection: any) => Promise<string>) | undefined;
-  signMessage: ((message: Uint8Array) => Promise<Uint8Array>) | undefined;
+  sendTransaction: any; // Type according to your needs
+  signMessage: any; // Type according to your needs
 }
 
-/**
- * Custom hook to access wallet state and other SDK features.
- * This provides a typed and consistent way to interact with the DevFun SDK
- * and integrates our Firestore instance.
- */
 export function useDevapp(): UseDevappHook {
-  // Get the original hook's return values
-  // const {
-  //   userWallet,
-  //   sendTransaction,
-  //   signMessage,
-  // } = useDevappSDK();
-
-  // Get the firestore instance from our firebase setup
+  const { publicKey, sendTransaction, signMessage } = useWallet();
   const firestore = useFirestore();
 
-  // Return a combined object that matches the specified interface
+  const userWallet = publicKey ? publicKey.toBase58() : undefined;
+
   return {
-    userWallet: undefined,
+    userWallet,
     firestore,
-    sendTransaction: undefined,
-    signMessage: undefined,
+    sendTransaction,
+    signMessage,
   };
 }

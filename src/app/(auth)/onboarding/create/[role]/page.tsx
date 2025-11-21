@@ -14,7 +14,7 @@ import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { ChevronDown, ChevronUp, Loader2, Plus, Trash2 } from 'lucide-react';
 import { useDevapp } from '@/hooks/use-devapp';
-import { UserButton } from '@devfunlabs/web-sdk';
+import { WalletMultiButton } from '@solana/wallet-adapter-react-ui';
 
 const TALENT_CATEGORIES = {
   music: {
@@ -143,13 +143,11 @@ export default function CreateProfilePage() {
         return;
     }
     
-    // Spec: Account type selection required for Artist/Business
     if (accountType !== 'fan' && !values.isArtist && !values.isBusiness) {
         alert("Please select an account type (Artist or Business).");
         return;
     }
    
-    // Spec: Artist must select talent category
     if (values.isArtist && !values.talentCategory) {
         alert("Please select a talent category for artists.");
         return;
@@ -182,7 +180,7 @@ export default function CreateProfilePage() {
           walletAddress: docId,
           username: values.username,
           bio: values.bio || '',
-          skills: '', // per spec
+          skills: '',
           tags: values.tags || '',
           location: values.location || '',
           profilePhotoUrl: sanitizeUrl(values.profilePhotoUrl) || `https://picsum.photos/seed/${docId}/400`,
@@ -234,7 +232,6 @@ export default function CreateProfilePage() {
       setValue('talentSubcategories', newSubs);
   }
 
-  // Wallet Connection Check for Artist/Business, as per spec
   if ((accountType === 'artist' || accountType === 'business') && !userWallet) {
     return (
       <div className="flex min-h-screen items-center justify-center p-4">
@@ -244,7 +241,7 @@ export default function CreateProfilePage() {
             <CardDescription>A Solana wallet is required to create an {accountType} profile.</CardDescription>
           </CardHeader>
           <CardContent className="flex justify-center">
-            <UserButton height="48px" primaryColor="#ec4899" radius="24px" />
+            <WalletMultiButton />
           </CardContent>
            <CardFooter className="justify-center">
                 <Button variant="link" onClick={() => router.push('/onboarding')}>
@@ -268,7 +265,6 @@ export default function CreateProfilePage() {
       business: "Discover and hire amazing talent"
   }[accountType] || "Tell us about yourself";
 
-  // Step 2 for artists, per spec
   if (step === 2) {
       return (
           <div className="flex min-h-screen items-center justify-center p-4">
@@ -286,7 +282,6 @@ export default function CreateProfilePage() {
       )
   }
 
-  // Step 1: Profile creation form
   return (
     <div className="flex min-h-screen items-center justify-center p-4">
       <Card className="w-full max-w-2xl">
