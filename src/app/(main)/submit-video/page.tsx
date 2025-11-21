@@ -56,18 +56,24 @@ export default function SubmitVideoPage() {
   useEffect(() => {
     const fetchUserProfile = async () => {
       if (user && firestore) {
-        const userDocRef = doc(firestore, 'users', user.uid);
-        const docSnap = await getDoc(userDocRef);
-        if (docSnap.exists()) {
-          setUserProfile(docSnap.data() as User);
+        try {
+          const userDocRef = doc(firestore, 'users', user.uid);
+          const docSnap = await getDoc(userDocRef);
+          if (docSnap.exists()) {
+            setUserProfile(docSnap.data() as User);
+          }
+        } catch (error) {
+            console.error("Error fetching user profile:", error);
+        } finally {
+            setIsProfileLoading(false);
         }
+      } else if (!isUserLoading) {
+        // If there's no user and we're not loading one, profile loading is done.
+        setIsProfileLoading(false);
       }
-      setIsProfileLoading(false);
     };
 
-    if (!isUserLoading) {
-        fetchUserProfile();
-    }
+    fetchUserProfile();
   }, [user, firestore, isUserLoading]);
 
   async function onSubmit(values: z.infer<typeof videoSchema>) {
@@ -134,7 +140,10 @@ export default function SubmitVideoPage() {
     }
   }
 
-  if (isUserLoading || isProfileLoading) {
+  // Combined loading state
+  const isLoading = isUserLoading || isProfileLoading;
+
+  if (isLoading) {
     return (
       <div className="flex flex-1 items-center justify-center h-full">
         <Loader2 className="h-8 w-8 animate-spin" />
@@ -142,6 +151,7 @@ export default function SubmitVideoPage() {
     );
   }
 
+  // Check permissions only after loading is complete
   if (!user || userProfile?.role !== 'artist') {
     return (
        <div className="flex flex-1 items-center justify-center h-full">
