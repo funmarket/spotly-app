@@ -225,34 +225,24 @@ export function VideoFeed({ videos, activeFeedTab, setActiveFeedTab, isLoading, 
   }
 
   return (
-    <div ref={feedRef} className="relative h-[calc(100vh)] w-full snap-y snap-mandatory overflow-y-scroll bg-black scrollbar-hide">
-      <TopCategoryMenu activeFeedTab={activeFeedTab} setActiveFeedTab={setActiveFeedTab} onSearchClick={() => {}} />
-
-      {videos.map((video) => (
-        <VideoCard 
-            key={video.id} 
-            video={video}
-            onVote={handleVote}
-            onFavorite={handleFavorite}
-            guestVoteCount={guestVoteCount}
-            onGuestVote={handleGuestVote}
-            currentUser={currentUser}
-            nextVideo={nextVideo}
-            prevVideo={prevVideo}
-        />
-      ))}
-
-      <BottomNavBar />
-
-      <style jsx global>{`
-        .scrollbar-hide::-webkit-scrollbar {
-          display: none;
-        }
-        .scrollbar-hide {
-          -ms-overflow-style: none; /* IE and Edge */
-          scrollbar-width: none; /* Firefox */
-        }
-      `}</style>
+    <div className="h-screen w-full bg-black">
+        <TopCategoryMenu activeFeedTab={activeFeedTab} setActiveFeedTab={setActiveFeedTab} onSearchClick={() => {}} />
+        <div ref={feedRef} className="relative h-full w-full snap-y snap-mandatory overflow-y-scroll scrollbar-hide">
+            {videos.map((video) => (
+                <VideoCard 
+                    key={video.id} 
+                    video={video}
+                    onVote={handleVote}
+                    onFavorite={handleFavorite}
+                    guestVoteCount={guestVoteCount}
+                    onGuestVote={handleGuestVote}
+                    currentUser={currentUser}
+                    nextVideo={nextVideo}
+                    prevVideo={prevVideo}
+                />
+            ))}
+        </div>
+        <BottomNavBar />
     </div>
   );
 }
