@@ -1,35 +1,40 @@
 import type { User } from '@/lib/types';
 import Image from 'next/image';
 import { Button } from '@/components/ui/button';
-import { Mail, UserPlus, Twitter, Instagram, Youtube } from 'lucide-react';
+import { Mail, UserPlus, Twitter, Instagram, Youtube, Globe } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '../ui/avatar';
 import { Badge } from '../ui/badge';
+import Link from 'next/link';
 
-const socialIcons = {
+const socialIcons: { [key: string]: React.ReactNode } = {
   twitter: <Twitter className="h-4 w-4" />,
   instagram: <Instagram className="h-4 w-4" />,
   youtube: <Youtube className="h-4 w-4" />,
+  website: <Globe className="h-4 w-4" />,
 };
 
-export function ProfileHeader({ user }: { user: User }) {
+export function ProfileHeader({ user, isOwnProfile, onMessage }: { user: User, isOwnProfile: boolean, onMessage: () => void }) {
   return (
     <div className="relative">
-      <div className="h-48 md:h-64 w-full overflow-hidden rounded-lg">
-        <Image
-          src={user.bannerPhotoUrl}
-          alt={`${user.username}'s banner`}
-          width={1200}
-          height={400}
-          className="w-full h-full object-cover"
-          data-ai-hint="banner image"
-        />
+      <div className="h-48 md:h-64 w-full overflow-hidden">
+        {user.bannerPhotoUrl ? (
+          <Image
+            src={user.bannerPhotoUrl}
+            alt={`${user.username}'s banner`}
+            fill
+            className="object-cover"
+            data-ai-hint="banner image"
+          />
+        ) : (
+          <div className="bg-gradient-to-br from-muted to-secondary h-full w-full" />
+        )}
       </div>
       <div className="container mx-auto px-4 sm:px-6 lg:px-8">
         <div className="relative -mt-16 sm:-mt-20 md:-mt-24 flex flex-col md:flex-row items-center md:items-end md:space-x-5">
           <Avatar className="h-32 w-32 md:h-40 md:w-40 ring-4 ring-background">
             <AvatarImage src={user.profilePhotoUrl} alt={user.username} data-ai-hint="profile picture" />
             <AvatarFallback className="text-4xl">
-              {user.username.slice(1, 3)}
+              {user.username?.slice(0, 2) || '??'}
             </AvatarFallback>
           </Avatar>
           <div className="mt-4 md:mt-0 md:pb-4 flex-1 flex flex-col md:flex-row items-center justify-between w-full">
@@ -44,19 +49,30 @@ export function ProfileHeader({ user }: { user: User }) {
               </div>
             </div>
             <div className="mt-4 md:mt-0 flex items-center space-x-3">
-              {user.socialLinks?.map((link) => (
-                <Button key={link.platform} variant="outline" size="icon" asChild>
-                  <a href={link.url} target="_blank" rel="noopener noreferrer">
-                    {socialIcons[link.platform as keyof typeof socialIcons]}
-                  </a>
-                </Button>
+              {user.socialLinks && Object.entries(user.socialLinks).map(([platform, url]) => (
+                 url && socialIcons[platform] && (
+                    <Button key={platform} variant="outline" size="icon" asChild>
+                      <a href={url as string} target="_blank" rel="noopener noreferrer">
+                        {socialIcons[platform]}
+                      </a>
+                    </Button>
+                 )
               ))}
-              <Button variant="outline">
-                <UserPlus className="mr-2 h-4 w-4" /> Follow
-              </Button>
-              <Button>
-                <Mail className="mr-2 h-4 w-4" /> Message
-              </Button>
+              {!isOwnProfile && (
+                <>
+                  <Button variant="outline">
+                    <UserPlus className="mr-2 h-4 w-4" /> Follow
+                  </Button>
+                  <Button onClick={onMessage}>
+                    <Mail className="mr-2 h-4 w-4" /> Message
+                  </Button>
+                </>
+              )}
+               {isOwnProfile && (
+                  <Button variant="outline" asChild>
+                     <Link href="/onboarding/create/artist">Edit Profile</Link>
+                  </Button>
+               )}
             </div>
           </div>
         </div>

@@ -8,8 +8,21 @@ export interface User {
   bannerPhotoUrl: string;
   bio: string;
   role: 'artist' | 'business' | 'fan';
+  subRole?: string;
   talentCategory?: 'music' | 'acting' | 'creator';
-  socialLinks?: { platform: string; url: string }[];
+  talentSubcategories?: string[];
+  socialLinks?: Record<string, string>;
+  extraLinks?: { label: string; url: string }[];
+  tags?: string;
+  location?: string;
+  rankingScore?: number;
+  escrowBalance?: number;
+  isBanned?: boolean;
+  isSuspended?: boolean;
+  suspensionReason?: string;
+  warnings?: number;
+  adminNotes?: string;
+  isDeleted?: boolean;
   createdAt?: Timestamp;
   updatedAt?: Timestamp;
 }
@@ -126,4 +139,15 @@ export interface MarketplaceProduct {
     status: 'active' | 'inactive' | 'sold_out';
     imageUrl: string;
     createdAt: Timestamp;
+}
+
+export interface Notification {
+  id: string;
+  recipientWallet: string;
+  senderWallet?: string;
+  message: string;
+  type: string;
+  read: boolean;
+  relatedId?: string;
+  createdAt: { seconds: number, nanoseconds: number };
 }

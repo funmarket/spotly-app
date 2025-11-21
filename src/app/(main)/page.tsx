@@ -2,11 +2,12 @@
 'use client';
 import { useEffect, useState } from 'react';
 import { VideoFeed } from '@/components/feed/video-feed';
-import { useFirebase, useMemoFirebase, useCollection } from '@/firebase';
+import { useFirebase, useMemoFirebase } from '@/firebase';
 import { collection, query, where, orderBy, getDoc, doc, limit } from 'firebase/firestore';
 import type { EnrichedVideo, User, Video } from '@/lib/types';
 import { Loader2 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
+import { useCollection } from '@/firebase/firestore/use-collection';
 
 function Feed() {
   const { firestore, user, isUserLoading } = useFirebase();
@@ -16,27 +17,18 @@ function Feed() {
   const [isEnriching, setIsEnriching] = useState(true);
   const [activeFeedTab, setActiveFeedTab] = useState('music');
   const [currentUser, setCurrentUser] = useState<User | null>(null);
-  const [isCheckingProfile, setIsCheckingProfile] = useState(true);
-
 
   useEffect(() => {
-    if (isUserLoading) {
-      return;
-    }
-
+    if (isUserLoading) return;
     if (user) {
       const userDocRef = doc(firestore, 'users', user.uid);
       getDoc(userDocRef).then((docSnap) => {
         if (docSnap.exists()) {
            setCurrentUser({ userId: docSnap.id, ...docSnap.data() } as User);
-        } else {
-           router.replace('/onboarding');
         }
-        setIsCheckingProfile(false);
       });
     } else {
       setCurrentUser(null);
-      setIsCheckingProfile(false);
     }
   }, [user, isUserLoading, firestore, router]);
 
@@ -54,7 +46,6 @@ function Feed() {
     }
   }, [firestore, activeFeedTab]);
 
-  // @ts-ignore
   const { data: videos, isLoading: areVideosLoading } = useCollection<Video & { id: string }>(videosQuery);
   
   useEffect(() => {
@@ -102,7 +93,7 @@ function Feed() {
     enrichVideos();
   }, [videos, firestore, areVideosLoading]);
 
-  const isLoading = isUserLoading || isCheckingProfile || areVideosLoading || isEnriching;
+  const isLoading = isUserLoading || areVideosLoading || isEnriching;
 
   if (isLoading && enrichedVideos.length === 0) {
     return (
@@ -141,3 +132,4 @@ export default function HomePage() {
 
   return <Feed />;
 }
+

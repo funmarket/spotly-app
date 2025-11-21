@@ -1,16 +1,17 @@
 'use client';
-import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import { useEffect } from 'react';
 
-export default function InboxRedirectPage() {
+export default function InboxPage() {
     const router = useRouter();
+
     useEffect(() => {
         router.replace('/gossip?tab=inbox');
     }, [router]);
-    
+
     return (
-        <div className="flex flex-1 items-center justify-center h-full">
-            <p>Redirecting to your inbox...</p>
+        <div className="flex items-center justify-center h-full">
+            <p className="text-muted-foreground">Redirecting to your inbox...</p>
         </div>
     );
 }
