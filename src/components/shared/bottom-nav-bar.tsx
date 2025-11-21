@@ -42,16 +42,15 @@ const NavItem = ({
   }
 
   return (
-    <Link href={finalHref} legacyBehavior>
-      <a
-        className={cn(
-          'flex flex-col items-center justify-center gap-1 text-xs text-muted-foreground transition-colors hover:text-primary',
-          isActive && 'text-primary'
-        )}
-      >
-        <Icon className="h-5 w-5" />
-        <span>{label}</span>
-      </a>
+    <Link
+      href={finalHref}
+      className={cn(
+        'flex flex-col items-center justify-center gap-1 text-xs text-muted-foreground transition-colors hover:text-primary',
+        isActive && 'text-primary'
+      )}
+    >
+      <Icon className="h-5 w-5" />
+      <span>{label}</span>
     </Link>
   );
 };
