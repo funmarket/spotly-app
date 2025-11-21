@@ -23,18 +23,18 @@ export interface Video {
   flopCount: number;
   shareCount: number;
   commentCount: number;
-  status?: 'active' | 'pending' | 'archived';
+  status: 'active' | 'pending' | 'archived';
   duration?: number;
-  isBanned?: boolean;
+  isBanned: boolean;
   adminFlag?: boolean;
   banReason?: string;
-  bookCount?: number;
-  adoptCount?: number;
+  bookCount: number;
+  adoptCount: number;
   adminReason?: string;
-  rankingScore?: number;
-  rawVideoInput?: string;
-  videoCategory?: string;
-  hiddenFromFeed?: boolean;
+  rankingScore: number;
+  rawVideoInput: string;
+  videoCategory: string;
+  hiddenFromFeed: boolean;
   createdAt: Timestamp | { seconds: number; nanoseconds: number };
   updatedAt?: Timestamp | { seconds: number; nanoseconds: number };
 }

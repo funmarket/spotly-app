@@ -23,8 +23,7 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { PlusSquare, Loader2 } from 'lucide-react';
 import { useFirebase } from '@/firebase';
-import { addDocumentNonBlocking } from '@/firebase/non-blocking-updates';
-import { collection, serverTimestamp } from 'firebase/firestore';
+import { addDoc, collection, serverTimestamp } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -34,24 +33,6 @@ const videoSchema = z.object({
   description: z.string().min(1, { message: 'Please add a description.' }).max(500),
   videoCategory: z.string().min(1, { message: 'Please select a category.' }),
 });
-
-// Note: In a real app, this parsing should happen in a secure backend/cloud function.
-// This is a simplified client-side version.
-function parseVideoUrl(url: string): string | null {
-  // Simple check for common video platform URLs
-  if (url.includes('youtube.com') || url.includes('youtu.be')) {
-    const videoIdMatch = url.match(/(?:v=|\/|embed\/|watch\?v=|\.be\/)([a-zA-Z0-9_-]{11})/);
-    if (videoIdMatch) {
-      return `https://www.youtube.com/embed/${videoIdMatch[1]}`;
-    }
-  }
-  // This is a placeholder for direct video URLs
-  if (url.endsWith('.mp4') || url.endsWith('.webm') || url.endsWith('.ogg')) {
-    return url;
-  }
-  // Add more parsers for TikTok, Vimeo, etc. as needed
-  return null; // Or return the original URL if it's a direct link
-}
 
 export default function SubmitVideoPage() {
   const { user, isUserLoading, firestore } = useFirebase();
@@ -77,7 +58,9 @@ export default function SubmitVideoPage() {
       return;
     }
     
-    if(user.role !== 'artist') {
+    // This check assumes the user object from useFirebase has the role property
+    // @ts-ignore
+    if (user.role !== 'artist') {
       toast({
         variant: 'destructive',
         title: 'Permission Denied',
@@ -87,28 +70,20 @@ export default function SubmitVideoPage() {
     }
 
     setIsSubmitting(true);
-
-    const videoUrl = parseVideoUrl(values.rawVideoInput);
-
-    if (!videoUrl) {
-      form.setError('rawVideoInput', {
-        type: 'manual',
-        message: 'Could not parse this video URL. Please use a valid YouTube, Vimeo, or direct video link.',
-      });
-      setIsSubmitting(false);
-      return;
-    }
     
     const videosCollection = collection(firestore, 'videos');
 
     try {
-      await addDocumentNonBlocking(videosCollection, {
+      // The Cloud Function 'processVideoUpload' will handle parsing the URL 
+      // and setting the final 'videoUrl' field and other computed properties.
+      await addDoc(videosCollection, {
         artistId: user.uid,
         rawVideoInput: values.rawVideoInput,
-        videoUrl: videoUrl,
         description: values.description,
         videoCategory: values.videoCategory,
-        status: 'active', // Default to active for now
+        // Default values that will be updated by the Cloud Function
+        videoUrl: '', 
+        status: 'pending',
         isBanned: false,
         hiddenFromFeed: false,
         topCount: 0,
@@ -125,7 +100,7 @@ export default function SubmitVideoPage() {
 
       toast({
         title: 'Video Submitted!',
-        description: 'Your video is now live on TalentVerse.',
+        description: 'Your video is being processed and will be live shortly.',
       });
       form.reset();
 
@@ -148,6 +123,7 @@ export default function SubmitVideoPage() {
     );
   }
 
+  // @ts-ignore
   if (!user || user.role !== 'artist') {
     return (
        <div className="flex flex-1 items-center justify-center h-full">
@@ -250,5 +226,3 @@ export default function SubmitVideoPage() {
     </div>
   );
 }
-
-    

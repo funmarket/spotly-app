@@ -39,15 +39,15 @@ service cloud.firestore {
     function isOwner(userId) {
       return isSignedIn() && request.auth.uid == userId;
     }
-
-    /**
-     * Checks if the requester is the owner of an existing document.
-     * CRITICAL: Used for all update and delete operations to prevent
-     * acting on documents that don't exist.
-     */
-    function isExistingOwner(userId) {
-      return isOwner(userId) && resource != null;
+    
+    function getUserRole(userId) {
+        return get(/databases/$(database)/documents/users/$(userId)).data.role;
     }
+    
+    function isArtist(userId) {
+        return getUserRole(userId) == 'artist';
+    }
+
 
     /**
      * Checks if the requester is the designated admin user.
@@ -55,15 +55,6 @@ service cloud.firestore {
      */
     function isAdmin() {
       return isSignedIn() && request.auth.uid == 'ADMIN_WALLET_PLACEHOLDER';
-    }
-
-    /**
-     * Validates that a user creating their own profile document sets the
-     * internal 'walletAddress' field correctly to match their auth UID.
-     * This enforces relational integrity from the moment of creation.
-     */
-    function hasValidWalletAddressOnCreate(walletAddress) {
-      return request.resource.data.walletAddress == walletAddress;
     }
 
     /**
@@ -110,16 +101,16 @@ service cloud.firestore {
     match /users/{walletAddress} {
       allow get, list: if true;
 
-      allow create: if isOwner(walletAddress) && hasValidWalletAddressOnCreate(walletAddress);
+      allow create: if isOwner(walletAddress);
 
-      allow update: if (isExistingOwner(walletAddress) && !isAttemptingAdminWrite() && isWalletAddressImmutable()) || (isAdmin() && resource != null);
+      allow update: if (isOwner(walletAddress) && !isAttemptingAdminWrite() && isWalletAddressImmutable()) || (isAdmin());
 
-      allow delete: if isExistingOwner(walletAddress) || isAdmin();
+      allow delete: if isOwner(walletAddress) || isAdmin();
     }
     
     match /videos/{videoId} {
       allow get, list: if true;
-      allow create: if isSignedIn() && request.resource.data.artistId == request.auth.uid;
+      allow create: if isSignedIn() && request.resource.data.artistId == request.auth.uid && isArtist(request.auth.uid);
       allow update: if (isOwner(resource.data.artistId) && !isAttemptingAdminVideoWrite()) || isAdmin();
       allow delete: if isOwner(resource.data.artistId) || isAdmin();
     }
