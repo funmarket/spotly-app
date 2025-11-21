@@ -86,6 +86,20 @@ service cloud.firestore {
       ];
       return request.writeFields.hasAny(adminFields);
     }
+    
+    /**
+     * Checks if a write request attempts to modify admin-only video fields.
+     */
+    function isAttemptingAdminVideoWrite() {
+      let adminFields = [
+        'adminFlag', 'isBanned', 'banReason', 'adminReason', 'rankingScore', 'hiddenFromFeed'
+      ];
+      return request.writeFields.hasAny(adminFields);
+    }
+
+    // ----------------------------------------------------------------------
+    // Collection Rules
+    // ----------------------------------------------------------------------
 
     /**
      * @description
@@ -115,13 +129,6 @@ service cloud.firestore {
         allow create: if isSignedIn() && request.resource.data.artistId == request.auth.uid;
         allow update: if (isOwner(resource.data.artistId) && !isAttemptingAdminVideoWrite()) || isAdmin();
         allow delete: if isOwner(resource.data.artistId) || isAdmin();
-        
-        function isAttemptingAdminVideoWrite() {
-          let adminFields = [
-            'adminFlag', 'isBanned', 'banReason', 'adminReason', 'rankingScore', 'hiddenFromFeed'
-          ];
-          return request.writeFields.hasAny(adminFields);
-        }
     }
     
     // ----------------------------------------------------------------------
