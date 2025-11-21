@@ -1,5 +1,8 @@
 'use client';
 
+import { SolanaProvider } from '@/firebase/solana-provider';
+import { FirebaseClientProvider } from '@/firebase/client-provider';
+
 // This layout is necessary to ensure that all pages in the (auth) group
 // have access to the Firebase context provided by FirebaseClientProvider.
 
@@ -8,7 +11,12 @@ export default function AuthLayout({
 }: {
   children: React.ReactNode;
 }) {
-  // The actual providers (Solana, Firebase) are in the root layout (app/layout.tsx),
-  // which wraps this layout. We just need this file to exist to create the layout boundary.
-  return <>{children}</>;
+  // The actual providers (Solana, Firebase) are needed here to wrap the auth pages
+  return (
+    <SolanaProvider>
+      <FirebaseClientProvider>
+        {children}
+      </FirebaseClientProvider>
+    </SolanaProvider>
+  );
 }
