@@ -1,3 +1,64 @@
 {
-  "placeholderImages": []
+  "placeholderImages": [
+    {
+      "id": "profile-1",
+      "description": "Profile picture of a female singer.",
+      "imageUrl": "https://images.unsplash.com/photo-1531746020798-e6953c6e8e04?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw2fHx3b21hbiUyMHBvcnRyYWl0fGVufDB8fHx8MTc2MzY1NzY3NHww&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "woman portrait"
+    },
+    {
+      "id": "profile-2",
+      "description": "Profile picture of a male guitarist.",
+      "imageUrl": "https://images.unsplash.com/photo-1636377985931-898218afd306?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw3fHxtYW4lMjBwb3J0cmFpdHxlbnwwfHx8fDE3NjM3MDc5ODN8MA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "man portrait"
+    },
+    {
+      "id": "profile-3",
+      "description": "Profile picture of a female dancer.",
+      "imageUrl": "https://images.unsplash.com/photo-1584720223124-466ff369e7c2?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHwyfHx3b21hbiUyMGRhbmNpbmd8ZW58MHx8fHwxNzYzNzQwMzQ4fDA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "woman dancing"
+    },
+    {
+      "id": "profile-4",
+      "description": "Profile picture of a male actor.",
+      "imageUrl": "https://images.unsplash.com/photo-1728022036532-232e2c5f4b47?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHwyfHxtYW4lMjBhY3Rpbmd8ZW58MHx8fHwxNzYzNzQwMzQ4fDA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "man acting"
+    },
+    {
+      "id": "profile-5",
+      "description": "Profile picture of a content creator.",
+      "imageUrl": "https://images.unsplash.com/photo-1622700950970-e82a3df61a89?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHwxfHxwZXJzb24lMjBjcmVhdGl2ZXxlbnwwfHx8fDE3NjM3MzUxNDl8MA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "person creative"
+    },
+    {
+      "id": "banner-1",
+      "description": "Banner image of a concert stage.",
+      "imageUrl": "https://images.unsplash.com/photo-1567942712661-82b9b407abbf?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw1fHxjb25jZXJ0JTIwc3RhZ2V8ZW58MHx8fHwxNzYzNzM2MzI1fDA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "concert stage"
+    },
+    {
+      "id": "banner-2",
+      "description": "Banner image of a recording studio.",
+      "imageUrl": "https://images.unsplash.com/photo-1559732277-7453b141e3a1?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw3fHxyZWNvcmRpbmclMjBzdHVkaW98ZW58MHx8fHwxNzYzNzM1NzI5fDA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "recording studio"
+    },
+    {
+      "id": "banner-3",
+      "description": "Banner image of a dance studio.",
+      "imageUrl": "https://images.unsplash.com/photo-1524594152303-9fd13543fe6e?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHwxfHxkYW5jZSUyMHN0dWRpb3xlbnwwfHx8fDE3NjM3NDAzNDh8MA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "dance studio"
+    },
+    {
+      "id": "banner-4",
+      "description": "Banner image of a film set.",
+      "imageUrl": "https://images.unsplash.com/photo-1485846234645-a62644f84728?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw4fHxmaWxtJTIwc2V0fGVufDB8fHx8MTc2MzczOTk3Mnww&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "film set"
+    },
+    {
+      "id": "banner-5",
+      "description": "Banner image of a creative workspace.",
+      "imageUrl": "https://images.unsplash.com/photo-1654372066425-d0a1eccb2549?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3NDE5ODJ8MHwxfHNlYXJjaHw5fHxjcmVhdGl2ZSUyMHdvcmtzcGFjZXxlbnwwfHx8fDE3NjM3MDYzNTh8MA&ixlib=rb-4.1.0&q=80&w=1080",
+      "imageHint": "creative workspace"
+    }
+  ]
 }
