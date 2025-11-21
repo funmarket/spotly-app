@@ -58,7 +58,7 @@ export function useCollection<T = any>(
   type StateDataType = ResultItemType[] | null;
 
   const [data, setData] = useState<StateDataType>(null);
-  const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
   const [error, setError] = useState<FirestoreError | Error | null>(null);
 
   useEffect(() => {
@@ -72,7 +72,6 @@ export function useCollection<T = any>(
     setIsLoading(true);
     setError(null);
 
-    // Directly use memoizedTargetRefOrQuery as it's assumed to be the final query
     const unsubscribe = onSnapshot(
       memoizedTargetRefOrQuery,
       (snapshot: QuerySnapshot<DocumentData>) => {
@@ -85,28 +84,40 @@ export function useCollection<T = any>(
         setIsLoading(false);
       },
       (error: FirestoreError) => {
-        // This logic extracts the path from either a ref or a query
-        const path: string =
-          memoizedTargetRefOrQuery.type === 'collection'
-            ? (memoizedTargetRefOrQuery as CollectionReference).path
-            : (memoizedTargetRefOrQuery as unknown as InternalQuery)._query.path.canonicalString()
+        console.error(
+          "[useCollection] Firestore onSnapshot error:",
+          error.code,
+          error.message,
+          error
+        );
 
-        const contextualError = new FirestorePermissionError({
-          operation: 'list',
-          path,
-        })
+        // Only wrap as permission error *if it actually is one*
+        if (error.code === "permission-denied") {
+          const path: string =
+            (memoizedTargetRefOrQuery as any).type === "collection"
+              ? (memoizedTargetRefOrQuery as CollectionReference).path
+              : (memoizedTargetRefOrQuery as unknown as InternalQuery)._query.path.canonicalString();
 
-        setError(contextualError)
-        setData(null)
-        setIsLoading(false)
+          const contextualError = new FirestorePermissionError({
+            operation: "list",
+            path,
+          });
 
-        // trigger global error propagation
-        errorEmitter.emit('permission-error', contextualError);
+          setError(contextualError);
+          errorEmitter.emit("permission-error", contextualError);
+        } else {
+          // For everything else, just propagate the actual Firestore error
+          setError(error);
+        }
+
+        setData(null);
+        setIsLoading(false);
       }
     );
 
     return () => unsubscribe();
-  }, [memoizedTargetRefOrQuery]); // Re-run if the target query/reference changes.
+  }, [memoizedTargetRefOrQuery]);
+
   if(memoizedTargetRefOrQuery && !memoizedTargetRefOrQuery.__memo) {
     throw new Error(memoizedTargetRefOrQuery + ' was not properly memoized using useMemoFirebase');
   }
