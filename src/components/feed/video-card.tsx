@@ -64,7 +64,7 @@ const ActionButton = ({
 );
 
 
-export function VideoCard({ video, onVote, onFavorite, guestVoteCount, onGuestVote, currentUser, nextVideo, prevVideo }: { video: EnrichedVideo, onVote: (videoId: string, isTop: boolean) => Promise<void>, onFavorite: (videoId:string) => Promise<void>, guestVoteCount: number, onGuestVote: () => void, currentUser: User | null, nextVideo: () => void, prevVideo: () => void }) {
+export function VideoCard({ video, onVote, onFavorite, guestVoteCount, onGuestVote, currentUser, nextVideo, prevVideo, voteLocked }: { video: EnrichedVideo, onVote: (videoId: string, isTop: boolean) => Promise<void>, onFavorite: (videoId:string) => Promise<void>, guestVoteCount: number, onGuestVote: () => void, currentUser: User | null, nextVideo: () => void, prevVideo: () => void, voteLocked: boolean }) {
   const cardRef = useRef<HTMLDivElement>(null);
   const isVisible = useOnScreen(cardRef);
   const { firestore, userWallet } = useDevapp();
@@ -74,7 +74,6 @@ export function VideoCard({ video, onVote, onFavorite, guestVoteCount, onGuestVo
   const [topCount, setTopCount] = useState(video.topCount || 0);
   const [flopCount, setFlopCount] = useState(video.flopCount || 0);
   const [userVote, setUserVote] = useState<'top' | 'flop' | null>(null);
-  const [isVoteLoading, setIsVoteLoading] = useState(false);
   const [showVoteLimitModal, setShowVoteLimitModal] = useState(false);
   
   const favoritesQuery = useMemoFirebase(() => {
@@ -97,9 +96,7 @@ export function VideoCard({ video, onVote, onFavorite, guestVoteCount, onGuestVo
     return user.role.charAt(0).toUpperCase() + user.role.slice(1);
   }
 
-  const handleVote = async (isTop: boolean) => {
-    if (isVoteLoading) return;
-
+  const handleVote = (isTop: boolean) => {
     if (!userWallet) { // Guest user
       if (guestVoteCount >= 10) {
         setShowVoteLimitModal(true);
@@ -107,33 +104,13 @@ export function VideoCard({ video, onVote, onFavorite, guestVoteCount, onGuestVo
       }
       onGuestVote();
     }
-
-    setIsVoteLoading(true);
-
-    // Optimistic UI update
-    if (userVote === 'top') setTopCount(p => p - 1);
-    if (userVote === 'flop') setFlopCount(p => p - 1);
-
-    const newVoteType = userVote === (isTop ? 'top' : 'flop') ? null : (isTop ? 'top' : 'flop');
-
-    if (newVoteType === 'top') setTopCount(p => p + 1);
-    if (newVoteType === 'flop') setFlopCount(p => p + 1);
-    setUserVote(newVoteType);
+    onVote(video.id, isTop);
     
-    if (!isTop) {
-        setTimeout(() => nextVideo(), 300);
-    }
-
-    try {
-      await onVote(video.id, isTop);
-    } catch (error) {
-      // Revert UI on failure
-      toast({ title: 'Error processing your vote', variant: 'destructive' });
-      setTopCount(video.topCount || 0);
-      setFlopCount(video.flopCount || 0);
-      setUserVote(null); 
-    } finally {
-      setIsVoteLoading(false);
+    if (isTop) {
+      setUserVote(userVote === 'top' ? null : 'top');
+    } else {
+      setUserVote(userVote === 'flop' ? null : 'flop');
+      setTimeout(() => nextVideo(), 300);
     }
   };
   
@@ -206,21 +183,43 @@ export function VideoCard({ video, onVote, onFavorite, guestVoteCount, onGuestVo
        </div>
 
       {/* Right Action Bar */}
-      <div className="absolute right-3 sm:right-4 top-1/2 -translate-y-1/2 flex flex-col gap-4 z-20">
-        <ActionButton icon={Bookmark} label="Save" onClick={handleFavoriteClick} isActive={isFavorited} iconClassName={isFavorited ? 'fill-white' : ''} />
-        <ActionButton icon={ThumbsUp} label="Top" onClick={() => handleVote(true)} isActive={userVote === 'top'} isDisabled={isVoteLoading} iconClassName="text-green-400 group-hover:drop-shadow-[0_0_8px_rgba(34,197,94,0.8)]" />
-        <ActionButton icon={ThumbsDown} label="Flop" onClick={() => handleVote(false)} isActive={userVote === 'flop'} isDisabled={isVoteLoading} iconClassName="text-red-400 group-hover:drop-shadow-[0_0_8px_rgba(239,68,68,0.8)]" />
-        <ActionButton icon={ArrowDown} label="Down" onClick={nextVideo} iconClassName="text-gray-400" />
-        <ActionButton icon={DollarSign} label="Tip" onClick={handleTip} iconClassName="text-yellow-400 group-hover:drop-shadow-[0_0_8px_rgba(234,179,8,0.8)]" />
-        
-        {currentUser?.role === 'business' && (
-            <>
-                <ActionButton icon={BookIcon} label="Book" onClick={handleHireOrAdopt} iconClassName="text-cyan-400 group-hover:drop-shadow-[0_0_8px_rgba(34,211,238,0.8)]" />
-                <ActionButton icon={AdoptIcon} label="Adopt" onClick={handleHireOrAdopt} iconClassName="text-purple-400 group-hover:drop-shadow-[0_0_8px_rgba(168,85,247,0.8)]" />
-            </>
-        )}
-         <ActionButton icon={Share2} label="Share" onClick={() => toast({title: 'Share not implemented'})} />
-      </div>
+        <div className="absolute right-3 sm:right-4 top-1/2 -translate-y-[70px] flex flex-col gap-4 z-20">
+            <ActionButton icon={Bookmark} label={`${isFavorited ? 'Saved' : 'Save'}`} onClick={handleFavoriteClick} isActive={isFavorited} iconClassName={isFavorited ? 'fill-white' : ''} />
+            
+            <button
+                disabled={voteLocked}
+                onClick={() => handleVote(true)}
+                className="flex flex-col items-center justify-center gap-1 text-white group disabled:opacity-50 disabled:cursor-not-allowed transition transform duration-200 active:scale-95"
+            >
+                <div className="flex items-center justify-center h-10 w-10 sm:h-12 sm:w-12 rounded-full bg-black/40 backdrop-blur-sm transition-all hover:bg-black/60 group-hover:scale-110">
+                    <ThumbsUp className={`h-6 w-6 sm:h-7 sm:w-7 transition-all text-green-400 group-hover:drop-shadow-[0_0_8px_rgba(34,197,94,0.8)] ${userVote === 'top' ? 'scale-110' : ''}`} />
+                </div>
+                <span className="text-xs font-semibold drop-shadow-md">Top</span>
+            </button>
+            
+            <button
+                disabled={voteLocked}
+                onClick={() => handleVote(false)}
+                className="flex flex-col items-center justify-center gap-1 text-white group disabled:opacity-50 disabled:cursor-not-allowed transition transform duration-200 active:scale-95"
+            >
+                <div className="flex items-center justify-center h-10 w-10 sm:h-12 sm:w-12 rounded-full bg-black/40 backdrop-blur-sm transition-all hover:bg-black/60 group-hover:scale-110">
+                    <ThumbsDown className={`h-6 w-6 sm:h-7 sm:w-7 transition-all text-red-400 group-hover:drop-shadow-[0_0_8px_rgba(239,68,68,0.8)] ${userVote === 'flop' ? 'scale-110' : ''}`} />
+                </div>
+                <span className="text-xs font-semibold drop-shadow-md">Flop</span>
+            </button>
+            
+            <ActionButton icon={ArrowDown} onClick={nextVideo} iconClassName="text-gray-400" />
+            <ActionButton icon={DollarSign} label="Tip" onClick={handleTip} iconClassName="text-yellow-400 group-hover:drop-shadow-[0_0_8px_rgba(234,179,8,0.8)]" />
+            
+            {currentUser?.role === 'business' && (
+                <>
+                    <ActionButton icon={BookIcon} label="Book" onClick={handleHireOrAdopt} iconClassName="text-cyan-400 group-hover:drop-shadow-[0_0_8px_rgba(34,211,238,0.8)]" />
+                    <ActionButton icon={AdoptIcon} label="Adopt" onClick={handleHireOrAdopt} iconClassName="text-purple-400 group-hover:drop-shadow-[0_0_8px_rgba(168,85,247,0.8)]" />
+                </>
+            )}
+            <ActionButton icon={Share2} label="Share" onClick={() => toast({title: 'Share not implemented'})} />
+        </div>
+
     </div>
   );
 }
