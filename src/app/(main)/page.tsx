@@ -1,12 +1,12 @@
 'use client';
 import { useEffect, useState, useMemo } from 'react';
 import { VideoFeed } from '@/components/feed/video-feed';
-import { useFirebase } from '@/firebase';
+import { useFirebase, useMemoFirebase } from '@/firebase';
 import { collection, query, where, orderBy, getDoc, doc, limit } from 'firebase/firestore';
 import type { EnrichedVideo, User, Video } from '@/lib/types';
 import { Loader2 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import { useCollection } from '@/firebase/firestore/use-collection';
+import { useCollection } from '@/firebase';
 
 function Feed() {
   const { firestore, user, isUserLoading } = useFirebase();
@@ -35,7 +35,7 @@ function Feed() {
   }, [user, isUserLoading, firestore, router]);
 
 
-  const videosQuery = useMemo(() => {
+  const videosQuery = useMemoFirebase(() => {
     if (!firestore) return null;
     
     const videosCollection = collection(firestore, 'videos');
