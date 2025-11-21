@@ -131,7 +131,8 @@ service cloud.firestore {
      * `/videos/{videoId}`
      */
     match /videos/{videoId} {
-        allow get, list: if true;
+        allow read: if true;
+        allow list: if true;
 
         allow create: if isSignedIn() && request.resource.data.artistId == request.auth.uid;
         
@@ -275,3 +276,5 @@ service cloud.firestore {
     }
   }
 }
+
+    
