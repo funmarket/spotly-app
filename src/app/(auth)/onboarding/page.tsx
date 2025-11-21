@@ -46,18 +46,15 @@ export default function OnboardingRoleSelectionPage() {
 
   useEffect(() => {
     const checkProfileAndRedirect = async () => {
-      if (connected && publicKey && firestore && showWalletConnectForRole) {
+      if (connected && publicKey && firestore && showWalletConnectForRole && showWalletConnectForRole !== 'fan') {
         setIsCheckingProfile(true);
         const userDocRef = doc(firestore, 'users', publicKey.toBase58());
         const userDoc = await getDoc(userDocRef);
         if (userDoc.exists()) {
-          // Profile exists, redirect to their profile page
           router.push(`/profile/${publicKey.toBase58()}`);
         } else {
-          // No profile, proceed to creation page for the selected role
           router.push(`/onboarding/create/${showWalletConnectForRole}`);
         }
-        // No need to set isCheckingProfile to false, as we are navigating away
       }
     };
     checkProfileAndRedirect();
@@ -65,17 +62,22 @@ export default function OnboardingRoleSelectionPage() {
 
 
   const handleRoleClick = (role: string) => {
+    // Fans do not need to connect a wallet to create a profile
+    if (role === 'fan') {
+      router.push(`/onboarding/create/fan`);
+      return;
+    }
+    
+    // Artists and Businesses require a wallet
     if (!connected) {
       setShowWalletConnectForRole(role);
       return;
     }
-    // If wallet is connected, just navigate
      router.push(`/onboarding/create/${role}`);
   };
 
   const getWalletConnectText = () => {
     switch (showWalletConnectForRole) {
-      case 'fan': return 'Connect your wallet to create a free Fan account';
       case 'artist': return 'Artists need a wallet to receive tips and payments';
       case 'business': return 'Connect your wallet to create a business account';
       default: return 'Please connect your wallet to continue';

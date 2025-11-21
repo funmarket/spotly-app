@@ -1,7 +1,7 @@
 'use client';
 import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
+import { doc, setDoc, serverTimestamp, collection } from 'firebase/firestore';
 import { useFirebase } from '@/firebase';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -73,7 +73,7 @@ const ClientOnlyWalletButton = () => {
 };
 
 export default function CreateProfilePage() {
-  const { firestore } = useFirebase();
+  const { firestore, auth } = useFirebase();
   const { publicKey, connected } = useWallet();
   const router = useRouter();
   const params = useParams();
@@ -165,12 +165,18 @@ export default function CreateProfilePage() {
   const talentCategory = watch('talentCategory');
   
   const onSubmit = async (values: ProfileFormValues) => {
-    if (!publicKey || !firestore) return;
+    if (!firestore) return;
     
+    // For artist/business, wallet must be connected. For fans, it's optional.
+    if ((accountType === 'artist' || accountType === 'business') && !publicKey) {
+        console.error("Wallet not connected for artist/business profile creation.");
+        return;
+    }
+
     setIsSubmitting(true);
     try {
         let role: 'fan' | 'artist' | 'business' = 'fan';
-         if (accountType !== 'fan') {
+        if (accountType !== 'fan') {
             if (values.isArtist && values.isBusiness) {
                 role = 'artist'; // Artist role takes precedence
             } else if (values.isArtist) {
@@ -180,15 +186,17 @@ export default function CreateProfilePage() {
             }
         }
 
-        const userDocRef = doc(firestore, 'users', publicKey.toBase58());
+        // Use wallet address for ID if available, otherwise generate a new ID for fans
+        const docId = publicKey ? publicKey.toBase58() : doc(collection(firestore, 'users')).id;
+        const userDocRef = doc(firestore, 'users', docId);
         
         await setDoc(userDocRef, {
-            walletAddress: publicKey.toBase58(),
+            walletAddress: publicKey ? publicKey.toBase58() : docId,
             username: values.username,
             bio: values.bio || '',
             role: role,
-            profilePhotoUrl: values.profilePhotoUrl || `https://picsum.photos/seed/${publicKey.toBase58()}/400`,
-            bannerPhotoUrl: values.bannerPhotoUrl || `https://picsum.photos/seed/banner-${publicKey.toBase58()}/1200/400`,
+            profilePhotoUrl: values.profilePhotoUrl || `https://picsum.photos/seed/${docId}/400`,
+            bannerPhotoUrl: values.bannerPhotoUrl || `https://picsum.photos/seed/banner-${docId}/1200/400`,
             talentCategory: values.isArtist ? values.talentCategory : null,
             talentSubcategories: values.isArtist ? values.talentSubcategories : [],
             subRole: values.isArtist ? values.subRole : null,
@@ -234,13 +242,14 @@ export default function CreateProfilePage() {
       setValue('talentSubcategories', newSubs);
   }
 
-  if (!connected || !publicKey) {
+  // Wallet connection is only required for Artist and Business accounts
+  if ((accountType === 'artist' || accountType === 'business') && (!connected || !publicKey)) {
     return (
       <div className="flex min-h-screen items-center justify-center p-4">
         <Card className="w-full max-w-md text-center">
           <CardHeader>
             <CardTitle className="font-headline text-3xl">Welcome to SPOTLY!</CardTitle>
-            <CardDescription>Connect your Solana wallet to create your profile.</CardDescription>
+            <CardDescription>Connect your Solana wallet to create your {accountType} profile.</CardDescription>
           </CardHeader>
           <CardContent>
             <ClientOnlyWalletButton />
