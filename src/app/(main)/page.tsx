@@ -1,3 +1,4 @@
+
 'use client';
 import { useEffect, useState } from 'react';
 import { VideoFeed } from '@/components/feed/video-feed';
@@ -25,8 +26,10 @@ function Feed() {
         if (docSnap.exists()) {
            setCurrentUser({ userId: docSnap.id, ...docSnap.data() } as User);
         } else {
-            // User is authenticated but has no profile, redirect to onboarding.
-            router.push('/onboarding');
+            // User is authenticated but has no profile.
+            // DO NOT redirect. Treat them as a guest for browsing purposes.
+            // The user will be prompted to create a profile when they take an action.
+            setCurrentUser(null);
         }
       });
     } else {
@@ -37,13 +40,12 @@ function Feed() {
 
   const videosQuery = useMemoFirebase(() => {
     if (!firestore) return null;
-    
+
     const videosCollection = collection(firestore, 'videos');
     
     if (activeFeedTab === 'rising') {
        return query(videosCollection, orderBy('rankingScore', 'desc'), limit(50));
     } else {
-        // Simplified query to avoid index error. Filtering will be done client-side.
        return query(videosCollection, orderBy('createdAt', 'desc'), limit(100));
     }
   }, [firestore, activeFeedTab]);
@@ -61,7 +63,6 @@ function Feed() {
       
       const userCache = new Map<string, User>();
 
-      // Client-side filtering
       const filteredVideos = activeFeedTab === 'rising' 
         ? videos 
         : videos.filter(v => v.videoCategory === activeFeedTab);
