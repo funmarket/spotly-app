@@ -199,9 +199,10 @@ export function VideoCard({ video, onVote, onFavorite, guestVoteCount, onGuestVo
       </div>
       
       <div className="absolute right-3 sm:right-4 top-1/2 -translate-y-1/2 flex flex-col gap-3 z-20">
-        <ActionButton icon={ThumbsUp} label="Top" onClick={() => handleVote(true)} isActive={userVote === 'top'} isDisabled={isVoteLoading} className="text-green-400" />
+        <ActionButton icon={ThumbsUp} label="Up" onClick={() => handleVote(true)} isActive={userVote === 'top'} isDisabled={isVoteLoading} className="text-green-400" />
         <ActionButton icon={ThumbsDown} label="Flop" onClick={() => handleVote(false)} isActive={userVote === 'flop'} isDisabled={isVoteLoading} className="text-red-400" />
         <ActionButton icon={Bookmark} label="Save" onClick={() => onFavorite(video.id)} isActive={isFavorited} className={isFavorited ? '!bg-yellow-500' : ''} />
+        <ActionButton icon={ChevronDown} label="Down" onClick={nextVideo} />
         <ActionButton icon={DollarSign} label="Tip" onClick={handleTip} className="text-yellow-400" />
         
         {currentUser?.role === 'business' && (
@@ -210,14 +211,10 @@ export function VideoCard({ video, onVote, onFavorite, guestVoteCount, onGuestVo
                 <ActionButton icon={AdoptIcon} label="Adopt" onClick={handleHireOrAdopt} className="text-purple-400" />
             </>
         )}
-        <ActionButton icon={Share2} label="Share" onClick={() => toast({ title: 'Sharing not implemented yet.' })} />
       </div>
 
        <div className="absolute left-3 sm:left-4 top-1/2 -translate-y-1/2 z-20">
-         <ActionButton icon={ChevronUp} onClick={prevVideo} />
-       </div>
-       <div className="absolute left-3 sm:left-4 bottom-16 sm:bottom-5 z-20">
-          <ActionButton icon={ChevronDown} onClick={nextVideo} />
+         <ActionButton icon={ChevronUp} label="Up" onClick={prevVideo} />
        </div>
 
     </div>
