@@ -1,6 +1,5 @@
 'use client';
 import { useMemo } from 'react';
-import { getUser } from '@/lib/data';
 import { notFound } from 'next/navigation';
 import { ProfileHeader } from '@/components/profile/profile-header';
 import { AdminAiInsights } from '@/components/profile/admin-ai-insights';
@@ -9,9 +8,9 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import Image from 'next/image';
 import Link from 'next/link';
 import { BarChart, Eye, ThumbsUp, Wallet, Video as VideoIcon } from 'lucide-react';
-import { useCollection, useFirestore, useMemoFirebase, useUser } from '@/firebase';
-import { collection, query, where, orderBy } from 'firebase/firestore';
-import type { Video } from '@/lib/types';
+import { useCollection, useFirestore, useMemoFirebase, useUser, useDoc } from '@/firebase';
+import { collection, query, where, orderBy, doc } from 'firebase/firestore';
+import type { Video, User } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
 
 const StatCard = ({ icon: Icon, title, value, color, isLoading }: { icon: React.ElementType, title: string, value: string, color: string, isLoading?: boolean }) => (
@@ -77,19 +76,25 @@ function ProfileVideos({ userId }: { userId: string }) {
 
 export default function ProfilePage({ params }: { params: { userId: string } }) {
   const { user: authUser } = useUser();
-  const viewingUser = getUser(params.userId); // Still using mock data for user profile
-  if (!viewingUser) {
+  const firestore = useFirestore();
+
+  const userDocRef = useMemoFirebase(() => {
+      if (!firestore || !params.userId) return null;
+      return doc(firestore, 'users', params.userId);
+  }, [firestore, params.userId]);
+  const { data: viewingUser, isLoading: isUserLoading } = useDoc<User>(userDocRef);
+
+  if (!isUserLoading && !viewingUser) {
     notFound();
   }
   
-  const firestore = useFirestore();
   const videosQuery = useMemoFirebase(() => {
-    if (!firestore) return null;
+    if (!firestore || !viewingUser?.walletAddress) return null;
     return query(
       collection(firestore, 'videos'),
       where('artistId', '==', viewingUser.walletAddress)
     );
-  }, [firestore, viewingUser.walletAddress]);
+  }, [firestore, viewingUser?.walletAddress]);
 
   const { data: videos, isLoading: videosLoading } = useCollection<Video>(videosQuery);
 
@@ -104,7 +109,11 @@ export default function ProfilePage({ params }: { params: { userId: string } }) 
   }, [videos]);
   
   const isAdmin = authUser?.uid === 'ADMIN_WALLET_PLACEHOLDER';
-  const isOwnProfile = authUser?.uid === viewingUser.walletAddress;
+  const isOwnProfile = authUser?.uid === viewingUser?.walletAddress;
+
+  if (isUserLoading || !viewingUser) {
+      return <div className="min-h-screen"><Skeleton className="h-64 w-full" /><div className="container mx-auto p-4 sm:p-6 lg:p-8 mt-6"><Skeleton className="h-32 w-full" /></div></div>
+  }
 
   const mainContent = (
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">

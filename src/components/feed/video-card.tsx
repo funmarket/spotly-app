@@ -4,7 +4,6 @@ import type { EnrichedVideo, UserVote, Favorite } from '@/lib/types';
 import { useOnScreen } from '@/hooks/use-on-screen';
 import { VideoPlayer } from './video-player';
 import Link from 'next/link';
-import Image from 'next/image';
 import { Button } from '@/components/ui/button';
 import {
   ThumbsUp,
@@ -31,6 +30,8 @@ import {
   limit,
 } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
+import { getAnalytics, logEvent } from 'firebase/analytics';
+
 
 function formatCount(num: number | undefined): string {
   if (num === undefined) return '0';
@@ -73,7 +74,7 @@ const ActionButton = ({
 export function VideoCard({ video }: { video: EnrichedVideo }) {
   const cardRef = useRef<HTMLDivElement>(null);
   const isVisible = useOnScreen(cardRef);
-  const { firestore, user } = useFirebase();
+  const { firestore, user, firebaseApp } = useFirebase();
   const { toast } = useToast();
 
   const [topCount, setTopCount] = useState(video.topCount || 0);
@@ -189,6 +190,11 @@ export function VideoCard({ video }: { video: EnrichedVideo }) {
 
     try {
       await batch.commit();
+      const analytics = getAnalytics(firebaseApp);
+      logEvent(analytics, 'vote', {
+        video_id: video.id,
+        vote_type: isTop ? 'top' : 'flop',
+      });
     } catch (error) {
       console.error('Error voting:', error);
       toast({ title: 'Error processing your vote', variant: 'destructive' });
@@ -209,12 +215,17 @@ export function VideoCard({ video }: { video: EnrichedVideo }) {
     setIsFavoriteLoading(true);
 
     try {
+      const analytics = getAnalytics(firebaseApp);
       if (isFavorite && favoriteId) {
         // Un-favorite
         await deleteDoc(doc(firestore, 'favorites', favoriteId));
         setIsFavorite(false);
         setFavoriteId(null);
         toast({ title: 'Removed from favorites' });
+        logEvent(analytics, 'remove_from_favorites', {
+          item_id: video.id,
+          item_type: 'video',
+        });
       } else {
         // Favorite
         const favCollection = collection(firestore, 'favorites');
@@ -227,6 +238,10 @@ export function VideoCard({ video }: { video: EnrichedVideo }) {
         setIsFavorite(true);
         setFavoriteId(newFavDoc.id);
         toast({ title: 'Added to favorites!' });
+        logEvent(analytics, 'add_to_favorites', {
+          item_id: video.id,
+          item_type: 'video',
+        });
       }
     } catch (error) {
       console.error('Error favoriting:', error);
@@ -251,7 +266,7 @@ export function VideoCard({ video }: { video: EnrichedVideo }) {
         >
           <Avatar className="h-12 w-12 border-2 border-primary">
             <AvatarImage src={video.user.profilePhotoUrl} alt={video.user.username} />
-            <AvatarFallback>{video.user.username?.slice(1, 3)}</AvatarFallback>
+            <AvatarFallback>{video.user.username?.slice(0, 2)}</AvatarFallback>
           </Avatar>
           <div>
             <h3 className="font-bold text-lg group-hover:underline">{video.user.username}</h3>

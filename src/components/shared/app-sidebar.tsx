@@ -21,7 +21,7 @@ import {
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { Avatar, AvatarFallback, AvatarImage } from '../ui/avatar';
-import { getUser } from '@/lib/data';
+import { useUser } from '@/firebase';
 
 const navItems = [
   { href: '/', label: 'Home', icon: Home },
@@ -52,8 +52,7 @@ const Logo = () => (
 
 export function AppSidebar() {
   const pathname = usePathname();
-  // In a real app, you'd get the current user from context/session
-  const currentUser = getUser('wallet_fan_1'); 
+  const { user } = useUser();
 
   return (
     <Sidebar>
@@ -89,14 +88,14 @@ export function AppSidebar() {
         </SidebarMenu>
       </SidebarContent>
       <SidebarFooter>
-        {currentUser && (
+        {user && (
            <SidebarMenuButton asChild tooltip={{ children: 'Profile', side: 'right' }}>
-            <Link href={`/profile/${currentUser.userId}`}>
+            <Link href={`/profile/${user.uid}`}>
               <Avatar className="h-8 w-8">
-                <AvatarImage src={currentUser.profilePhotoUrl} alt={currentUser.username} />
-                <AvatarFallback>{currentUser.username.charAt(0)}</AvatarFallback>
+                <AvatarImage src={user.photoURL || ''} alt={user.displayName || ''} />
+                <AvatarFallback>{user.displayName?.charAt(0)}</AvatarFallback>
               </Avatar>
-              <span className="truncate">{currentUser.username}</span>
+              <span className="truncate">{user.displayName || 'User'}</span>
             </Link>
             </SidebarMenuButton>
         )}

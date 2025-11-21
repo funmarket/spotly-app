@@ -4,12 +4,13 @@ import { collection, query, where, orderBy, updateDoc, doc } from 'firebase/fire
 import { useCollection } from '@/firebase/firestore/use-collection';
 import { Bell, Loader2 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
 import { formatDistanceToNow } from 'date-fns';
 import { Skeleton } from '@/components/ui/skeleton';
-import { getUser } from '@/lib/data';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import Link from 'next/link';
+import { useDoc } from '@/firebase/firestore/use-doc';
+import type { User } from '@/lib/types';
+
 
 interface Notification {
   id: string;
@@ -24,7 +25,13 @@ interface Notification {
 
 function NotificationItem({ notification }: { notification: Notification }) {
   const { firestore } = useFirebase();
-  const sender = notification.senderWallet ? getUser(notification.senderWallet) : null;
+  
+  const senderDocRef = useMemoFirebase(() => {
+      if (!firestore || !notification.senderWallet) return null;
+      return doc(firestore, 'users', notification.senderWallet);
+  }, [firestore, notification.senderWallet]);
+
+  const { data: sender } = useDoc<User>(senderDocRef);
 
   const timeAgo = notification.createdAt
     ? formatDistanceToNow(new Date(notification.createdAt.seconds * 1000), { addSuffix: true })
@@ -36,20 +43,19 @@ function NotificationItem({ notification }: { notification: Notification }) {
     await updateDoc(notifRef, { read: true });
   };
   
-  // Basic navigation logic, can be expanded
   const getLink = () => {
       switch(notification.type) {
           case 'follow':
               return `/profile/${notification.senderWallet}`;
           case 'message':
-              return `/gossip`; // Or a specific chat
+              return `/gossip`;
           case 'tip':
           case 'booking':
           case 'adoption':
               return `/profile/${notification.recipientWallet}`;
           case 'order_shipped':
           case 'order_completed':
-              return `/marketplace`; // or specific order
+              return `/marketplace`;
           default:
               return '#';
       }
@@ -65,7 +71,7 @@ function NotificationItem({ notification }: { notification: Notification }) {
             {sender && (
               <Avatar>
                 <AvatarImage src={sender.profilePhotoUrl} alt={sender.username} />
-                <AvatarFallback>{sender.username.charAt(0)}</AvatarFallback>
+                <AvatarFallback>{sender.username?.charAt(0)}</AvatarFallback>
               </Avatar>
             )}
             <div className="flex-1">

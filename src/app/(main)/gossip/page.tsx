@@ -4,7 +4,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { useFirebase, useMemoFirebase } from '@/firebase';
-import { addDoc, collection, query, orderBy, serverTimestamp } from 'firebase/firestore';
+import { addDoc, collection, query, orderBy, serverTimestamp, doc } from 'firebase/firestore';
 import { useCollection } from '@/firebase/firestore/use-collection';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
@@ -15,16 +15,20 @@ import { Loader2, Send } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { formatDistanceToNow } from 'date-fns';
 import type { User, GossipPost } from '@/lib/types';
-import { getUser } from '@/lib/data';
+import { useDoc } from '@/firebase/firestore/use-doc';
 
 const postSchema = z.object({
   content: z.string().min(1, 'Post cannot be empty').max(280, 'Post is too long'),
 });
 
 function PostCard({ post }: { post: GossipPost & { id: string } }) {
-  // In a real app, you would fetch the user from Firestore using the authorId
-  // For now, we'll use the mock data.
-  const author = getUser(post.authorId);
+  const { firestore } = useFirebase();
+  const authorDocRef = useMemoFirebase(() => {
+    if (!firestore || !post.authorId) return null;
+    return doc(firestore, 'users', post.authorId);
+  }, [firestore, post.authorId]);
+  
+  const { data: author } = useDoc<User>(authorDocRef);
 
   const timeAgo = post.createdAt
     ? formatDistanceToNow(new Date(post.createdAt.seconds * 1000), { addSuffix: true })
