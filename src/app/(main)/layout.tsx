@@ -1,5 +1,4 @@
-import { AppSidebar } from '@/components/shared/app-sidebar';
-import { SidebarProvider, SidebarInset } from '@/components/ui/sidebar';
+import { BottomNavBar } from '@/components/shared/bottom-nav-bar';
 
 export default function MainLayout({
   children,
@@ -7,13 +6,9 @@ export default function MainLayout({
   children: React.ReactNode;
 }) {
   return (
-    <SidebarProvider>
-      <div className="flex min-h-screen bg-background">
-        <AppSidebar />
-        <SidebarInset className="p-0 m-0 rounded-none shadow-none bg-transparent">
-          {children}
-        </SidebarInset>
-      </div>
-    </SidebarProvider>
+    <div className="flex flex-col min-h-screen bg-background">
+      <main className="flex-1 w-full h-full">{children}</main>
+      <BottomNavBar />
+    </div>
   );
 }
