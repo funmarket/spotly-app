@@ -1,6 +1,6 @@
 'use client';
 import { useMemo } from 'react';
-import { notFound } from 'next/navigation';
+import { notFound, useRouter } from 'next/navigation';
 import { ProfileHeader } from '@/components/profile/profile-header';
 import { AdminAiInsights } from '@/components/profile/admin-ai-insights';
 import { Card, CardContent, CardFooter } from '@/components/ui/card';
@@ -12,6 +12,7 @@ import { useCollection, useFirestore, useMemoFirebase, useUser, useDoc } from '@
 import { collection, query, where, orderBy, doc } from 'firebase/firestore';
 import type { Video, User } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
+import { AiInsights } from '@/components/profile/ai-insights';
 
 const StatCard = ({ icon: Icon, title, value, color, isLoading }: { icon: React.ElementType, title: string, value: string, color: string, isLoading?: boolean }) => (
   <Card className="bg-card/50">
@@ -54,6 +55,18 @@ function ProfileVideos({ userId }: { userId: string }) {
       </div>
     );
   }
+  
+  if (!videos || videos.length === 0) {
+      return (
+          <Card className="col-span-full py-12 text-center">
+              <CardContent>
+                  <VideoIcon className="mx-auto h-12 w-12 text-muted-foreground" />
+                  <h3 className="mt-4 text-lg font-semibold">No Videos Yet</h3>
+                  <p className="mt-1 text-sm text-muted-foreground">This artist hasn't uploaded any videos.</p>
+              </CardContent>
+          </Card>
+      )
+  }
 
   return (
     <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
@@ -75,13 +88,15 @@ function ProfileVideos({ userId }: { userId: string }) {
 }
 
 export default function ProfilePage({ params }: { params: { userId: string } }) {
+  const { userId } = params;
   const { user: authUser } = useUser();
   const firestore = useFirestore();
+  const router = useRouter();
 
   const userDocRef = useMemoFirebase(() => {
-      if (!firestore || !params.userId) return null;
-      return doc(firestore, 'users', params.userId);
-  }, [firestore, params.userId]);
+      if (!firestore || !userId) return null;
+      return doc(firestore, 'users', userId);
+  }, [firestore, userId]);
   const { data: viewingUser, isLoading: isUserLoading } = useDoc<User>(userDocRef);
 
   if (!isUserLoading && !viewingUser) {
@@ -108,46 +123,53 @@ export default function ProfilePage({ params }: { params: { userId: string } }) 
     }, { totalViews: 0, totalTops: 0, totalVideos: 0 });
   }, [videos]);
   
-  const isAdmin = authUser?.uid === 'ADMIN_WALLET_PLACEHOLDER';
+  const isAdmin = authUser?.uid === 'HZ2GQg1Qdh4kmGSTjRBAHVwTw88JVqkL1Hda2Y1Tqxgs';
   const isOwnProfile = authUser?.uid === viewingUser?.walletAddress;
 
   if (isUserLoading || !viewingUser) {
       return <div className="min-h-screen"><Skeleton className="h-64 w-full" /><div className="container mx-auto p-4 sm:p-6 lg:p-8 mt-6"><Skeleton className="h-32 w-full" /></div></div>
   }
 
-  const mainContent = (
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-        <StatCard icon={Wallet} title="Total Earnings" value="$0" color="text-green-400" isLoading={videosLoading} />
-        <StatCard icon={VideoIcon} title="Total Videos" value={stats.totalVideos.toLocaleString()} color="text-primary" isLoading={videosLoading} />
-        <StatCard icon={Eye} title="Total Views" value={stats.totalViews.toLocaleString()} color="text-blue-400" isLoading={videosLoading} />
-        <StatCard icon={ThumbsUp} title="Total Tops" value={stats.totalTops.toLocaleString()} color="text-pink-400" isLoading={videosLoading} />
-    </div>
-  );
+  const handleMessage = () => {
+    router.push(`/gossip?openConversationWith=${userId}`);
+  };
 
   return (
     <div className="min-h-screen">
-      <ProfileHeader user={viewingUser} />
+      <ProfileHeader user={viewingUser} isOwnProfile={isOwnProfile} onMessage={handleMessage} />
       <div className="container mx-auto p-4 sm:p-6 lg:p-8 mt-6">
-        {(isOwnProfile || isAdmin) && viewingUser.role === 'artist' ? (
-          <Tabs defaultValue="overview" className="w-full">
+        <Tabs defaultValue="videos" className="w-full">
             <TabsList className="grid w-full grid-cols-3">
-              <TabsTrigger value="overview">Overview</TabsTrigger>
               <TabsTrigger value="videos">Videos</TabsTrigger>
+              <TabsTrigger value="stats">Stats</TabsTrigger>
               <TabsTrigger value="insights">AI Insights</TabsTrigger>
             </TabsList>
-            <TabsContent value="overview" className="mt-6">
-              {mainContent}
-            </TabsContent>
             <TabsContent value="videos" className="mt-6">
                <ProfileVideos userId={viewingUser.walletAddress} />
             </TabsContent>
+            <TabsContent value="stats" className="mt-6">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                    <StatCard icon={Wallet} title="Total Earnings" value="$0" color="text-green-400" isLoading={videosLoading} />
+                    <StatCard icon={VideoIcon} title="Total Videos" value={stats.totalVideos.toLocaleString()} color="text-primary" isLoading={videosLoading} />
+                    <StatCard icon={Eye} title="Total Views" value={stats.totalViews.toLocaleString()} color="text-blue-400" isLoading={videosLoading} />
+                    <StatCard icon={ThumbsUp} title="Total Tops" value={stats.totalTops.toLocaleString()} color="text-pink-400" isLoading={videosLoading} />
+                </div>
+            </TabsContent>
             <TabsContent value="insights" className="mt-6">
-              <AdminAiInsights />
+              {isAdmin && <AdminAiInsights />}
+              {(isOwnProfile && viewingUser.role === 'artist') && <AiInsights artistId={userId} />}
+              {!isOwnProfile && !isAdmin && (
+                  <Card className="col-span-full py-12 text-center">
+                    <CardContent>
+                      <h3 className="text-lg font-semibold">Private Insights</h3>
+                      <p className="mt-1 text-sm text-muted-foreground">
+                        AI-generated insights are only visible to the artist and administrators.
+                      </p>
+                    </CardContent>
+                  </Card>
+              )}
             </TabsContent>
           </Tabs>
-        ) : (
-           mainContent
-        )}
       </div>
     </div>
   );
