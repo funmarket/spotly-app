@@ -1,47 +1,55 @@
 'use client';
-import { useEffect } from 'react';
-import { useRouter } from 'next/navigation';
-import { doc, getDoc } from 'firebase/firestore';
 import { useFirebase } from '@/firebase';
-import { BottomNavBar } from '@/components/shared/bottom-nav-bar';
+import { useRouter } from 'next/navigation';
+import { useEffect, useState } from 'react';
 import { Loader2 } from 'lucide-react';
+import { getDoc, doc } from 'firebase/firestore';
 
 function AppContent({ children }: { children: React.ReactNode }) {
-  const { firestore, user, isUserLoading } = useFirebase();
+  const { user, isUserLoading, firestore } = useFirebase();
   const router = useRouter();
+  const [isCheckingProfile, setIsCheckingProfile] = useState(true);
 
   useEffect(() => {
     if (isUserLoading) {
-      return; // Wait until user status is resolved
+      return;
     }
-    if (user && firestore) {
+
+    if (user) {
       const userDocRef = doc(firestore, 'users', user.uid);
       getDoc(userDocRef).then((docSnap) => {
         if (!docSnap.exists()) {
-          // If user is authenticated but has no profile, redirect to onboarding
+          // If user is authenticated but has no profile, send to onboarding
           router.replace('/onboarding');
+        } else {
+          // User has a profile, allow access
+          setIsCheckingProfile(false);
         }
       });
+    } else {
+      // Not logged in, can view public pages
+      setIsCheckingProfile(false);
     }
-    // No action needed for guest users (user is null), they can browse freely.
   }, [user, isUserLoading, firestore, router]);
-
-  if (isUserLoading) {
+  
+  if (isUserLoading || isCheckingProfile) {
     return (
       <div className="flex h-screen items-center justify-center bg-background">
         <Loader2 className="h-12 w-12 animate-spin text-primary" />
       </div>
     );
   }
-  
-  return (
-    <div className="flex flex-col min-h-screen bg-background">
-      <main className="flex-1 w-full h-full">{children}</main>
-      <BottomNavBar />
-    </div>
-  );
+
+  return <>{children}</>;
 }
 
+
 export default function MainLayout({ children }: { children: React.ReactNode }) {
-    return <AppContent>{children}</AppContent>;
+  return (
+    <main>
+        <AppContent>
+            {children}
+        </AppContent>
+    </main>
+  );
 }

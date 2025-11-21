@@ -1,31 +1,35 @@
 'use client';
 import { useEffect, useState } from 'react';
 import { VideoFeed } from '@/components/feed/video-feed';
-import { useCollection, useFirebase, useMemoFirebase } from '@/firebase';
+import { useFirebase, useMemoFirebase } from '@/firebase';
 import { collection, query, where, orderBy, getDoc, doc, limit } from 'firebase/firestore';
 import type { EnrichedVideo, User, Video } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
-
-const LoadingSkeleton = () => (
-  <div className="h-screen w-full snap-start relative flex items-center justify-center bg-black">
-    <Skeleton className="h-full w-full" />
-  </div>
-);
-
-const HomeSkeleton = () => (
-    <div className="relative h-[calc(100vh)] w-full snap-y snap-mandatory overflow-y-scroll bg-black scrollbar-hide">
-        <LoadingSkeleton />
-        <LoadingSkeleton />
-        <LoadingSkeleton />
-    </div>
-);
+import { useRouter } from 'next/navigation';
+import { Loader2 } from 'lucide-react';
 
 export default function HomePage() {
   const { firestore, user, isUserLoading } = useFirebase();
+  const router = useRouter();
+
   const [enrichedVideos, setEnrichedVideos] = useState<EnrichedVideo[]>([]);
   const [isEnriching, setIsEnriching] = useState(true);
   const [activeFeedTab, setActiveFeedTab] = useState('music');
   const [currentUser, setCurrentUser] = useState<User | null>(null);
+
+  useEffect(() => {
+    if (user && firestore) {
+      const userDocRef = doc(firestore, 'users', user.uid);
+      getDoc(userDocRef).then((docSnap) => {
+        if (docSnap.exists()) {
+           setCurrentUser({ userId: docSnap.id, ...docSnap.data() } as User);
+        }
+      });
+    } else {
+        setCurrentUser(null);
+    }
+  }, [user, firestore]);
+
 
   const videosQuery = useMemoFirebase(() => {
     if (!firestore) return null;
@@ -42,19 +46,6 @@ export default function HomePage() {
 
   const { data: videos, isLoading: areVideosLoading } = useCollection<Video & { id: string }>(videosQuery);
   
-  useEffect(() => {
-    if (user && firestore) {
-        const userDocRef = doc(firestore, 'users', user.uid);
-        getDoc(userDocRef).then(docSnap => {
-            if (docSnap.exists()) {
-                setCurrentUser({ userId: docSnap.id, ...docSnap.data() } as User);
-            }
-        });
-    } else {
-        setCurrentUser(null);
-    }
-  }, [user, firestore]);
-
   useEffect(() => {
     const enrichVideos = async () => {
       if (!videos || !firestore) {
@@ -103,7 +94,11 @@ export default function HomePage() {
   const isLoading = isUserLoading || areVideosLoading || isEnriching;
 
   if (isLoading && enrichedVideos.length === 0) {
-    return <HomeSkeleton />;
+    return (
+      <div className="flex h-screen items-center justify-center bg-background">
+        <Loader2 className="h-12 w-12 animate-spin text-primary" />
+      </div>
+    );
   }
 
   return (
