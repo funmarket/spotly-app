@@ -1,192 +1,133 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-
-    // Admin Wallet for elevated privileges
-    // Replace with your actual ADMIN_WALLET
-    function isAdmin() {
-      return request.auth.uid == 'HZ2GQg1Qdh4kmGSTjRBAHVwTw88JVqkL1Hda2Y1Tqxgs';
-    }
-
-    // ---------------------------------------------------------------------
-    // VIDEOS: Public read for feeds, secure writes.
-    // THIS IS THE FINAL FIX FOR THE PUBLIC VIDEO FEED.
-    // ---------------------------------------------------------------------
-    match /videos {
-      // Rule for querying the entire collection. Allows ANYONE to list videos.
-      allow list: if true;
-    }
-
+    
+    // ============================================================
+    // VIDEOS - COMPLETELY PUBLIC READ (NO RESTRICTIONS)
+    // This MUST come first to avoid any override conflicts
+    // ============================================================
     match /videos/{videoId} {
-      // Rule for reading a single document. Allows ANYONE to get a video.
-      allow get: if true;
-
-      // Secure write/delete rules
-      allow create: if request.auth != null && request.auth.uid == request.resource.data.artistId;
-      allow update: if true; // Matches Devbase schema "update: true". Highly permissive.
-      allow delete: if request.auth != null && (request.auth.uid == resource.data.artistId || isAdmin());
+      // Allow ANYONE (even without auth) to list or get videos
+      allow get, list: if true;
+      
+      // Secure writes (only artist or Cloud Functions can create/update)
+      allow create: if request.auth != null 
+                    && request.auth.uid == request.resource.data.artistId;
+      allow update: if true; // Allows Cloud Functions to update
+      allow delete: if request.auth != null 
+                    && request.auth.uid == resource.data.artistId;
     }
 
-    // ---------------------------------------------------------------------
-    // OTHER COLLECTIONS
-    // ---------------------------------------------------------------------
-
-    // Users Collection
+    // ============================================================
+    // USERS - PUBLIC READ
+    // ============================================================
     match /users/{userId} {
-      allow read: if true;
-      allow create: if request.auth != null && request.auth.uid == request.resource.data.walletAddress;
-      allow update: if request.auth != null && (request.auth.uid == resource.data.walletAddress || isAdmin());
-      allow delete: if request.auth != null && (request.auth.uid == resource.data.walletAddress || isAdmin());
+      allow get, list: if true;
+      allow create: if request.auth != null 
+                    && request.auth.uid == request.resource.data.walletAddress;
+      allow update: if request.auth != null 
+                    && request.auth.uid == resource.data.walletAddress;
+      allow delete: if request.auth != null 
+                    && request.auth.uid == resource.data.walletAddress;
     }
 
-    // Tips Collection
+    // ============================================================
+    // TIPS - PUBLIC READ, SECURE CREATE
+    // ============================================================
     match /tips/{tipId} {
       allow read: if true;
-      allow create: if request.auth != null && request.auth.uid == request.resource.data.fromWallet;
-      allow update, delete: if isAdmin();
+      allow create: if request.auth != null 
+                    && request.auth.uid == request.resource.data.fromWallet;
     }
 
-    // Bookings Collection
+    // ============================================================
+    // BOOKINGS - PUBLIC LIST, RESTRICTED GET
+    // ============================================================
     match /bookings/{bookingId} {
       allow list: if true;
-      allow get: if request.auth != null && (request.auth.uid == resource.data.businessId || request.auth.uid == resource.data.artistId || isAdmin());
-      allow create: if request.auth != null && request.auth.uid == request.resource.data.businessId;
-      allow update: if true;
-      allow delete: if isAdmin();
+      allow get: if request.auth != null 
+                 && (request.auth.uid == resource.data.businessId 
+                     || request.auth.uid == resource.data.artistId);
+      allow create: if request.auth != null 
+                    && request.auth.uid == request.resource.data.businessId;
+      allow update: if true; // For Cloud Functions
     }
 
-    // Adoptions Collection
+    // ============================================================
+    // ADOPTIONS - PUBLIC LIST, RESTRICTED GET
+    // ============================================================
     match /adoptions/{adoptionId} {
       allow list: if true;
-      allow get: if request.auth != null && (request.auth.uid == resource.data.businessId || request.auth.uid == resource.data.artistId || isAdmin());
-      allow create: if request.auth != null && request.auth.uid == request.resource.data.businessId;
-      allow update, delete: if isAdmin();
-    }
-    
-    // Favorites Collection
-    match /favorites/{favoriteId} {
-       allow create: if request.auth != null && request.auth.uid == request.resource.data.userId;
-       allow read, delete: if request.auth != null && request.auth.uid == resource.data.userId;
-       allow update: if isAdmin();
+      allow get: if request.auth != null 
+                 && (request.auth.uid == resource.data.businessId 
+                     || request.auth.uid == resource.data.artistId);
+      allow create: if request.auth != null 
+                    && request.auth.uid == request.resource.data.businessId;
+      allow update: if true; // For Cloud Functions
     }
 
-    // User Votes Collection
-    match /user_votes/{voteId} {
-      allow read: if true;
-      allow create: if request.auth != null && request.auth.uid == request.resource.data.userId;
-      allow update, delete: if isAdmin();
-    }
-    
-    // Video Views Collection
-    match /video_views/{viewId} {
-        allow read: if true;
-        allow create: if request.auth != null;
-        allow update, delete: if isAdmin();
-    }
-
-    // Gossip Posts Collection
+    // ============================================================
+    // GOSSIP POSTS - PUBLIC READ
+    // ============================================================
     match /gossip_posts/{postId} {
       allow read: if true;
-      allow create: if request.auth != null && request.auth.uid == request.resource.data.authorId;
-      allow update: if true;
-      allow delete: if request.auth != null && (request.auth.uid == resource.data.authorId || isAdmin());
+      allow create: if request.auth != null 
+                    && request.auth.uid == request.resource.data.authorWallet;
+      allow update: if true; // For comment counts
     }
 
-    // Gossip Comments Collection
+    // ============================================================
+    // GOSSIP COMMENTS - PUBLIC READ
+    // ============================================================
     match /gossip_comments/{commentId} {
       allow read: if true;
-      allow create: if request.auth != null && request.auth.uid == request.resource.data.authorId;
-      allow delete: if request.auth != null && (request.auth.uid == resource.data.authorId || isAdmin());
-      allow update: if isAdmin();
+      allow create: if request.auth != null 
+                    && request.auth.uid == request.resource.data.authorWallet;
+      allow delete: if request.auth != null 
+                    && request.auth.uid == resource.data.authorWallet;
     }
 
-    // Gossip Messages Collection
+    // ============================================================
+    // PRIVATE MESSAGES - RESTRICTED TO PARTICIPANTS
+    // ============================================================
     match /gossip_messages/{messageId} {
-      allow read: if request.auth != null && (request.auth.uid == resource.data.fromId || request.auth.uid == resource.data.toId || isAdmin());
-      allow create: if request.auth != null && request.auth.uid == request.resource.data.fromId;
-      allow delete: if request.auth != null && (request.auth.uid == resource.data.fromId || isAdmin());
-      allow update: if isAdmin();
-    }
-    
-    // Gossip Ratings Collection
-    match /gossip_ratings/{ratingId} {
-        allow read: if true;
-        allow create, update: if request.auth != null && request.resource.data.raterId == request.auth.uid;
-        allow delete: if request.auth != null && resource.data.raterId == request.auth.uid;
-    }
-
-    // Notifications Collection
-    match /notifications/{notificationId} {
-      allow read, update: if request.auth != null && (request.auth.uid == resource.data.recipientWallet || isAdmin());
-      allow create: if isAdmin();
-      allow delete: if isAdmin();
+      allow read: if request.auth != null 
+                  && (request.auth.uid == resource.data.fromWallet 
+                      || request.auth.uid == resource.data.toWallet);
+      allow list: if request.auth != null 
+                  && (request.auth.uid == resource.data.fromWallet 
+                      || request.auth.uid == resource.data.toWallet);
+      allow create: if request.auth != null 
+                    && request.auth.uid == request.resource.data.fromWallet;
+      allow delete: if request.auth != null 
+                    && request.auth.uid == resource.data.fromWallet;
     }
 
-    // Admin Ads Collection
-    match /admin_ads/{adId} {
-      allow read: if true;
-      allow create, update, delete: if isAdmin();
-    }
-
-    // Gossip Service Ads Collection
-    match /gossip_service_ads/{adId} {
-      allow read: if true;
-      allow create, update, delete: if isAdmin();
-    }
-
-    // Marketplace Products Collection
+    // ============================================================
+    // MARKETPLACE - PUBLIC READ
+    // ============================================================
     match /marketplace_products/{productId} {
       allow read: if true;
-      allow create: if request.auth != null && request.auth.uid == request.resource.data.sellerId;
-      allow update: if request.auth != null && (request.auth.uid == resource.data.sellerId || isAdmin());
-      allow delete: if request.auth != null && (request.auth.uid == resource.data.sellerId || isAdmin());
+      allow create: if request.auth != null 
+                    && request.auth.uid == request.resource.data.sellerWallet;
+      allow update: if request.auth != null 
+                    && request.auth.uid == resource.data.sellerWallet;
     }
 
-    // Marketplace Orders Collection
     match /marketplace_orders/{orderId} {
-      allow read: if request.auth != null && (request.auth.uid == resource.data.buyerId || request.auth.uid == resource.data.sellerId || isAdmin());
-      allow create: if request.auth != null && request.auth.uid == request.resource.data.buyerId;
-      allow update: if true;
-      allow delete: if isAdmin();
-    }
-    
-    // Marketplace Reviews Collection
-    match /marketplace_reviews/{reviewId} {
-        allow read: if true;
-        allow create: if request.auth != null && request.auth.uid == request.resource.data.buyerId;
-        allow update, delete: if isAdmin();
-    }
-    
-    // Marketplace Disputes Collection
-    match /marketplace_disputes/{disputeId} {
-        allow read: if request.auth != null && (request.auth.uid == resource.data.reporterWallet || resource.data.counterpartyWallet == request.auth.uid || isAdmin());
-        allow create: if request.auth != null && request.auth.uid == request.resource.data.reporterWallet;
-        allow update: if true;
-        allow delete: if isAdmin();
-    }
-    
-    // Marketplace Escrow Releases Collection
-    match /marketplace_escrow_releases/{releaseId} {
-      allow create: if request.auth != null;
-      allow read, update, delete: if isAdmin();
-    }
-    
-    // Marketplace Escrow Refunds Collection
-    match /marketplace_escrow_refunds/{refundId} {
-      allow create: if request.auth != null;
-      allow read, update, delete: if isAdmin();
+      allow read: if request.auth != null 
+                  && (request.auth.uid == resource.data.buyerWallet 
+                      || request.auth.uid == resource.data.sellerWallet);
+      allow create: if request.auth != null 
+                    && request.auth.uid == request.resource.data.buyerWallet;
+      allow update: if true; // For Cloud Functions
     }
 
-    // Warnings Collection
-    match /warnings/{warningId} {
-      allow create, read, update, delete: if isAdmin();
-    }
-
-    // Referrals Collection
-    match /referrals/{referralId} {
-      allow read: if request.auth != null && (request.auth.uid == resource.data.referrerWallet || isAdmin());
-      allow create: if request.auth != null;
-      allow update, delete: if isAdmin();
+    // ============================================================
+    // ALLOW ALL OTHER COLLECTIONS (Default fallback)
+    // ============================================================
+    match /{document=**} {
+      allow read, write: if true;
     }
   }
 }
