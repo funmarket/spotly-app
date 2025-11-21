@@ -1,5 +1,5 @@
 'use client';
-import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import type { EnrichedVideo, User, Favorite } from '@/lib/types';
 import { VideoCard } from './video-card';
 import { Button } from '@/components/ui/button';
@@ -180,6 +180,10 @@ export function VideoFeed({ videos, activeFeedTab, setActiveFeedTab, isLoading, 
    const nextVideo = useCallback(() => {
     feedRef.current?.scrollBy({ top: window.innerHeight, behavior: 'smooth' });
   }, []);
+  
+   const prevVideo = useCallback(() => {
+    feedRef.current?.scrollBy({ top: -window.innerHeight, behavior: 'smooth' });
+  }, []);
 
    const handleFavorite = useCallback(async (videoId: string) => {
     if (!user || !firestore) {
@@ -234,6 +238,7 @@ export function VideoFeed({ videos, activeFeedTab, setActiveFeedTab, isLoading, 
             onGuestVote={handleGuestVote}
             currentUser={currentUser}
             nextVideo={nextVideo}
+            prevVideo={prevVideo}
         />
       ))}
 

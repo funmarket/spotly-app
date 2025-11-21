@@ -10,14 +10,18 @@ import {
   ThumbsDown,
   Share2,
   Bookmark,
-  DollarSign
+  DollarSign,
+  ChevronUp,
+  ChevronDown
 } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '../ui/avatar';
-import { useFirebase } from '@/firebase';
+import { useFirebase, useMemoFirebase } from '@/firebase';
 import { useToast } from '@/hooks/use-toast';
 import { useRouter } from 'next/navigation';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '../ui/dialog';
-import { useCollection } from '@/firebase';
+import { useCollection } from '@/firebase/firestore/use-collection';
+import { collection, query, where } from 'firebase/firestore';
+
 
 const BookIcon = (props: React.SVGProps<SVGSVGElement>) => (
     <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"></path><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"></path></svg>
@@ -47,7 +51,7 @@ const ActionButton = ({
   className = '',
 }: {
   icon: React.ElementType;
-  label: string;
+  label?: string;
   onClick?: () => void;
   isActive?: boolean;
   isDisabled?: boolean;
@@ -66,11 +70,11 @@ const ActionButton = ({
     >
       <Icon className="h-6 w-6" />
     </Button>
-    <span className="text-xs font-semibold text-white drop-shadow-md">{label}</span>
+    {label && <span className="text-xs font-semibold text-white drop-shadow-md">{label}</span>}
   </div>
 );
 
-export function VideoCard({ video, onVote, onFavorite, guestVoteCount, onGuestVote, currentUser, nextVideo }: { video: EnrichedVideo, onVote: (videoId: string, isTop: boolean) => Promise<void>, onFavorite: (videoId: string) => Promise<void>, guestVoteCount: number, onGuestVote: () => void, currentUser: User | null, nextVideo: () => void }) {
+export function VideoCard({ video, onVote, onFavorite, guestVoteCount, onGuestVote, currentUser, nextVideo, prevVideo }: { video: EnrichedVideo, onVote: (videoId: string, isTop: boolean) => Promise<void>, onFavorite: (videoId: string) => Promise<void>, guestVoteCount: number, onGuestVote: () => void, currentUser: User | null, nextVideo: () => void, prevVideo: () => void }) {
   const cardRef = useRef<HTMLDivElement>(null);
   const isVisible = useOnScreen(cardRef);
   const { firestore, user } = useFirebase();
@@ -83,8 +87,8 @@ export function VideoCard({ video, onVote, onFavorite, guestVoteCount, onGuestVo
   const [isVoteLoading, setIsVoteLoading] = useState(false);
   const [showVoteLimitModal, setShowVoteLimitModal] = useState(false);
   
-  const favoritesQuery = useMemo(() => {
-    if (!user) return null;
+  const favoritesQuery = useMemoFirebase(() => {
+    if (!user || !firestore) return null;
     return query(collection(firestore, 'favorites'), where('userId', '==', user.uid), where('itemId', '==', video.id));
   }, [firestore, user, video.id]);
 
@@ -151,6 +155,14 @@ export function VideoCard({ video, onVote, onFavorite, guestVoteCount, onGuestVo
     }
     // TODO: Implement Hire/Adopt modal
   }
+  
+  const handleTip = () => {
+      if(!user) {
+          toast({ title: 'Please log in to tip artists.', variant: 'destructive' });
+          return;
+      }
+      toast({ title: 'Tipping not implemented yet.'});
+  }
 
 
   return (
@@ -186,17 +198,22 @@ export function VideoCard({ video, onVote, onFavorite, guestVoteCount, onGuestVo
         </Link>
       </div>
 
-      <div className="absolute right-3 bottom-20 flex flex-col items-center gap-4">
+      <div className="absolute right-3 bottom-16 sm:bottom-5 flex flex-col items-center gap-4">
+        <ActionButton icon={ChevronUp} onClick={prevVideo} />
+
         <ActionButton icon={ThumbsUp} label="Top" onClick={() => handleVote(true)} isActive={userVote === 'top'} isDisabled={isVoteLoading} />
         <ActionButton icon={ThumbsDown} label="Flop" onClick={() => handleVote(false)} isActive={userVote === 'flop'} isDisabled={isVoteLoading} />
         <ActionButton icon={Bookmark} label="Save" onClick={() => onFavorite(video.id)} isActive={isFavorited} className={isFavorited ? '!bg-yellow-500' : ''} />
-        <ActionButton icon={Share2} label="Share" onClick={() => toast({ title: 'Sharing not implemented yet.' })} />
-         {currentUser?.role === 'business' && (
+        <ActionButton icon={DollarSign} label="Tip" onClick={handleTip} className="hover:bg-green-500/80" />
+        {currentUser?.role === 'business' && (
             <>
                 <ActionButton icon={BookIcon} label="Hire" onClick={handleHireOrAdopt} className="hover:bg-cyan-500/80" />
                 <ActionButton icon={AdoptIcon} label="Adopt" onClick={handleHireOrAdopt} className="hover:bg-purple-500/80" />
             </>
         )}
+        <ActionButton icon={Share2} label="Share" onClick={() => toast({ title: 'Sharing not implemented yet.' })} />
+
+        <ActionButton icon={ChevronDown} onClick={nextVideo} />
       </div>
     </div>
   );
