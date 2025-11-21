@@ -1,8 +1,9 @@
+
 'use client';
 
 import { useMemo } from 'react';
 import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
-import { collection, query, where, orderBy } from 'firebase/firestore';
+import { collection, query, orderBy } from 'firebase/firestore';
 import type { MarketplaceProduct } from '@/lib/types';
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -63,12 +64,16 @@ export default function MarketplacePage() {
     if (!firestore) return null;
     return query(
       collection(firestore, 'marketplace_products'),
-      where('status', '==', 'active'),
       orderBy('createdAt', 'desc')
     );
   }, [firestore]);
 
-  const { data: products, isLoading } = useCollection<MarketplaceProduct>(productsQuery);
+  const { data: allProducts, isLoading } = useCollection<MarketplaceProduct>(productsQuery);
+
+  const products = useMemo(() => {
+    if (!allProducts) return [];
+    return allProducts.filter(p => p.status === 'active');
+  }, [allProducts]);
 
   return (
     <div className="container mx-auto p-4 sm:p-6 lg:p-8">
