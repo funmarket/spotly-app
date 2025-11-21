@@ -1,5 +1,5 @@
 'use client';
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { notFound, useRouter } from 'next/navigation';
 import { ProfileHeader } from '@/components/profile/profile-header';
 import { AdminAiInsights } from '@/components/profile/admin-ai-insights';
@@ -7,12 +7,14 @@ import { Card, CardContent, CardFooter } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import Image from 'next/image';
 import Link from 'next/link';
-import { BarChart, Eye, ThumbsUp, Wallet, Video as VideoIcon } from 'lucide-react';
+import { BarChart, Eye, ThumbsUp, Wallet, Video as VideoIcon, Trash2 } from 'lucide-react';
 import { useCollection, useFirestore, useMemoFirebase, useUser, useDoc } from '@/firebase';
-import { collection, query, where, orderBy, doc } from 'firebase/firestore';
+import { collection, query, where, orderBy, doc, deleteDoc } from 'firebase/firestore';
 import type { Video, User } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { AiInsights } from '@/components/profile/ai-insights';
+import { Button } from '@/components/ui/button';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 
 const StatCard = ({ icon: Icon, title, value, color, isLoading }: { icon: React.ElementType, title: string, value: string, color: string, isLoading?: boolean }) => (
   <Card className="bg-card/50">
@@ -27,9 +29,10 @@ const StatCard = ({ icon: Icon, title, value, color, isLoading }: { icon: React.
 );
 
 
-function ProfileVideos({ userId }: { userId: string }) {
+function ProfileVideos({ userId, canEdit }: { userId: string, canEdit: boolean }) {
   const firestore = useFirestore();
-  
+  const [deletingVideo, setDeletingVideo] = useState<Video | null>(null);
+
   const videosQuery = useMemoFirebase(() => {
     if (!firestore) return null;
     return query(
@@ -38,8 +41,24 @@ function ProfileVideos({ userId }: { userId: string }) {
       orderBy('createdAt', 'desc')
     );
   }, [firestore, userId]);
-  
+
   const { data: videos, isLoading } = useCollection<Video>(videosQuery);
+
+  const handleDeleteClick = (e: React.MouseEvent, video: Video) => {
+    e.preventDefault();
+    e.stopPropagation();
+    setDeletingVideo(video);
+  }
+
+  const confirmDeleteVideo = async () => {
+    if (!deletingVideo || !firestore) return;
+    try {
+      await deleteDoc(doc(firestore, 'videos', deletingVideo.id!));
+      setDeletingVideo(null);
+    } catch (error) {
+      console.error('Failed to delete video:', error);
+    }
+  }
 
   if (isLoading) {
     return (
@@ -55,7 +74,7 @@ function ProfileVideos({ userId }: { userId: string }) {
       </div>
     );
   }
-  
+
   if (!videos || videos.length === 0) {
       return (
           <Card className="col-span-full py-12 text-center">
@@ -69,25 +88,52 @@ function ProfileVideos({ userId }: { userId: string }) {
   }
 
   return (
-    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-      {videos?.map(video => (
-        <Link href="#" key={video.id} className="group">
-          <Card className="overflow-hidden">
-            <div className="aspect-w-9 aspect-h-16 relative">
-              <Image src={`https://picsum.photos/seed/${video.id}/300/500`} alt={video.description} layout="fill" className="object-cover group-hover:scale-105 transition-transform duration-300" />
-              <div className="absolute inset-0 bg-black/20" />
-            </div>
-            <CardFooter className="p-2">
-              <p className="text-xs text-muted-foreground truncate">{video.description}</p>
-            </CardFooter>
-          </Card>
-        </Link>
-      ))}
-    </div>
+    <>
+      <Dialog open={!!deletingVideo} onOpenChange={(isOpen) => !isOpen && setDeletingVideo(null)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete Video?</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to permanently delete this video? This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="ghost" onClick={() => setDeletingVideo(null)}>Cancel</Button>
+            <Button variant="destructive" onClick={confirmDeleteVideo}>Delete</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+        {videos?.map(video => (
+          <Link href="#" key={video.id} className="group">
+            <Card className="overflow-hidden">
+              <div className="aspect-w-9 aspect-h-16 relative">
+                <Image src={`https://picsum.photos/seed/${video.id}/300/500`} alt={video.description} layout="fill" className="object-cover group-hover:scale-105 transition-transform duration-300" />
+                <div className="absolute inset-0 bg-black/20" />
+                 {canEdit && (
+                  <Button
+                    variant="destructive"
+                    size="icon"
+                    className="absolute top-2 right-2 z-10 h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity"
+                    onClick={(e) => handleDeleteClick(e, video)}
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
+                )}
+              </div>
+              <CardFooter className="p-2">
+                <p className="text-xs text-muted-foreground truncate">{video.description}</p>
+              </CardFooter>
+            </Card>
+          </Link>
+        ))}
+      </div>
+    </>
   )
 }
 
-export default function ProfilePage({ params: { userId } }: { params: { userId: string } }) {
+export default function ProfilePage({ params }: { params: { userId: string } }) {
+  const { userId } = params;
   const { user: authUser } = useUser();
   const firestore = useFirestore();
   const router = useRouter();
@@ -144,7 +190,7 @@ export default function ProfilePage({ params: { userId } }: { params: { userId: 
               <TabsTrigger value="insights">AI Insights</TabsTrigger>
             </TabsList>
             <TabsContent value="videos" className="mt-6">
-               <ProfileVideos userId={viewingUser.walletAddress} />
+               <ProfileVideos userId={viewingUser.walletAddress} canEdit={isOwnProfile} />
             </TabsContent>
             <TabsContent value="stats" className="mt-6">
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
