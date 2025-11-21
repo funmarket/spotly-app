@@ -3,7 +3,7 @@ import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { useFirebase } from '@/firebase';
+import { useFirebase, useMemoFirebase } from '@/firebase';
 import { addDoc, collection, query, orderBy, serverTimestamp } from 'firebase/firestore';
 import { useCollection } from '@/firebase/firestore/use-collection';
 import { Button } from '@/components/ui/button';
@@ -108,9 +108,10 @@ function PostComposer() {
 
 export default function GossipPage() {
   const { firestore, isUserLoading } = useFirebase();
-  const postsQuery = firestore
-    ? query(collection(firestore, 'gossip_posts'), orderBy('createdAt', 'desc'))
-    : null;
+  const postsQuery = useMemoFirebase(() => {
+    if (!firestore) return null;
+    return query(collection(firestore, 'gossip_posts'), orderBy('createdAt', 'desc'));
+  }, [firestore]);
   const { data: posts, isLoading } = useCollection<GossipPost>(postsQuery);
 
   return (
