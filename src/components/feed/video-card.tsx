@@ -1,3 +1,4 @@
+
 'use client';
 import { useRef, useState, useEffect, useCallback } from 'react';
 import type { EnrichedVideo, UserVote, Favorite, User } from '@/lib/types';
@@ -11,10 +12,10 @@ import {
   Share2,
   Bookmark,
   DollarSign,
-  ChevronUp,
-  ArrowDown,
   Briefcase,
   UserPlus,
+  ArrowUp,
+  ArrowDown,
 } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '../ui/avatar';
 import { useFirebase, useMemoFirebase } from '@/firebase';
@@ -31,18 +32,6 @@ const BookIcon = (props: React.SVGProps<SVGSVGElement>) => (
 const AdoptIcon = (props: React.SVGProps<SVGSVGElement>) => (
     <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}><path d="M12 20v-6M9 17H6M15 17h3M12 20a7 7 0 0 1-7-7V9a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v4a7 7 0 0 1-7 7Z"></path><path d="M12 8a2 2 0 0 0-2 2v0a2 2 0 0 0 4 0v0a2 2 0 0 0-2-2Z"></path></svg>
 );
-
-
-function formatCount(num: number | undefined): string {
-  if (num === undefined) return '0';
-  if (num >= 1000000) {
-    return (num / 1000000).toFixed(1) + 'M';
-  }
-  if (num >= 1000) {
-    return (num / 1000).toFixed(1) + 'K';
-  }
-  return num.toString();
-}
 
 const ActionButton = ({
   icon: Icon,
@@ -61,22 +50,20 @@ const ActionButton = ({
   className?: string;
   iconClassName?: string;
 }) => (
-  <div className="flex flex-col items-center gap-1.5">
-    <button
-      onClick={onClick}
-      disabled={isDisabled}
-      className={
-        `flex h-12 w-12 items-center justify-center rounded-lg bg-black/40 text-white backdrop-blur-sm transition-colors duration-200 hover:bg-white/20 disabled:opacity-50 disabled:cursor-not-allowed
-        ${isActive ? '!bg-primary text-primary-foreground' : ''} ${className}`
-      }
-    >
-      <Icon className={`h-6 w-6 ${iconClassName}`} />
-    </button>
-    {label && <span className="text-xs font-semibold text-white drop-shadow-md">{label}</span>}
-  </div>
+  <button
+    onClick={onClick}
+    disabled={isDisabled}
+    className={`flex flex-col items-center justify-center gap-1 text-white group disabled:opacity-50 disabled:cursor-not-allowed ${className}`}
+  >
+    <div className="flex items-center justify-center h-10 w-10 sm:h-12 sm:w-12 rounded-full bg-black/40 backdrop-blur-sm transition-all hover:bg-black/60 group-hover:scale-110">
+        <Icon className={`h-6 w-6 sm:h-7 sm:w-7 transition-all ${isActive ? 'scale-110' : ''} ${iconClassName}`} />
+    </div>
+    {label && <span className="text-xs font-semibold drop-shadow-md">{label}</span>}
+  </button>
 );
 
-export function VideoCard({ video, onVote, onFavorite, guestVoteCount, onGuestVote, currentUser, nextVideo, prevVideo }: { video: EnrichedVideo, onVote: (videoId: string, isTop: boolean) => Promise<void>, onFavorite: (videoId: string) => Promise<void>, guestVoteCount: number, onGuestVote: () => void, currentUser: User | null, nextVideo: () => void, prevVideo: () => void }) {
+
+export function VideoCard({ video, onVote, onFavorite, guestVoteCount, onGuestVote, currentUser, nextVideo, prevVideo }: { video: EnrichedVideo, onVote: (videoId: string, isTop: boolean) => Promise<void>, onFavorite: (videoId:string) => Promise<void>, guestVoteCount: number, onGuestVote: () => void, currentUser: User | null, nextVideo: () => void, prevVideo: () => void }) {
   const cardRef = useRef<HTMLDivElement>(null);
   const isVisible = useOnScreen(cardRef);
   const { firestore, user } = useFirebase();
@@ -97,8 +84,10 @@ export function VideoCard({ video, onVote, onFavorite, guestVoteCount, onGuestVo
   const { data: favorites } = useCollection<Favorite>(favoritesQuery);
   const isFavorited = (favorites || []).length > 0;
 
-
   const getSubRole = (user: User) => {
+    if (user.talentSubcategories && user.talentSubcategories.length > 0) {
+        return user.talentSubcategories[0];
+    }
     if (user.talentCategory) {
       const cat = user.talentCategory.charAt(0).toUpperCase() + user.talentCategory.slice(1);
       if (user.role === 'artist') return cat;
@@ -109,7 +98,7 @@ export function VideoCard({ video, onVote, onFavorite, guestVoteCount, onGuestVo
   const handleVote = async (isTop: boolean) => {
     if (isVoteLoading) return;
 
-    if (!currentUser) { // Guest user
+    if (!user) { // Guest user
       if (guestVoteCount >= 10) {
         setShowVoteLimitModal(true);
         return;
@@ -155,7 +144,7 @@ export function VideoCard({ video, onVote, onFavorite, guestVoteCount, onGuestVo
         })
         return;
     }
-    // TODO: Implement Hire/Adopt modal
+    router.push(`/profile/${video.user.walletAddress}`);
   }
   
   const handleTip = () => {
@@ -164,6 +153,14 @@ export function VideoCard({ video, onVote, onFavorite, guestVoteCount, onGuestVo
           return;
       }
       toast({ title: 'Tipping not implemented yet.'});
+  }
+
+  const handleFavoriteClick = () => {
+    if (!user) {
+        toast({ title: 'Please log in to save videos.', variant: 'destructive' });
+        return;
+    }
+    onFavorite(video.id);
   }
 
 
@@ -187,7 +184,7 @@ export function VideoCard({ video, onVote, onFavorite, guestVoteCount, onGuestVo
       <VideoPlayer src={video.videoUrl} isPlaying={isVisible} />
       <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-black/30 pointer-events-none" />
 
-      <div className="absolute bottom-16 sm:bottom-5 left-5 right-[100px] text-white">
+      <div className="absolute bottom-20 sm:bottom-5 left-5 right-[100px] text-white">
         <Link href={`/profile/${video.user.walletAddress}`} className="flex items-center gap-3 mb-3 group">
           <Avatar className="h-12 w-12 border-2 border-primary">
             <AvatarImage src={video.user.profilePhotoUrl} alt={video.user.username} />
@@ -198,28 +195,30 @@ export function VideoCard({ video, onVote, onFavorite, guestVoteCount, onGuestVo
             <p className="text-sm font-light text-white/80 drop-shadow-lg capitalize">{getSubRole(video.user)}</p>
           </div>
         </Link>
+        <p className="text-sm text-white drop-shadow-md line-clamp-2">{video.description}</p>
       </div>
       
-      {/* Right Action Bar */}
-      <div className="absolute right-3 sm:right-4 top-1/2 -translate-y-1/2 flex flex-col gap-4 z-20">
-        <ActionButton icon={Bookmark} label="Save" onClick={() => onFavorite(video.id)} isActive={isFavorited} iconClassName={isFavorited ? 'fill-white' : ''} />
-        <ActionButton icon={ThumbsUp} label="Up" onClick={() => handleVote(true)} isActive={userVote === 'top'} isDisabled={isVoteLoading} iconClassName="text-green-400" />
-        <ActionButton icon={ThumbsDown} label="Flop" onClick={() => handleVote(false)} isActive={userVote === 'flop'} isDisabled={isVoteLoading} iconClassName="text-red-400" />
-        <ActionButton icon={ArrowDown} label="Down" onClick={nextVideo} iconClassName="text-gray-400" />
-        <ActionButton icon={DollarSign} label="Tip" onClick={handleTip} iconClassName="text-green-400" />
-        {currentUser?.role === 'business' && (
-            <>
-                <ActionButton icon={Briefcase} label="Book" onClick={handleHireOrAdopt} iconClassName="text-cyan-400" />
-                <ActionButton icon={UserPlus} label="Adopt" onClick={handleHireOrAdopt} iconClassName="text-purple-400" />
-            </>
-        )}
-      </div>
-
-       {/* Left Action Bar */}
+      {/* Left Action Bar */}
        <div className="absolute left-3 sm:left-4 top-1/2 -translate-y-1/2 z-20">
-         <ActionButton icon={ChevronUp} onClick={prevVideo} />
+         <ActionButton icon={ArrowUp} onClick={prevVideo} />
        </div>
 
+      {/* Right Action Bar */}
+      <div className="absolute right-3 sm:right-4 top-1/2 -translate-y-1/2 flex flex-col gap-4 z-20">
+        <ActionButton icon={Bookmark} label="Save" onClick={handleFavoriteClick} isActive={isFavorited} iconClassName={isFavorited ? 'fill-white' : ''} />
+        <ActionButton icon={ThumbsUp} label="Top" onClick={() => handleVote(true)} isActive={userVote === 'top'} isDisabled={isVoteLoading} iconClassName="text-green-400 group-hover:drop-shadow-[0_0_8px_rgba(34,197,94,0.8)]" />
+        <ActionButton icon={ThumbsDown} label="Flop" onClick={() => handleVote(false)} isActive={userVote === 'flop'} isDisabled={isVoteLoading} iconClassName="text-red-400 group-hover:drop-shadow-[0_0_8px_rgba(239,68,68,0.8)]" />
+        <ActionButton icon={ArrowDown} label="Down" onClick={nextVideo} iconClassName="text-gray-400" />
+        <ActionButton icon={DollarSign} label="Tip" onClick={handleTip} iconClassName="text-yellow-400 group-hover:drop-shadow-[0_0_8px_rgba(234,179,8,0.8)]" />
+        
+        {currentUser?.role === 'business' && (
+            <>
+                <ActionButton icon={BookIcon} label="Book" onClick={handleHireOrAdopt} iconClassName="text-cyan-400 group-hover:drop-shadow-[0_0_8px_rgba(34,211,238,0.8)]" />
+                <ActionButton icon={AdoptIcon} label="Adopt" onClick={handleHireOrAdopt} iconClassName="text-purple-400 group-hover:drop-shadow-[0_0_8px_rgba(168,85,247,0.8)]" />
+            </>
+        )}
+         <ActionButton icon={Share2} label="Share" onClick={() => toast({title: 'Share not implemented'})} />
+      </div>
     </div>
   );
 }

@@ -27,12 +27,12 @@ function Feed() {
            setCurrentUser({ userId: docSnap.id, ...docSnap.data() } as User);
         } else {
             // User is authenticated but has no profile.
-            // DO NOT redirect. Treat them as a guest for browsing purposes.
-            // The user will be prompted to create a profile when they take an action.
+            // Treat them as a guest for browsing purposes.
             setCurrentUser(null);
         }
       });
     } else {
+      // No authenticated user, treat as guest.
       setCurrentUser(null);
     }
   }, [user, isUserLoading, firestore, router]);
@@ -46,7 +46,8 @@ function Feed() {
     if (activeFeedTab === 'rising') {
        return query(videosCollection, orderBy('rankingScore', 'desc'), limit(50));
     } else {
-       return query(videosCollection, orderBy('createdAt', 'desc'), limit(100));
+       // For specific categories, we also order by creation date as a primary sort key
+       return query(videosCollection, where('videoCategory', '==', activeFeedTab), orderBy('createdAt', 'desc'), limit(100));
     }
   }, [firestore, activeFeedTab]);
 
@@ -63,9 +64,7 @@ function Feed() {
       
       const userCache = new Map<string, User>();
 
-      const filteredVideos = activeFeedTab === 'rising' 
-        ? videos 
-        : videos.filter(v => v.videoCategory === activeFeedTab);
+      const filteredVideos = videos; // Query now handles category filtering
 
       const enriched = await Promise.all(
         filteredVideos

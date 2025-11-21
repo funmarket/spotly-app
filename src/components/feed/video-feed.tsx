@@ -1,3 +1,4 @@
+
 'use client';
 import { useState, useRef, useEffect, useCallback } from 'react';
 import type { EnrichedVideo, User, Favorite } from '@/lib/types';
@@ -53,7 +54,7 @@ function TopCategoryMenu({ activeFeedTab, setActiveFeedTab, onSearchClick }: { a
           ))}
         </div>
         <div className="flex items-center gap-1">
-           <Button variant="ghost" size="icon" onClick={onSearchClick} className="text-white/80 hover:text-white hover:bg-white/10">
+           <Button variant="ghost" size="icon" onClick={() => router.push('/discover')} className="text-white/80 hover:text-white hover:bg-white/10">
             <Search className="h-5 w-5" />
           </Button>
           <Button variant="ghost" size="icon" onClick={() => router.push('/notifications')} className="text-white/80 hover:text-white hover:bg-white/10 relative">
@@ -81,7 +82,7 @@ const BottomNavBar = () => {
       { href: '/', label: 'Home', icon: Home },
       { href: '/discover', label: 'Discover', icon: Compass },
       { href: '/submit-video', label: 'Upload', icon: Upload },
-      { href: '/gossip', label: 'Gossip', icon: MessageCircle },
+      { href: '/gossip', label: 'Inbox', icon: MessageCircle },
       { href: '/profile', label: 'Profile', icon: UserIcon },
     ];
 
@@ -122,10 +123,11 @@ export function VideoFeed({ videos, activeFeedTab, setActiveFeedTab, isLoading, 
   const [guestVoteCount, setGuestVoteCount] = useState(0);
 
   useEffect(() => {
-    if (!currentUser) {
-        setGuestVoteCount(parseInt(localStorage.getItem('guestVoteCount') || '0'));
+    if (!user) { // Only track for guests
+        const storedCount = localStorage.getItem('guestVoteCount');
+        setGuestVoteCount(storedCount ? parseInt(storedCount) : 0);
     }
-  }, [currentUser]);
+  }, [user]);
 
   const handleGuestVote = () => {
     const newCount = guestVoteCount + 1;
@@ -135,7 +137,7 @@ export function VideoFeed({ videos, activeFeedTab, setActiveFeedTab, isLoading, 
 
    const handleVote = useCallback(async (videoId: string, isTop: boolean) => {
     if (!user && guestVoteCount >= 10) {
-      // Logic to show signup modal will be in VideoCard
+      // Logic to show signup modal is in VideoCard
       return; 
     }
     if (!firestore) return;
@@ -160,7 +162,7 @@ export function VideoFeed({ videos, activeFeedTab, setActiveFeedTab, isLoading, 
     // Revert existing vote if there is one
     if (existingVote === 'top') batch.update(videoRef, { topCount: increment(-1), rankingScore: increment(-1) });
     if (existingVote === 'flop') batch.update(videoRef, { flopCount: increment(-1), rankingScore: increment(1) });
-    if (voteDocId) batch.delete(doc(firestore, 'user_votes', voteDocId));
+    if (voteDocId && user) batch.delete(doc(firestore, 'user_votes', voteDocId));
 
     // Apply new vote
     if (newVoteType) {
@@ -227,7 +229,7 @@ export function VideoFeed({ videos, activeFeedTab, setActiveFeedTab, isLoading, 
   return (
     <div className="h-screen w-full bg-black">
         <TopCategoryMenu activeFeedTab={activeFeedTab} setActiveFeedTab={setActiveFeedTab} onSearchClick={() => {}} />
-        <div ref={feedRef} className="relative h-full w-full snap-y snap-mandatory overflow-y-scroll scrollbar-hide">
+        <div ref={feedRef} className="relative h-full w-full snap-y snap-mandatory overflow-y-scroll scrollbar-hide pt-14 pb-16">
             {videos.map((video) => (
                 <VideoCard 
                     key={video.id} 
