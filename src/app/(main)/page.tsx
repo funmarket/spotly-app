@@ -1,7 +1,7 @@
 'use client';
 import { useEffect, useState } from 'react';
 import { VideoFeed } from '@/components/feed/video-feed';
-import { useCollection, useMemoFirebase } from '@/firebase';
+import { useCollection, useFirebase, useMemoFirebase } from '@/firebase';
 import { useFirestore } from '@/firebase/provider';
 import { collection, query, where, orderBy, getDocs, doc, getDoc } from 'firebase/firestore';
 import type { EnrichedVideo, User, Video } from '@/lib/types';
@@ -15,12 +15,13 @@ const LoadingSkeleton = () => (
 
 
 export default function HomePage() {
-  const firestore = useFirestore();
+  const { firestore, isUserLoading } = useFirebase();
   const [enrichedVideos, setEnrichedVideos] = useState<EnrichedVideo[]>([]);
   const [isEnriching, setIsEnriching] = useState(true);
 
   const videosQuery = useMemoFirebase(() => {
-    if (!firestore) return null;
+    // **FIX:** Do not run the query until Firebase auth state is resolved.
+    if (!firestore || isUserLoading) return null; 
     return query(
       collection(firestore, 'videos'),
       where('status', '==', 'active'),
@@ -28,14 +29,14 @@ export default function HomePage() {
       where('hiddenFromFeed', '==', false),
       orderBy('createdAt', 'desc')
     );
-  }, [firestore]);
+  }, [firestore, isUserLoading]);
 
   const { data: videos, isLoading: areVideosLoading } = useCollection<Video & { id: string }>(videosQuery);
 
   useEffect(() => {
     const enrichVideos = async () => {
       if (!videos || !firestore) {
-        if (!areVideosLoading) setIsEnriching(false);
+        if (!areVideosLoading && !isUserLoading) setIsEnriching(false);
         return;
       }
       
@@ -70,10 +71,10 @@ export default function HomePage() {
     };
 
     enrichVideos();
-  }, [videos, firestore, areVideosLoading]);
+  }, [videos, firestore, areVideosLoading, isUserLoading]);
 
 
-  if (areVideosLoading || isEnriching) {
+  if (areVideosLoading || isEnriching || isUserLoading) {
     return (
        <div className="relative h-[calc(100vh)] w-full snap-y snap-mandatory overflow-y-scroll bg-black scrollbar-hide">
         <LoadingSkeleton />
