@@ -110,9 +110,13 @@ export default function CreateProfilePage() {
     })).optional(),
   }).refine(data => {
       if (accountType === 'artist' || accountType === 'business') {
-        return data.isArtist || data.isBusiness;
+          if (data.isArtist || data.isBusiness) return true;
+          // For combined roles, we need to allow both.
+          // This check is primarily for the single role selection pages.
+          if (accountType === 'artist' && data.isArtist) return true;
+          if (accountType === 'business' && data.isBusiness) return true;
       }
-      return true;
+      return accountType === 'fan'; // Fans don't need to select a type.
   }, {
       message: 'Please select at least one account type (Artist or Business).',
       path: ['isArtist'],
@@ -174,7 +178,7 @@ export default function CreateProfilePage() {
 
     setIsSubmitting(true);
     try {
-        let role: 'fan' | 'artist' | 'business' = 'fan';
+        let role: 'fan' | 'artist' | 'business' | 'regular' = 'fan';
         if (values.isArtist) {
             role = 'artist';
         } else if (values.isBusiness) {
@@ -192,17 +196,17 @@ export default function CreateProfilePage() {
             profilePhotoUrl: values.profilePhotoUrl || `https://picsum.photos/seed/${docId}/400`,
             bannerPhotoUrl: values.bannerPhotoUrl || `https://picsum.photos/seed/banner-${docId}/1200/400`,
             talentCategory: values.isArtist ? values.talentCategory : null,
-            talentSubcategories: values.isArtist ? values.talentSubcategories : [],
+            talentSubcategories: values.isArtist ? JSON.stringify(values.talentSubcategories) : '[]',
             subRole: values.isArtist ? values.subRole : null,
             tags: values.tags || '',
             location: values.location || '',
-            socialLinks: values.socialLinks || {},
-            extraLinks: values.extraLinks || [],
+            socialLinks: JSON.stringify(values.socialLinks || {}),
+            extraLinks: JSON.stringify(values.extraLinks || []),
             rankingScore: 0,
             escrowBalance: 0,
             createdAt: serverTimestamp(),
             updatedAt: serverTimestamp(),
-        });
+        }, { merge: true });
         
         if (role === 'artist') {
             setStep(2);
@@ -236,17 +240,22 @@ export default function CreateProfilePage() {
       setValue('talentSubcategories', newSubs);
   }
 
-  if ((accountType === 'artist' || accountType === 'business') && (!connected || !publicKey)) {
+  if ((accountType === 'artist' || accountType === 'business') && !connected) {
     return (
       <div className="flex min-h-screen items-center justify-center p-4">
         <Card className="w-full max-w-md text-center">
           <CardHeader>
-            <CardTitle className="font-headline text-3xl">Welcome to SPOTLY!</CardTitle>
-            <CardDescription>Connect your Solana wallet to create your {accountType} profile.</CardDescription>
+            <CardTitle className="font-headline text-3xl">Connect Your Wallet</CardTitle>
+            <CardDescription>A wallet is required to create an {accountType} profile on SPOTLY.</CardDescription>
           </CardHeader>
           <CardContent>
             <ClientOnlyWalletButton />
           </CardContent>
+           <CardFooter>
+                <Button variant="link" onClick={() => router.push('/onboarding')}>
+                    Choose a different role
+                </Button>
+           </CardFooter>
         </Card>
       </div>
     );

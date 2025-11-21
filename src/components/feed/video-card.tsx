@@ -86,7 +86,8 @@ export function VideoCard({ video, onVote, onFavorite, guestVoteCount, onGuestVo
 
   const getSubRole = (user: User) => {
     if (user.talentSubcategories && user.talentSubcategories.length > 0) {
-        return user.talentSubcategories[0];
+        const subcategories = typeof user.talentSubcategories === 'string' ? JSON.parse(user.talentSubcategories) : user.talentSubcategories;
+        if (subcategories.length > 0) return subcategories[0];
     }
     if (user.talentCategory) {
       const cat = user.talentCategory.charAt(0).toUpperCase() + user.talentCategory.slice(1);
