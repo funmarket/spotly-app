@@ -12,7 +12,9 @@ import {
   Bookmark,
   DollarSign,
   ChevronUp,
-  ChevronDown
+  ArrowDown,
+  Briefcase,
+  UserPlus,
 } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '../ui/avatar';
 import { useFirebase, useMemoFirebase } from '@/firebase';
@@ -49,6 +51,7 @@ const ActionButton = ({
   isActive,
   isDisabled,
   className = '',
+  iconClassName = '',
 }: {
   icon: React.ElementType;
   label?: string;
@@ -56,20 +59,19 @@ const ActionButton = ({
   isActive?: boolean;
   isDisabled?: boolean;
   className?: string;
+  iconClassName?: string;
 }) => (
-  <div className="flex flex-col items-center gap-1">
-    <Button
-      variant="ghost"
-      size="icon"
-      className={
-        `h-12 w-12 rounded-full text-white bg-black/40 backdrop-blur-sm hover:bg-white/20 transition-colors duration-200
-        ${isActive ? '!bg-primary text-primary-foreground' : ''} ${className}`
-      }
+  <div className="flex flex-col items-center gap-1.5">
+    <button
       onClick={onClick}
       disabled={isDisabled}
+      className={
+        `flex h-12 w-12 items-center justify-center rounded-lg bg-black/40 text-white backdrop-blur-sm transition-colors duration-200 hover:bg-white/20 disabled:opacity-50 disabled:cursor-not-allowed
+        ${isActive ? '!bg-primary text-primary-foreground' : ''} ${className}`
+      }
     >
-      <Icon className="h-6 w-6" />
-    </Button>
+      <Icon className={`h-6 w-6 ${iconClassName}`} />
+    </button>
     {label && <span className="text-xs font-semibold text-white drop-shadow-md">{label}</span>}
   </div>
 );
@@ -198,23 +200,24 @@ export function VideoCard({ video, onVote, onFavorite, guestVoteCount, onGuestVo
         </Link>
       </div>
       
-      <div className="absolute right-3 sm:right-4 top-1/2 -translate-y-1/2 flex flex-col gap-3 z-20">
-        <ActionButton icon={ThumbsUp} label="Up" onClick={() => handleVote(true)} isActive={userVote === 'top'} isDisabled={isVoteLoading} className="text-green-400" />
-        <ActionButton icon={ThumbsDown} label="Flop" onClick={() => handleVote(false)} isActive={userVote === 'flop'} isDisabled={isVoteLoading} className="text-red-400" />
-        <ActionButton icon={Bookmark} label="Save" onClick={() => onFavorite(video.id)} isActive={isFavorited} className={isFavorited ? '!bg-yellow-500' : ''} />
-        <ActionButton icon={ChevronDown} label="Down" onClick={nextVideo} />
-        <ActionButton icon={DollarSign} label="Tip" onClick={handleTip} className="text-yellow-400" />
-        
+      {/* Right Action Bar */}
+      <div className="absolute right-3 sm:right-4 top-1/2 -translate-y-1/2 flex flex-col gap-4 z-20">
+        <ActionButton icon={Bookmark} label="Save" onClick={() => onFavorite(video.id)} isActive={isFavorited} iconClassName={isFavorited ? 'fill-white' : ''} />
+        <ActionButton icon={ThumbsUp} label="Up" onClick={() => handleVote(true)} isActive={userVote === 'top'} isDisabled={isVoteLoading} iconClassName="text-green-400" />
+        <ActionButton icon={ThumbsDown} label="Flop" onClick={() => handleVote(false)} isActive={userVote === 'flop'} isDisabled={isVoteLoading} iconClassName="text-red-400" />
+        <ActionButton icon={ArrowDown} label="Down" onClick={nextVideo} iconClassName="text-gray-400" />
+        <ActionButton icon={DollarSign} label="Tip" onClick={handleTip} iconClassName="text-green-400" />
         {currentUser?.role === 'business' && (
             <>
-                <ActionButton icon={BookIcon} label="Book" onClick={handleHireOrAdopt} className="text-cyan-400" />
-                <ActionButton icon={AdoptIcon} label="Adopt" onClick={handleHireOrAdopt} className="text-purple-400" />
+                <ActionButton icon={Briefcase} label="Book" onClick={handleHireOrAdopt} iconClassName="text-cyan-400" />
+                <ActionButton icon={UserPlus} label="Adopt" onClick={handleHireOrAdopt} iconClassName="text-purple-400" />
             </>
         )}
       </div>
 
+       {/* Left Action Bar */}
        <div className="absolute left-3 sm:left-4 top-1/2 -translate-y-1/2 z-20">
-         <ActionButton icon={ChevronUp} label="Up" onClick={prevVideo} />
+         <ActionButton icon={ChevronUp} onClick={prevVideo} />
        </div>
 
     </div>
