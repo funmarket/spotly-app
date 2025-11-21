@@ -157,6 +157,75 @@
         "createdAt",
         "updatedAt"
       ]
+    },
+    "GossipPost": {
+      "title": "Gossip Post",
+      "description": "A post in the gossip feed.",
+      "type": "object",
+      "properties": {
+        "authorId": { "type": "string", "description": "The wallet address of the post author (Firebase Auth UID)." },
+        "content": { "type": "string", "description": "The content of the post." },
+        "commentsCount": { "type": "number", "description": "The number of comments on the post." },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Timestamp of when the post was created." }
+      },
+      "required": ["authorId", "content", "commentsCount", "createdAt"]
+    },
+    "GossipComment": {
+      "title": "Gossip Comment",
+      "description": "A comment on a gossip post.",
+      "type": "object",
+      "properties": {
+        "postId": { "type": "string", "description": "The ID of the post being commented on." },
+        "authorId": { "type": "string", "description": "The wallet address of the comment author (Firebase Auth UID)." },
+        "content": { "type": "string", "description": "The content of the comment." },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Timestamp of when the comment was created." }
+      },
+      "required": ["postId", "authorId", "content", "createdAt"]
+    },
+    "GossipRating": {
+      "title": "Gossip Rating",
+      "description": "A rating on a gossip post.",
+      "type": "object",
+      "properties": {
+        "postId": { "type": "string", "description": "The ID of the post being rated." },
+        "raterId": { "type": "string", "description": "The wallet address of the rater (Firebase Auth UID)." },
+        "rating": { "type": "number", "description": "The rating value." }
+      },
+      "required": ["postId", "raterId", "rating"]
+    },
+    "GossipUserFollow": {
+        "title": "Gossip User Follow",
+        "description": "Represents a user following another user.",
+        "type": "object",
+        "properties": {
+            "followerId": { "type": "string", "description": "The wallet address of the follower (Firebase Auth UID)." },
+            "followingId": { "type": "string", "description": "The wallet address of the user being followed." }
+        },
+        "required": ["followerId", "followingId"]
+    },
+    "GossipMessage": {
+        "title": "Gossip Message",
+        "description": "A private message between users.",
+        "type": "object",
+        "properties": {
+            "fromId": { "type": "string", "description": "The wallet address of the sender (Firebase Auth UID)." },
+            "toId": { "type": "string", "description": "The wallet address of the recipient." },
+            "content": { "type": "string", "description": "The content of the message." },
+            "createdAt": { "type": "string", "format": "date-time", "description": "Timestamp of when the message was sent." }
+        },
+        "required": ["fromId", "toId", "content", "createdAt"]
+    },
+    "GossipServiceAd": {
+        "title": "Gossip Service Ad",
+        "description": "A sponsored ad in the gossip feed.",
+        "type": "object",
+        "properties": {
+            "title": { "type": "string", "description": "The title of the ad." },
+            "content": { "type": "string", "description": "The content of the ad." },
+            "imageUrl": { "type": "string", "format": "uri", "description": "URL of the ad image." },
+            "targetUrl": { "type": "string", "format": "uri", "description": "URL the ad links to." }
+        },
+        "required": ["title", "content", "imageUrl", "targetUrl"]
     }
   },
   "auth": {
@@ -198,10 +267,56 @@
             }
           ]
         }
+      },
+      {
+          "path": "/gossip_posts/{postId}",
+          "definition": {
+              "entityName": "GossipPost",
+              "schema": { "$ref": "#/backend/entities/GossipPost" },
+              "description": "Stores individual posts for the gossip feed."
+          }
+      },
+      {
+          "path": "/gossip_comments/{commentId}",
+          "definition": {
+              "entityName": "GossipComment",
+              "schema": { "$ref": "#/backend/entities/GossipComment" },
+              "description": "Stores comments for gossip posts."
+          }
+      },
+      {
+          "path": "/gossip_ratings/{ratingId}",
+          "definition": {
+              "entityName": "GossipRating",
+              "schema": { "$ref": "#/backend/entities/GossipRating" },
+              "description": "Stores ratings for gossip posts."
+          }
+      },
+      {
+          "path": "/gossip_user_follows/{followId}",
+          "definition": {
+              "entityName": "GossipUserFollow",
+              "schema": { "$ref": "#/backend/entities/GossipUserFollow" },
+              "description": "Tracks user follow relationships."
+          }
+      },
+      {
+          "path": "/gossip_messages/{messageId}",
+          "definition": {
+              "entityName": "GossipMessage",
+              "schema": { "$ref": "#/backend/entities/GossipMessage" },
+              "description": "Stores private messages between users."
+          }
+      },
+      {
+          "path": "/gossip_service_ads/{adId}",
+          "definition": {
+              "entityName": "GossipServiceAd",
+              "schema": { "$ref": "#/backend/entities/GossipServiceAd" },
+              "description": "Stores sponsored ads for the gossip feed."
+          }
       }
     ],
     "reasoning": "This Firestore structure is designed to manage user authentication, profiles and videos using Firebase, focusing on replacing the existing Devbase user management system with Firebase Auth and Firestore. It prioritizes Authorization Independence by avoiding hierarchical `get()` calls in security rules. The `users` collection stores user profiles, with the document ID matching the Firebase Auth `uid` (Solana wallet address), ensuring direct access and simplifying security rules based on user ownership. The `videos` collection stores all video data, with `artistId` linking back to a user. All data in `users` and `videos` collections have the same security requirements. The structure enables secure `list` operations (QAPs) by storing user and video data directly in their respective collections, avoiding the need to filter based on parent document data.  Specifically, this structure avoids hierarchical dependencies, enabling atomic operations. Roles are stored directly in the database (DBAC), relying solely on `request.auth.uid` for authorization."
   }
 }
-
-    

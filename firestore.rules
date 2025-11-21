@@ -146,6 +146,44 @@ service cloud.firestore {
           return request.writeFields.hasAny(adminFields);
         }
     }
+    
+    // ----------------------------------------------------------------------
+    // Gossip Feed Rules
+    // ----------------------------------------------------------------------
+
+    match /gossip_posts/{postId} {
+      allow read: if true;
+      allow create: if isSignedIn() && request.resource.data.authorId == request.auth.uid;
+      allow update: if isOwner(resource.data.authorId) || isAdmin(); // e.g. for comment count
+      allow delete: if isOwner(resource.data.authorId) || isAdmin();
+    }
+    
+    match /gossip_comments/{commentId} {
+      allow read: if true;
+      allow create: if isSignedIn() && request.resource.data.authorId == request.auth.uid;
+      allow delete: if isOwner(resource.data.authorId) || isAdmin();
+    }
+
+    match /gossip_ratings/{ratingId} {
+        allow read: if true;
+        allow create, update: if isSignedIn() && request.resource.data.raterId == request.auth.uid;
+        allow delete: if isOwner(resource.data.raterId);
+    }
+
+    match /gossip_user_follows/{followId} {
+        allow read: if true;
+        allow create: if isSignedIn() && request.resource.data.followerId == request.auth.uid;
+        allow delete: if isOwner(resource.data.followerId) || isAdmin();
+    }
+
+    match /gossip_messages/{messageId} {
+        allow read, delete: if isSignedIn() && (request.auth.uid == resource.data.fromId || request.auth.uid == resource.data.toId);
+        allow create: if isSignedIn() && request.resource.data.fromId == request.auth.uid;
+    }
+    
+    match /gossip_service_ads/{adId} {
+      allow read: if true;
+      allow create, update, delete: if isAdmin();
+    }
   }
 }
-    

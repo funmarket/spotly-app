@@ -37,9 +37,46 @@ export interface Video {
   updatedAt?: Timestamp | string;
 }
 
-
 export type EnrichedVideo = Omit<Video, 'videoId'> & {
   id: string; // Document ID from Firestore
   user: User;
 };
-    
+
+export interface GossipPost {
+  authorId: string;
+  content: string;
+  commentsCount: number;
+  createdAt: Timestamp;
+}
+
+export interface GossipComment {
+  postId: string;
+  authorId: string;
+  content: string;
+  createdAt: Timestamp;
+}
+
+export interface GossipRating {
+  postId: string;
+  raterId: string;
+  rating: number;
+}
+
+export interface GossipUserFollow {
+  followerId: string;
+  followingId: string;
+}
+
+export interface GossipMessage {
+  fromId: string;
+  toId: string;
+  content: string;
+  createdAt: Timestamp;
+}
+
+export interface GossipServiceAd {
+  title: string;
+  content: string;
+  imageUrl: string;
+  targetUrl: string;
+}
