@@ -4,11 +4,10 @@ import { VideoFeed } from '@/components/feed/video-feed';
 import { useFirebase, useMemoFirebase } from '@/firebase';
 import { collection, query, where, orderBy, getDoc, doc, limit } from 'firebase/firestore';
 import type { EnrichedVideo, User, Video } from '@/lib/types';
-import { Skeleton } from '@/components/ui/skeleton';
-import { useRouter } from 'next/navigation';
 import { Loader2 } from 'lucide-react';
+import { useRouter } from 'next/navigation';
 
-export default function HomePage() {
+function Feed() {
   const { firestore, user, isUserLoading } = useFirebase();
   const router = useRouter();
 
@@ -16,19 +15,29 @@ export default function HomePage() {
   const [isEnriching, setIsEnriching] = useState(true);
   const [activeFeedTab, setActiveFeedTab] = useState('music');
   const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const [isCheckingProfile, setIsCheckingProfile] = useState(true);
+
 
   useEffect(() => {
-    if (user && firestore) {
+    if (isUserLoading) {
+      return;
+    }
+
+    if (user) {
       const userDocRef = doc(firestore, 'users', user.uid);
       getDoc(userDocRef).then((docSnap) => {
         if (docSnap.exists()) {
            setCurrentUser({ userId: docSnap.id, ...docSnap.data() } as User);
+        } else {
+           router.replace('/onboarding');
         }
+        setIsCheckingProfile(false);
       });
     } else {
-        setCurrentUser(null);
+      setCurrentUser(null);
+      setIsCheckingProfile(false);
     }
-  }, [user, firestore]);
+  }, [user, isUserLoading, firestore, router]);
 
 
   const videosQuery = useMemoFirebase(() => {
@@ -44,6 +53,7 @@ export default function HomePage() {
     }
   }, [firestore, activeFeedTab]);
 
+  // @ts-ignore
   const { data: videos, isLoading: areVideosLoading } = useCollection<Video & { id: string }>(videosQuery);
   
   useEffect(() => {
@@ -91,7 +101,7 @@ export default function HomePage() {
     enrichVideos();
   }, [videos, firestore, areVideosLoading]);
 
-  const isLoading = isUserLoading || areVideosLoading || isEnriching;
+  const isLoading = isUserLoading || isCheckingProfile || areVideosLoading || isEnriching;
 
   if (isLoading && enrichedVideos.length === 0) {
     return (
@@ -110,4 +120,23 @@ export default function HomePage() {
       currentUser={currentUser}
     />
   );
+}
+
+
+export default function HomePage() {
+  const [isClient, setIsClient] = useState(false);
+
+  useEffect(() => {
+    setIsClient(true);
+  }, []);
+
+  if (!isClient) {
+    return (
+      <div className="flex h-screen items-center justify-center bg-background">
+        <Loader2 className="h-12 w-12 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  return <Feed />;
 }

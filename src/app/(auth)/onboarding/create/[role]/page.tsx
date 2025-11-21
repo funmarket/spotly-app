@@ -61,52 +61,6 @@ const TALENT_CATEGORIES = {
   },
 };
 
-const profileSchema = z.object({
-  username: z.string().min(3, 'Username must be at least 3 characters').max(30, 'Username must be 30 characters or less'),
-  bio: z.string().max(280, 'Bio must be 280 characters or less').optional(),
-  profilePhotoUrl: z.string().url('Please enter a valid URL.').optional().or(z.literal('')),
-  bannerPhotoUrl: z.string().url('Please enter a valid URL.').optional().or(z.literal('')),
-  isArtist: z.boolean().default(false),
-  isBusiness: z.boolean().default(false),
-  talentCategory: z.string().optional(),
-  talentSubcategories: z.array(z.string()).optional(),
-  subRole: z.string().optional(),
-  tags: z.string().optional(),
-  location: z.string().optional(),
-  socialLinks: z.object({
-    youtube: z.string().optional(),
-    twitter: z.string().optional(),
-    instagram: z.string().optional(),
-    tiktok: z.string().optional(),
-  }).optional(),
-  extraLinks: z.array(z.object({
-    label: z.string().min(1, "Label is required"),
-    url: z.string().url("Must be a valid URL"),
-  })).optional(),
-}).refine(data => {
-    // For non-fan accounts, at least one role must be selected
-    const params = useParams();
-    if (params.role !== 'fan') {
-      return data.isArtist || data.isBusiness;
-    }
-    return true;
-}, {
-    message: 'Please select at least one account type (Artist or Business).',
-    path: ['isArtist'], // Attach error to one of the checkboxes
-}).refine(data => {
-    // If user is an artist, talent category is required
-    const params = useParams();
-    if (params.role !== 'fan' && data.isArtist) {
-        return !!data.talentCategory;
-    }
-    return true;
-}, {
-    message: 'Please select your primary talent category.',
-    path: ['talentCategory'],
-});
-
-type ProfileFormValues = z.infer<typeof profileSchema>;
-
 const ClientOnlyWalletButton = () => {
   const [hasMounted, setHasMounted] = useState(false);
   useEffect(() => {
@@ -130,6 +84,48 @@ export default function CreateProfilePage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showExtraLinks, setShowExtraLinks] = useState(false);
 
+  const profileSchema = z.object({
+    username: z.string().min(3, 'Username must be at least 3 characters').max(30, 'Username must be 30 characters or less'),
+    bio: z.string().max(280, 'Bio must be 280 characters or less').optional(),
+    profilePhotoUrl: z.string().url('Please enter a valid URL.').optional().or(z.literal('')),
+    bannerPhotoUrl: z.string().url('Please enter a valid URL.').optional().or(z.literal('')),
+    isArtist: z.boolean().default(false),
+    isBusiness: z.boolean().default(false),
+    talentCategory: z.string().optional(),
+    talentSubcategories: z.array(z.string()).optional(),
+    subRole: z.string().optional(),
+    tags: z.string().optional(),
+    location: z.string().optional(),
+    socialLinks: z.object({
+      youtube: z.string().optional(),
+      twitter: z.string().optional(),
+      instagram: z.string().optional(),
+      tiktok: z.string().optional(),
+    }).optional(),
+    extraLinks: z.array(z.object({
+      label: z.string().min(1, "Label is required"),
+      url: z.string().url("Must be a valid URL"),
+    })).optional(),
+  }).refine(data => {
+      if (accountType !== 'fan') {
+        return data.isArtist || data.isBusiness;
+      }
+      return true;
+  }, {
+      message: 'Please select at least one account type (Artist or Business).',
+      path: ['isArtist'],
+  }).refine(data => {
+      if (accountType !== 'fan' && data.isArtist) {
+          return !!data.talentCategory;
+      }
+      return true;
+  }, {
+      message: 'Please select your primary talent category.',
+      path: ['talentCategory'],
+  });
+
+  type ProfileFormValues = z.infer<typeof profileSchema>;
+
   const form = useForm<ProfileFormValues>({
     resolver: zodResolver(profileSchema),
     defaultValues: {
@@ -141,7 +137,7 @@ export default function CreateProfilePage() {
       isBusiness: accountType === 'business',
       talentCategory: '',
       talentSubcategories: [],
-      socialLinks: {},
+      socialLinks: { youtube: '', twitter: '', instagram: '', tiktok: '' },
       extraLinks: [],
     },
   });
@@ -219,7 +215,7 @@ export default function CreateProfilePage() {
       <div className="flex min-h-screen items-center justify-center p-4">
         <Card className="w-full max-w-md text-center">
           <CardHeader>
-            <CardTitle className="font-headline text-3xl">Welcome to TalentVerse!</CardTitle>
+            <CardTitle className="font-headline text-3xl">Welcome to SPOTLY!</CardTitle>
             <CardDescription>Connect your Solana wallet to create your profile.</CardDescription>
           </CardHeader>
           <CardContent>
@@ -423,16 +419,16 @@ export default function CreateProfilePage() {
                 <div className="space-y-4 rounded-lg border bg-background p-4">
                   <h3 className="font-medium">Social Media Links</h3>
                    <FormField control={form.control} name="socialLinks.youtube" render={({ field }) => (
-                        <FormItem><FormControl><Input placeholder="YouTube URL" {...field} /></FormControl><FormMessage /></FormItem>
+                        <FormItem><FormControl><Input placeholder="YouTube URL" {...field} value={field.value || ''} /></FormControl><FormMessage /></FormItem>
                    )}/>
                    <FormField control={form.control} name="socialLinks.twitter" render={({ field }) => (
-                        <FormItem><FormControl><Input placeholder="Twitter/X URL" {...field} /></FormControl><FormMessage /></FormItem>
+                        <FormItem><FormControl><Input placeholder="Twitter/X URL" {...field} value={field.value || ''} /></FormControl><FormMessage /></FormItem>
                    )}/>
                    <FormField control={form.control} name="socialLinks.instagram" render={({ field }) => (
-                        <FormItem><FormControl><Input placeholder="Instagram URL" {...field} /></FormControl><FormMessage /></FormItem>
+                        <FormItem><FormControl><Input placeholder="Instagram URL" {...field} value={field.value || ''} /></FormControl><FormMessage /></FormItem>
                    )}/>
                    <FormField control={form.control} name="socialLinks.tiktok" render={({ field }) => (
-                        <FormItem><FormControl><Input placeholder="TikTok URL" {...field} /></FormControl><FormMessage /></FormItem>
+                        <FormItem><FormControl><Input placeholder="TikTok URL" {...field} value={field.value || ''} /></FormControl><FormMessage /></FormItem>
                    )}/>
                 </div>
 
@@ -481,5 +477,3 @@ export default function CreateProfilePage() {
     </div>
   );
 }
-
-    
