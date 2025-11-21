@@ -1,5 +1,5 @@
 'use client';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { z } from 'zod';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -21,7 +21,7 @@ import {
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { PlusSquare, Loader2 } from 'lucide-react';
+import { PlusSquare, Loader2, AlertCircle } from 'lucide-react';
 import { useFirebase } from '@/firebase';
 import { addDoc, collection, serverTimestamp, doc, getDoc } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
@@ -29,9 +29,11 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import type { User } from '@/lib/types';
 import { useRouter } from 'next/navigation';
+import { parseVideoUrl } from '@/lib/video-parser';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
 const videoSchema = z.object({
-  rawVideoInput: z.string().url({ message: 'Please enter a valid video URL.' }),
+  rawVideoInput: z.string().min(1, { message: 'Please enter a video URL or embed code.' }),
   description: z.string().min(1, { message: 'Please add a description.' }).max(500),
   videoCategory: z.string().min(1, { message: 'Please select a category.' }),
 });
@@ -46,13 +48,17 @@ export default function SubmitVideoPage() {
 
   const form = useForm<z.infer<typeof videoSchema>>({
     resolver: zodResolver(videoSchema),
+    mode: 'onBlur',
     defaultValues: {
       rawVideoInput: '',
       description: '',
       videoCategory: '',
     },
   });
-  
+
+  const rawVideoInput = form.watch('rawVideoInput');
+  const videoParseResult = useMemo(() => parseVideoUrl(rawVideoInput), [rawVideoInput]);
+
   useEffect(() => {
     const fetchUserProfile = async () => {
       if (user && firestore) {
@@ -63,16 +69,14 @@ export default function SubmitVideoPage() {
             setUserProfile(docSnap.data() as User);
           }
         } catch (error) {
-            console.error("Error fetching user profile:", error);
+          console.error("Error fetching user profile:", error);
         } finally {
-            setIsProfileLoading(false);
+          setIsProfileLoading(false);
         }
       } else if (!isUserLoading) {
-        // If there's no user and we're not loading one, profile loading is done.
         setIsProfileLoading(false);
       }
     };
-
     fetchUserProfile();
   }, [user, firestore, isUserLoading]);
 
@@ -85,7 +89,7 @@ export default function SubmitVideoPage() {
       });
       return;
     }
-    
+
     if (userProfile?.role !== 'artist') {
       toast({
         variant: 'destructive',
@@ -95,8 +99,13 @@ export default function SubmitVideoPage() {
       return;
     }
 
+    const finalParseResult = parseVideoUrl(values.rawVideoInput);
+    if (finalParseResult.error || !finalParseResult.embedUrl) {
+      form.setError('rawVideoInput', { type: 'manual', message: finalParseResult.error });
+      return;
+    }
+
     setIsSubmitting(true);
-    
     const videosCollection = collection(firestore, 'videos');
 
     try {
@@ -105,9 +114,8 @@ export default function SubmitVideoPage() {
         rawVideoInput: values.rawVideoInput,
         description: values.description,
         videoCategory: values.videoCategory.toLowerCase().trim(),
-        // Backend/cloud function will process rawVideoInput into a normalized videoUrl
-        videoUrl: values.rawVideoInput, // Placeholder, to be replaced by backend
-        status: 'pending',
+        videoUrl: finalParseResult.embedUrl,
+        status: 'active', // Changed from 'pending' to 'active' for immediate visibility
         isBanned: false,
         hiddenFromFeed: false,
         topCount: 0,
@@ -124,13 +132,13 @@ export default function SubmitVideoPage() {
 
       toast({
         title: 'Video Submitted!',
-        description: 'Your video is being processed and will be live shortly.',
+        description: 'Your video is now live.',
       });
       form.reset();
       router.push('/');
 
     } catch (error: any) {
-       toast({
+      toast({
         variant: "destructive",
         title: "Submission Failed",
         description: error.message || "An unexpected error occurred.",
@@ -140,7 +148,6 @@ export default function SubmitVideoPage() {
     }
   }
 
-  // Combined loading state
   const isLoading = isUserLoading || isProfileLoading;
 
   if (isLoading) {
@@ -151,10 +158,9 @@ export default function SubmitVideoPage() {
     );
   }
 
-  // Check permissions only after loading is complete
   if (!user || userProfile?.role !== 'artist') {
     return (
-       <div className="flex flex-1 items-center justify-center h-full">
+      <div className="flex flex-1 items-center justify-center h-full p-4">
         <Card className="w-[380px] text-center">
           <CardHeader>
             <div className="mx-auto bg-primary/20 p-3 rounded-full mb-4 w-fit">
@@ -167,7 +173,7 @@ export default function SubmitVideoPage() {
           </CardHeader>
         </Card>
       </div>
-    )
+    );
   }
 
   return (
@@ -178,7 +184,7 @@ export default function SubmitVideoPage() {
             <PlusSquare /> Submit Your Video
           </CardTitle>
           <CardDescription>
-            Share your talent with the world. Paste a video link to get started.
+            Share your talent. Paste a YouTube link or embed code to get started.
           </CardDescription>
         </CardHeader>
         <Form {...form}>
@@ -189,7 +195,7 @@ export default function SubmitVideoPage() {
                 name="rawVideoInput"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Video URL</FormLabel>
+                    <FormLabel>YouTube URL or Embed Code</FormLabel>
                     <FormControl>
                       <Input
                         placeholder="e.g., https://www.youtube.com/watch?v=..."
@@ -200,6 +206,34 @@ export default function SubmitVideoPage() {
                   </FormItem>
                 )}
               />
+
+              {rawVideoInput && (
+                <div className="rounded-lg overflow-hidden border">
+                  {videoParseResult.embedUrl ? (
+                    <div className="aspect-video w-full bg-black">
+                      <iframe
+                        key={videoParseResult.embedUrl}
+                        src={videoParseResult.embedUrl}
+                        title="Video Preview"
+                        className="w-full h-full"
+                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                        allowFullScreen
+                      />
+                    </div>
+                  ) : videoParseResult.error ? (
+                     <Alert variant="destructive">
+                      <AlertCircle className="h-4 w-4" />
+                      <AlertTitle>Parsing Error</AlertTitle>
+                      <AlertDescription>{videoParseResult.error}</AlertDescription>
+                    </Alert>
+                  ) : (
+                    <div className="aspect-video w-full bg-muted flex items-center justify-center">
+                      <p className="text-muted-foreground text-sm">Paste a link to see a preview</p>
+                    </div>
+                  )}
+                </div>
+              )}
+
               <FormField
                 control={form.control}
                 name="description"
@@ -216,7 +250,7 @@ export default function SubmitVideoPage() {
                   </FormItem>
                 )}
               />
-               <FormField
+              <FormField
                 control={form.control}
                 name="videoCategory"
                 render={({ field }) => (
@@ -240,7 +274,7 @@ export default function SubmitVideoPage() {
               />
             </CardContent>
             <CardFooter>
-              <Button type="submit" disabled={isSubmitting} className="w-full">
+              <Button type="submit" disabled={isSubmitting || !!videoParseResult.error} className="w-full">
                 {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                 Submit Video
               </Button>
