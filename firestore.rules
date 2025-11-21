@@ -1,0 +1,112 @@
+/**
+ * Core Philosophy: This ruleset enforces a strict user-ownership model centered around user profiles.
+ * The fundamental principle is that users have complete control over their own data. While profile
+ * information is publicly readable to support discovery and interaction within the app, only the
+ * authenticated owner of a profile can create, modify, or delete it.
+ *
+ * Data Structure: The data architecture is flat and straightforward, consisting of a single top-level
+ * collection: `/users`. Each document in this collection represents a user profile, and the document
+ * ID is the user's unique Firebase Authentication UID, which corresponds to their Solana wallet address.
+ *
+ * Key Security Decisions:
+ * - Public Readability: User profiles are considered public information. Anyone, authenticated or not,
+ *   can read individual profiles (`get`) and list all users (`list`). This is essential for features
+ *   like user search and viewing profiles.
+ * - Strict Ownership for Writes: All write operations (`create`, `update`, `delete`) are strictly
+ *   limited to the authenticated user who owns the document. An anonymous user cannot write any data.
+ * - Self-Creation: A user can only create a profile document that corresponds to their own UID.
+ *   This prevents one user from creating a profile for another.
+ * - Data Integrity: To ensure the link between a user's auth UID, the document ID, and the internal
+ *   `walletAddress` field is unbreakable, the rules enforce that the `walletAddress` field must match
+ *   the document ID upon creation and must be immutable thereafter.
+ *
+ * Denormalization for Authorization: The security model is highly performant as it relies on the document's
+ * path (`/users/{userId}`) for authorization decisions. The user's UID is the document key, eliminating
+ * the need for any slow and costly `get()` or `exists()` calls to other documents to verify ownership.
+ *
+ * Structural Segregation: This principle is not heavily applied in this simple, flat structure, as
+ * there are no nested subcollections or mixed public/private data within a single document tree. The
+ * entire `/users` collection is treated as a single unit with public read and owner-only write access.
+ */
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ----------------------------------------------------------------------
+    // Helper Functions
+    // ----------------------------------------------------------------------
+
+    /**
+     * Checks if the user is authenticated via Firebase Auth.
+     */
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    /**
+     * Checks if the currently authenticated user's UID matches the provided userId.
+     * This is the core function for verifying document ownership.
+     */
+    function isOwner(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    /**
+     * Verifies that a document already exists.
+     * CRITICAL: Must be used for all update and delete operations to prevent
+     * acting on non-existent data.
+     */
+    function isExistingDocument() {
+      return resource != null;
+    }
+
+    /**
+     * Validates the creation of a new user profile.
+     * Ensures the creator is the owner and that the internal `walletAddress`
+     * field correctly matches the document ID (which is the user's UID).
+     */
+    function isCreatingOwnProfile(userId) {
+      return isOwner(userId) && request.resource.data.walletAddress == userId;
+    }
+
+    /**
+     * Validates an update to an existing user profile.
+     * Ensures the user is the owner, the document exists, and that the
+     * critical `walletAddress` field is not changed.
+     */
+    function isUpdatingOwnProfile(userId) {
+      return isOwner(userId) && isExistingDocument() && request.resource.data.walletAddress == resource.data.walletAddress;
+    }
+
+    /**
+     * Validates the deletion of a user profile.
+     * Ensures the user is the owner and the document actually exists.
+     */
+    function isDeletingOwnProfile(userId) {
+      return isOwner(userId) && isExistingDocument();
+    }
+
+
+    // ----------------------------------------------------------------------
+    // Collection Rules
+    // ----------------------------------------------------------------------
+
+    /**
+     * @description Manages user profile documents. Profiles are publicly readable but can
+     *              only be created, updated, or deleted by their owner.
+     * @path /users/{userId}
+     * @allow (get) Any user, authenticated or not, can read any user's profile.
+     * @allow (create) An authenticated user can create their own profile document (e.g., `create /users/USER_UID` where auth.uid is 'USER_UID').
+     * @deny (create) An authenticated user cannot create a profile for another user (e.g., `create /users/OTHER_UID`).
+     * @deny (update) A user cannot update another user's profile.
+     * @principle Enforces strict document ownership for all write operations while allowing public read access. It also validates relational integrity by ensuring the document's internal `walletAddress` matches the document ID (`userId`).
+     */
+    match /users/{userId} {
+      allow get: if true;
+      allow list: if true;
+      allow create: if isCreatingOwnProfile(userId);
+      allow update: if isUpdatingOwnProfile(userId);
+      allow delete: if isDeletingOwnProfile(userId);
+    }
+  }
+}

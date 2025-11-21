@@ -1,0 +1,168 @@
+{
+  "entities": {
+    "User": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "title": "User",
+      "type": "object",
+      "description": "Represents a user profile in the system, linked to a Solana wallet and Firebase Authentication.",
+      "properties": {
+        "walletAddress": {
+          "type": "string",
+          "description": "Unique identifier for the user, corresponding to their Solana wallet address and Firebase Auth UID. This is the primary key.",
+          "format": "string"
+        },
+        "username": {
+          "type": "string",
+          "description": "The user's display name."
+        },
+        "role": {
+          "type": "string",
+          "description": "The user's role in the application (regular, fan, artist, business)."
+        },
+        "bio": {
+          "type": "string",
+          "description": "A short biography or description of the user."
+        },
+        "profilePhotoUrl": {
+          "type": "string",
+          "description": "URL of the user's profile photo.",
+          "format": "uri"
+        },
+        "bannerPhotoUrl": {
+          "type": "string",
+          "description": "URL of the user's banner photo.",
+          "format": "uri"
+        },
+        "socialLinks": {
+          "type": "string",
+          "description": "JSON string containing links to the user's social media profiles.",
+          "format": "string"
+        },
+        "extraLinks": {
+          "type": "string",
+          "description": "JSON string containing additional links provided by the user.",
+          "format": "string"
+        },
+        "skills": {
+          "type": "string",
+          "description": "Comma-separated list of the user's skills."
+        },
+        "tags": {
+          "type": "string",
+          "description": "Comma-separated list of tags associated with the user."
+        },
+        "location": {
+          "type": "string",
+          "description": "The user's location."
+        },
+        "rankingScore": {
+          "type": "number",
+          "description": "A score representing the user's ranking on the platform."
+        },
+        "escrowBalance": {
+          "type": "number",
+          "description": "The user's escrow balance."
+        },
+        "isBanned": {
+          "type": "boolean",
+          "description": "Indicates whether the user is banned from the platform."
+        },
+        "isSuspended": {
+          "type": "boolean",
+          "description": "Indicates whether the user is suspended."
+        },
+        "suspensionReason": {
+          "type": "string",
+          "description": "The reason for the user's suspension."
+        },
+        "warnings": {
+          "type": "number",
+          "description": "The number of warnings the user has received."
+        },
+        "adminNotes": {
+          "type": "string",
+          "description": "Notes added by administrators regarding the user."
+        },
+        "isDeleted": {
+          "type": "boolean",
+          "description": "Indicates whether the user's account is deleted."
+        },
+        "talentCategory": {
+          "type": "string",
+          "description": "The primary category of talent the user represents (e.g., music, acting, creator)."
+        },
+        "talentSubcategories": {
+          "type": "string",
+          "description": "JSON string containing an array of talent subcategories."
+        },
+        "subRole": {
+          "type": "string",
+          "description": "A more specific role or title for the user (e.g., singer, actor)."
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "Timestamp indicating when the user account was created.",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "description": "Timestamp indicating when the user account was last updated.",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "walletAddress",
+        "username",
+        "role",
+        "bio",
+        "profilePhotoUrl",
+        "bannerPhotoUrl",
+        "socialLinks",
+        "extraLinks",
+        "skills",
+        "tags",
+        "location",
+        "rankingScore",
+        "escrowBalance",
+        "isBanned",
+        "isSuspended",
+        "suspensionReason",
+        "warnings",
+        "adminNotes",
+        "isDeleted",
+        "talentCategory",
+        "talentSubcategories",
+        "subRole",
+        "createdAt",
+        "updatedAt"
+      ]
+    }
+  },
+  "auth": {
+    "providers": [
+      "password",
+      "anonymous"
+    ]
+  },
+  "firestore": {
+    "structure": [
+      {
+        "path": "/users/{userId}",
+        "definition": {
+          "entityName": "User",
+          "schema": {
+            "$ref": "#/backend/entities/User"
+          },
+          "description": "Stores user profile information. The 'userId' parameter corresponds to the user's Solana wallet address (public key) and Firebase Auth UID. This serves as the document ID. Includes fields like 'walletAddress', 'username', 'role', 'bio', etc.",
+          "params": [
+            {
+              "name": "userId",
+              "description": "The user's Solana wallet address and Firebase Auth UID. This is the document ID."
+            }
+          ]
+        }
+      }
+    ],
+    "reasoning": "The Firestore data structure is designed to manage user authentication and profiles efficiently and securely, leveraging Firebase Auth and Firestore. The core principle is Authorization Independence, achieved by storing all necessary authorization data directly within the documents, eliminating the need for `get()` calls in security rules.  \n\nThe primary collection is `/users/{userId}`, where `{userId}` corresponds to the user's Solana wallet address, which is also the UID from Firebase Auth.  \n\nThis structure ensures that security rules can be written based solely on the data present in the user document and the `request.auth.uid`.  \n\nQAPs (Rules are not Filters) are supported by segregating the data by ownership (`/users/{userId}`) which enables secure `list` operations based on user ID."
+  }
+}
