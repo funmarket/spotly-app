@@ -349,6 +349,19 @@
         "createdAt": { "type": "string", "format": "date-time", "description": "Timestamp of when the ad was created." }
       },
       "required": ["title", "content", "targetUrl", "isActive", "createdAt"]
+    },
+    "Referral": {
+      "title": "Referral",
+      "description": "Represents a user referral.",
+      "type": "object",
+      "properties": {
+        "referrerWallet": { "type": "string", "description": "The wallet address of the user who referred someone." },
+        "referredWallet": { "type": "string", "description": "The wallet address of the user who was referred." },
+        "rewardAmount": { "type": "number", "description": "The amount of the reward given for the referral." },
+        "rewardStatus": { "type": "string", "enum": ["pending", "paid"], "description": "The status of the referral reward." },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Timestamp of when the referral was created." }
+      },
+      "required": ["referrerWallet", "referredWallet", "rewardAmount", "rewardStatus", "createdAt"]
     }
   },
   "auth": {
@@ -509,6 +522,14 @@
           "entityName": "AdminAd",
           "schema": { "$ref": "#/backend/entities/AdminAd" },
           "description": "Stores advertisements created by administrators."
+        }
+      },
+      {
+        "path": "/referrals/{referralId}",
+        "definition": {
+          "entityName": "Referral",
+          "schema": { "$ref": "#/backend/entities/Referral" },
+          "description": "Stores user referral data."
         }
       }
     ],

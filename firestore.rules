@@ -261,5 +261,17 @@ service cloud.firestore {
       allow read: if true;
       allow write: if isAdmin();
     }
+    
+    // ----------------------------------------------------------------------
+    // Referral Program Rules
+    // ----------------------------------------------------------------------
+
+    match /referrals/{referralId} {
+      // Allow users to read their own referrals
+      allow read: if isSignedIn() && isOwner(resource.data.referrerWallet);
+      
+      // Allow authenticated users to create their own referrals
+      allow create: if isSignedIn() && isOwner(request.resource.data.referrerWallet);
+    }
   }
 }

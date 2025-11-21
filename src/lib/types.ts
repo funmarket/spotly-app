@@ -96,3 +96,12 @@ export interface Favorite {
   userId: string;
   createdAt: Timestamp;
 }
+
+export interface Referral {
+    id?: string;
+    referrerWallet: string;
+    referredWallet: string;
+    rewardAmount: number;
+    rewardStatus: 'pending' | 'paid';
+    createdAt: Timestamp;
+}

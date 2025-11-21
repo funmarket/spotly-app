@@ -16,6 +16,7 @@ import {
   Heart,
   Bell,
   User,
+  Gift,
 } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
@@ -29,6 +30,7 @@ const navItems = [
   { href: '/submit-video', label: 'Submit', icon: PlusSquare },
   { href: '/favorites', label: 'Favorites', icon: Heart },
   { href: '/notifications', label: 'Notifications', icon: Bell },
+  { href: '/referrals', label: 'Referrals', icon: Gift },
 ];
 
 const Logo = () => (
