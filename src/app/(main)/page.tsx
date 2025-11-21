@@ -2,8 +2,7 @@
 import { useEffect, useState } from 'react';
 import { VideoFeed } from '@/components/feed/video-feed';
 import { useCollection, useFirebase, useMemoFirebase } from '@/firebase';
-import { useFirestore } from '@/firebase/provider';
-import { collection, query, where, orderBy, getDocs, doc, getDoc } from 'firebase/firestore';
+import { collection, query, where, orderBy, getDoc, doc } from 'firebase/firestore';
 import type { EnrichedVideo, User, Video } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
 
@@ -13,15 +12,13 @@ const LoadingSkeleton = () => (
   </div>
 );
 
-
 export default function HomePage() {
   const { firestore, isUserLoading } = useFirebase();
   const [enrichedVideos, setEnrichedVideos] = useState<EnrichedVideo[]>([]);
   const [isEnriching, setIsEnriching] = useState(true);
 
   const videosQuery = useMemoFirebase(() => {
-    // **FIX:** Do not run the query until Firebase auth state is resolved.
-    if (!firestore || isUserLoading) return null; 
+    if (!firestore) return null;
     return query(
       collection(firestore, 'videos'),
       where('status', '==', 'active'),
@@ -29,14 +26,14 @@ export default function HomePage() {
       where('hiddenFromFeed', '==', false),
       orderBy('createdAt', 'desc')
     );
-  }, [firestore, isUserLoading]);
+  }, [firestore]);
 
   const { data: videos, isLoading: areVideosLoading } = useCollection<Video & { id: string }>(videosQuery);
 
   useEffect(() => {
     const enrichVideos = async () => {
       if (!videos || !firestore) {
-        if (!areVideosLoading && !isUserLoading) setIsEnriching(false);
+        if (!areVideosLoading) setIsEnriching(false);
         return;
       }
       
@@ -51,7 +48,6 @@ export default function HomePage() {
           if (userSnap.exists()) {
              user = { userId: userSnap.id, ...userSnap.data() } as User;
           } else {
-             // Fallback for an artist profile that might have been deleted
              user = {
                 userId: 'unknown',
                 walletAddress: 'unknown',
@@ -71,10 +67,13 @@ export default function HomePage() {
     };
 
     enrichVideos();
-  }, [videos, firestore, areVideosLoading, isUserLoading]);
+  }, [videos, firestore, areVideosLoading]);
 
+  // This combined loading state is the key fix. It ensures we wait for both
+  // the initial Firebase auth check AND the video data to be fetched and enriched.
+  const isLoading = isUserLoading || areVideosLoading || isEnriching;
 
-  if (areVideosLoading || isEnriching || isUserLoading) {
+  if (isLoading) {
     return (
        <div className="relative h-[calc(100vh)] w-full snap-y snap-mandatory overflow-y-scroll bg-black scrollbar-hide">
         <LoadingSkeleton />
@@ -86,4 +85,3 @@ export default function HomePage() {
 
   return <VideoFeed videos={enrichedVideos} />;
 }
-    
