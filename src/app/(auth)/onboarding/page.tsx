@@ -42,7 +42,7 @@ export default function OnboardingRoleSelectionPage() {
   );
 
   const handleRoleClick = (role: string) => {
-    if (!publicKey) {
+    if (role !== 'fan' && !publicKey) {
       setShowWalletConnect(role);
       return;
     }
@@ -86,7 +86,7 @@ export default function OnboardingRoleSelectionPage() {
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
           <h1 className="text-4xl md:text-5xl font-bold mb-3 bg-gradient-to-r from-primary via-purple-500 to-accent bg-clip-text text-transparent">
-            Join TalentVerse
+            Join SPOTLY
           </h1>
           <p className="text-muted-foreground text-lg">
             Create your profile to get started.

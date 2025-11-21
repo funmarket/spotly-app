@@ -21,50 +21,65 @@ const HomeSkeleton = () => (
 );
 
 export default function HomePage() {
-  const { firestore, isUserLoading } = useFirebase();
+  const { firestore, user, isUserLoading } = useFirebase();
   const [enrichedVideos, setEnrichedVideos] = useState<EnrichedVideo[]>([]);
   const [isEnriching, setIsEnriching] = useState(true);
-  const [activeFeedTab, setActiveFeedTab] = useState('music'); // music, acting, creator, rising
+  const [activeFeedTab, setActiveFeedTab] = useState('music');
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
 
   const videosQuery = useMemoFirebase(() => {
-    if (!firestore || isUserLoading) return null;
+    if (!firestore) return null;
     
-    // Base query
     const videosCollection = collection(firestore, 'videos');
-    
-    // Common filters
     let q = query(videosCollection, where('status', '==', 'active'), where('isBanned', '==', false), where('hiddenFromFeed', '==', false));
 
     if (activeFeedTab === 'rising') {
-      // For 'rising', we sort by rankingScore
       return query(q, orderBy('rankingScore', 'desc'), limit(50));
     } else {
-      // For categories, we filter by category and sort by creation date
       return query(q, where('videoCategory', '==', activeFeedTab), orderBy('createdAt', 'desc'), limit(50));
     }
-  }, [firestore, isUserLoading, activeFeedTab]);
+  }, [firestore, activeFeedTab]);
 
   const { data: videos, isLoading: areVideosLoading } = useCollection<Video & { id: string }>(videosQuery);
+  
+  useEffect(() => {
+    if (user && firestore) {
+        const userDocRef = doc(firestore, 'users', user.uid);
+        getDoc(userDocRef).then(docSnap => {
+            if (docSnap.exists()) {
+                setCurrentUser({ userId: docSnap.id, ...docSnap.data() } as User);
+            }
+        });
+    } else {
+        setCurrentUser(null);
+    }
+  }, [user, firestore]);
 
   useEffect(() => {
     const enrichVideos = async () => {
       if (!videos || !firestore) {
-        if (!areVideosLoading && !isUserLoading) setIsEnriching(false);
+        if (!areVideosLoading) setIsEnriching(false);
         return;
       }
       
       setIsEnriching(true);
       
+      const userCache = new Map<string, User>();
+
       const enriched = await Promise.all(
         videos.map(async (video) => {
-          const userRef = doc(firestore, 'users', video.artistId);
-          const userSnap = await getDoc(userRef);
+          let artist: User | undefined = userCache.get(video.artistId);
+          if (!artist) {
+            const userRef = doc(firestore, 'users', video.artistId);
+            const userSnap = await getDoc(userRef);
+            if (userSnap.exists()) {
+              artist = { userId: userSnap.id, ...userSnap.data() } as User;
+              userCache.set(video.artistId, artist);
+            }
+          }
           
-          let user: User;
-          if (userSnap.exists()) {
-             user = { userId: userSnap.id, ...userSnap.data() } as User;
-          } else {
-             user = {
+          if (!artist) {
+             artist = {
                 userId: 'unknown',
                 walletAddress: 'unknown',
                 username: 'Unknown Artist',
@@ -74,7 +89,7 @@ export default function HomePage() {
                 role: 'fan',
              };
           }
-          return { ...video, user } as EnrichedVideo;
+          return { ...video, user: artist } as EnrichedVideo;
         })
       );
       
@@ -83,7 +98,7 @@ export default function HomePage() {
     };
 
     enrichVideos();
-  }, [videos, firestore, areVideosLoading, isUserLoading]);
+  }, [videos, firestore, areVideosLoading]);
 
   const isLoading = isUserLoading || areVideosLoading || isEnriching;
 
@@ -97,6 +112,7 @@ export default function HomePage() {
       activeFeedTab={activeFeedTab}
       setActiveFeedTab={setActiveFeedTab}
       isLoading={isLoading}
+      currentUser={currentUser}
     />
   );
 }

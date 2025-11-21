@@ -1,19 +1,31 @@
 'use client';
-import { useState, useRef, useEffect } from 'react';
-import type { EnrichedVideo } from '@/lib/types';
+import { useState, useRef, useEffect, useCallback } from 'react';
+import type { EnrichedVideo, User } from '@/lib/types';
 import { VideoCard } from './video-card';
 import { Button } from '@/components/ui/button';
-import { Search, Bell, X } from 'lucide-react';
-import { useRouter } from 'next/navigation';
+import { Search, Bell, X, Home, Compass, Upload, Inbox, User as UserIcon } from 'lucide-react';
+import { useRouter, usePathname } from 'next/navigation';
 import { Skeleton } from '@/components/ui/skeleton';
 import { useFirebase } from '@/firebase';
-import { collection, query, where, getDocs } from 'firebase/firestore';
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { cn } from '@/lib/utils';
+import {
+  collection,
+  doc,
+  writeBatch,
+  increment,
+  serverTimestamp,
+  query,
+  where,
+  getDocs,
+  limit,
+} from 'firebase/firestore';
+
 
 function TopCategoryMenu({ activeFeedTab, setActiveFeedTab, onSearchClick, onNotificationClick, unreadCount }: { activeFeedTab: string, setActiveFeedTab: (tab: string) => void, onSearchClick: () => void, onNotificationClick: () => void, unreadCount: number }) {
   const getTabLabel = (tab: string) => {
@@ -29,155 +41,157 @@ function TopCategoryMenu({ activeFeedTab, setActiveFeedTab, onSearchClick, onNot
   return (
     <div className="fixed top-0 left-0 right-0 z-50 bg-black/80 backdrop-blur-md border-b border-white/10">
       <div className="container mx-auto h-14 flex items-center justify-between gap-2 overflow-x-auto scrollbar-hide">
-        <div className="flex items-center gap-2 flex-shrink-0">
-           {["music", "acting", "creator", "rising"].map(cat => (
-            <Button
-              key={cat}
-              variant={activeFeedTab === cat ? 'default' : 'ghost'}
-              size="sm"
-              onClick={() => setActiveFeedTab(cat)}
-              className={`whitespace-nowrap transition-all text-xs sm:text-sm ${activeFeedTab === cat ? 'bg-primary text-primary-foreground' : 'text-white/70 hover:text-white hover:bg-white/10'}`}
-            >
-              {getTabLabel(cat)}
-            </Button>
-          ))}
-        </div>
-        <div className="flex items-center gap-1 flex-shrink-0">
-          <Button onClick={onSearchClick} variant="ghost" size="icon" className="text-white/70 hover:text-white hover:bg-white/10">
-            <Search size={20} />
-          </Button>
-          <Button onClick={onNotificationClick} variant="ghost" size="icon" className="text-white/70 hover:text-white hover:bg-white/10 relative">
-            <Bell size={20} />
-            {unreadCount > 0 && (
-              <span className="absolute -top-0.5 -right-0.5 bg-red-500 text-white text-[10px] rounded-full w-4 h-4 flex items-center justify-center">
-                {unreadCount > 9 ? '9+' : unreadCount}
-              </span>
-            )}
-          </Button>
-        </div>
+        <div className="text-xl font-bold text-white font-headline">SPOTLY</div>
       </div>
     </div>
   );
 }
 
-function SearchModal({ isOpen, onClose }: { isOpen: boolean, onClose: () => void }) {
-    const { firestore } = useFirebase();
+
+const BottomNavBar = () => {
+    const { user } = useFirebase();
     const router = useRouter();
-    const [searchQuery, setSearchQuery] = useState('');
-    const [searchResults, setSearchResults] = useState<{ videos: any[], users: any[] }>({ videos: [], users: [] });
-    const [loading, setLoading] = useState(false);
-    const [activeTab, setActiveTab] = useState('videos');
+    const pathname = usePathname();
 
-    const handleSearch = async () => {
-        if (!searchQuery.trim() || !firestore) return;
-        setLoading(true);
-        try {
-            const lowerQuery = searchQuery.toLowerCase();
-            
-            // This is a basic client-side search. For production, a dedicated search service like Algolia would be better.
-            const usersSnapshot = await getDocs(collection(firestore, 'users'));
-            const videosSnapshot = await getDocs(collection(firestore, 'videos'));
+    const navItems = [
+      { href: '/', label: 'Home', icon: Home },
+      { href: '/discover', label: 'Discover', icon: Compass },
+      { href: '/submit-video', label: 'Upload', icon: Upload },
+      { href: '/inbox', label: 'Inbox', icon: Inbox },
+      { href: '/profile', label: 'Profile', icon: UserIcon },
+    ];
 
-            const users = usersSnapshot.docs
-                .map(doc => ({ id: doc.id, ...doc.data() }))
-                .filter(u => u.username?.toLowerCase().includes(lowerQuery));
-
-            const videos = videosSnapshot.docs
-                .map(doc => ({ id: doc.id, ...doc.data() }))
-                .filter(v => v.description?.toLowerCase().includes(lowerQuery) || v.videoCategory?.toLowerCase().includes(lowerQuery));
-
-            setSearchResults({ users, videos });
-        } catch (error) {
-            console.error('Search error:', error);
-        } finally {
-            setLoading(false);
+    const NavItem = ({ href, label, icon: Icon }: { href: string; label: string; icon: React.ElementType; }) => {
+        const isActive = href === '/' ? pathname === href : pathname.startsWith(href);
+        let finalHref = href;
+        if (label === 'Profile') {
+            finalHref = user ? `/profile/${user.uid}` : '/onboarding';
         }
+
+        return (
+            <Link
+                href={finalHref}
+                className={cn(
+                    'flex flex-col items-center justify-center gap-1 text-xs text-muted-foreground transition-colors hover:text-primary',
+                    isActive && 'text-primary'
+                )}
+            >
+            <Icon className="h-5 w-5" />
+            <span>{label}</span>
+            </Link>
+        );
     };
-
+    
     return (
-        <Dialog open={isOpen} onOpenChange={onClose}>
-            <DialogContent className="bg-card text-card-foreground p-0">
-                <DialogHeader className="p-4 border-b">
-                    <DialogTitle>Search</DialogTitle>
-                </DialogHeader>
-                <div className="p-4">
-                    <div className="flex items-center gap-2 mb-4">
-                        <input
-                            type="text"
-                            value={searchQuery}
-                            onChange={(e) => setSearchQuery(e.target.value)}
-                            onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
-                            placeholder="Search videos, users..."
-                            className="flex-1 px-4 py-2 rounded-lg bg-input text-foreground"
-                            autoFocus
-                        />
-                        <Button onClick={handleSearch} disabled={loading}>
-                            <Search size={20} />
-                        </Button>
-                    </div>
-                    <div className="flex gap-2">
-                        {['videos', 'users'].map(tab => (
-                            <Button key={tab} variant={activeTab === tab ? 'secondary' : 'ghost'} onClick={() => setActiveTab(tab)}>
-                                {tab.charAt(0).toUpperCase() + tab.slice(1)} ({tab === 'videos' ? searchResults.videos.length : searchResults.users.length})
-                            </Button>
-                        ))}
-                    </div>
+        <nav className="fixed bottom-0 left-0 right-0 h-16 bg-background/80 backdrop-blur-sm border-t border-border z-50">
+            <div className="container mx-auto h-full">
+                <div className="grid h-full grid-cols-5 items-center">
+                    {navItems.map(item => <NavItem key={item.label} {...item} />)}
                 </div>
-                <div className="p-4 pt-0 overflow-y-auto max-h-[50vh]">
-                    {loading ? (
-                        <div className="space-y-3">
-                            <Skeleton className="h-16 w-full" />
-                            <Skeleton className="h-16 w-full" />
-                        </div>
-                    ) : (
-                        <div className="space-y-2">
-                            {activeTab === 'videos' && searchResults.videos.map(v => (
-                                <div key={v.id} onClick={() => { onClose(); router.push('/'); }} className="p-3 rounded-lg cursor-pointer hover:bg-muted">
-                                    <p className="font-bold truncate">{v.description}</p>
-                                    <p className="text-muted-foreground text-sm">#{v.videoCategory}</p>
-                                </div>
-                            ))}
-                            {activeTab === 'users' && searchResults.users.map(u => (
-                                <div key={u.id} onClick={() => { onClose(); router.push(`/profile/${u.id}`); }} className="p-3 rounded-lg cursor-pointer hover:bg-muted">
-                                    <p className="font-bold">{u.username}</p>
-                                    <p className="text-muted-foreground text-sm capitalize">{u.role}</p>
-                                </div>
-                            ))}
-                        </div>
-                    )}
-                </div>
-            </DialogContent>
-        </Dialog>
+            </div>
+        </nav>
     );
-}
+};
 
-export function VideoFeed({ videos, activeFeedTab, setActiveFeedTab, isLoading }: { videos: EnrichedVideo[], activeFeedTab: string, setActiveFeedTab: (tab: string) => void, isLoading: boolean }) {
-  const [showSearchModal, setShowSearchModal] = useState(false);
+export function VideoFeed({ videos, activeFeedTab, setActiveFeedTab, isLoading, currentUser }: { videos: EnrichedVideo[], activeFeedTab: string, setActiveFeedTab: (tab: string) => void, isLoading: boolean, currentUser: User | null }) {
   const router = useRouter();
+  const feedRef = useRef<HTMLDivElement>(null);
+  const { firestore, user } = useFirebase();
+  const [guestVoteCount, setGuestVoteCount] = useState(0);
+
+  useEffect(() => {
+    if (!currentUser) {
+        setGuestVoteCount(parseInt(localStorage.getItem('guestVoteCount') || '0'));
+    }
+  }, [currentUser]);
+
+  const handleGuestVote = () => {
+    const newCount = guestVoteCount + 1;
+    localStorage.setItem('guestVoteCount', newCount.toString());
+    setGuestVoteCount(newCount);
+  }
+
+   const handleVote = useCallback(async (videoId: string, isTop: boolean) => {
+    if (!user && guestVoteCount >= 10) {
+      return; 
+    }
+    if (!firestore) return;
+
+    const batch = writeBatch(firestore);
+    const videoRef = doc(firestore, 'videos', videoId);
+    let voteRef;
+    let existingVote: 'top' | 'flop' | null = null;
+    let voteDocId: string | null = null;
+
+    if (user) {
+        const voteQuery = query(collection(firestore, 'user_votes'), where('userId', '==', user.uid), where('videoId', '==', videoId), limit(1));
+        const voteSnapshot = await getDocs(voteQuery);
+        if (!voteSnapshot.empty) {
+            voteDocId = voteSnapshot.docs[0].id;
+            existingVote = voteSnapshot.docs[0].data().isPositive ? 'top' : 'flop';
+        }
+    }
+    
+    const newVoteType = (existingVote === (isTop ? 'top' : 'flop')) ? null : (isTop ? 'top' : 'flop');
+
+    // Revert existing vote if there is one
+    if (existingVote === 'top') batch.update(videoRef, { topCount: increment(-1), rankingScore: increment(-1) });
+    if (existingVote === 'flop') batch.update(videoRef, { flopCount: increment(-1), rankingScore: increment(1) });
+    if (voteDocId) batch.delete(doc(firestore, 'user_votes', voteDocId));
+
+    // Apply new vote
+    if (newVoteType) {
+        if(user) {
+            batch.set(doc(collection(firestore, 'user_votes')), { videoId: videoId, userId: user.uid, isPositive: isTop, createdAt: serverTimestamp() });
+        }
+        if (newVoteType === 'top') {
+            batch.update(videoRef, { topCount: increment(1), rankingScore: increment(1) });
+        } else {
+            batch.update(videoRef, { flopCount: increment(1), rankingScore: increment(-1) });
+        }
+    }
+    await batch.commit();
+  }, [firestore, user, guestVoteCount]);
+
+
+   const nextVideo = useCallback(() => {
+    feedRef.current?.scrollBy({ top: window.innerHeight, behavior: 'smooth' });
+  }, []);
 
   if (videos.length === 0 && !isLoading) {
     return (
       <div className="h-screen w-full flex flex-col bg-black">
-        <TopCategoryMenu activeFeedTab={activeFeedTab} setActiveFeedTab={setActiveFeedTab} onSearchClick={() => setShowSearchModal(true)} onNotificationClick={() => router.push('/notifications')} unreadCount={0} />
+        <TopCategoryMenu activeFeedTab={activeFeedTab} setActiveFeedTab={setActiveFeedTab} onSearchClick={() => {}} onNotificationClick={() => router.push('/notifications')} unreadCount={0} />
         <div className="flex-1 flex items-center justify-center text-center px-4">
             <div>
                 <h2 className="text-2xl font-bold text-white mb-2">No Videos Found</h2>
-                <p className="text-muted-foreground mb-6">There are no videos in the "{activeFeedTab}" category yet.</p>
+                <p className="text-muted-foreground mb-6">There are no videos in this category yet.</p>
                 <Button onClick={() => setActiveFeedTab('music')}>Switch to Music</Button>
             </div>
         </div>
+        <BottomNavBar />
       </div>
     );
   }
 
   return (
-    <div className="relative h-[calc(100vh)] w-full snap-y snap-mandatory overflow-y-scroll bg-black scrollbar-hide">
-      <TopCategoryMenu activeFeedTab={activeFeedTab} setActiveFeedTab={setActiveFeedTab} onSearchClick={() => setShowSearchModal(true)} onNotificationClick={() => router.push('/notifications')} unreadCount={0} />
-      <SearchModal isOpen={showSearchModal} onClose={() => setShowSearchModal(false)} />
+    <div ref={feedRef} className="relative h-[calc(100vh)] w-full snap-y snap-mandatory overflow-y-scroll bg-black scrollbar-hide">
+      <TopCategoryMenu activeFeedTab={activeFeedTab} setActiveFeedTab={setActiveFeedTab} onSearchClick={() => {}} onNotificationClick={() => router.push('/notifications')} unreadCount={0} />
 
-      {videos.map((video, index) => (
-        <VideoCard key={video.id} video={video} isRisingStar={activeFeedTab === 'rising'} rank={index + 1} />
+      {videos.map((video) => (
+        <VideoCard 
+            key={video.id} 
+            video={video}
+            onVote={handleVote}
+            guestVoteCount={guestVoteCount}
+            onGuestVote={handleGuestVote}
+            currentUser={currentUser}
+            nextVideo={nextVideo}
+        />
       ))}
+
+      <BottomNavBar />
+
       <style jsx global>{`
         .scrollbar-hide::-webkit-scrollbar {
           display: none;

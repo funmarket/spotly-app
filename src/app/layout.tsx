@@ -6,7 +6,7 @@ import { SolanaProvider } from '@/firebase/solana-provider';
 import { FirebaseClientProvider } from '@/firebase/client-provider';
 
 export const metadata: Metadata = {
-  title: 'TalentVerse',
+  title: 'SPOTLY',
   description: 'Discover the next big thing.',
 };
 
