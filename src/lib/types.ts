@@ -138,7 +138,9 @@ export interface MarketplaceProduct {
     stock: number;
     status: 'active' | 'inactive' | 'sold_out';
     imageUrl: string;
-    createdAt: Timestamp;
+    category: string;
+    subcategory?: string;
+    createdAt: Timestamp | { seconds: number; nanoseconds: number };
 }
 
 export interface Notification {

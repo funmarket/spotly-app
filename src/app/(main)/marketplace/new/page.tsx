@@ -15,12 +15,21 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useRouter } from 'next/navigation';
 
+const CATEGORY_OPTIONS = {
+  music: ['Instruments', 'DJ Gear', 'Studio Gear', 'Outfits/Stagewear', 'Music (Digital)', 'CDs', 'Vinyl', 'Vintage Gear', 'Accessories', 'Other'],
+  acting: ['Costumes', 'Props', 'Scripts', 'Coaching Sessions', 'Audition Services', 'Acting Classes', 'Tickets', 'Other'],
+  creator: ['Painting', 'Graffiti', 'Digital Art', 'Sculpture', 'Design', 'Fashion', 'Photography', 'Handmade', 'Prints', 'Other'],
+  merch: ['Clothing', 'Posters', 'Accessories', 'Other'],
+  other: [],
+};
+
 const productSchema = z.object({
   name: z.string().min(3, 'Title must be at least 3 characters').max(100),
   description: z.string().min(10, 'Description must be at least 10 characters').max(1000),
   price: z.coerce.number().positive('Price must be a positive number'),
   imageUrl: z.string().url('Please enter a valid image URL.').optional().or(z.literal('')),
   category: z.string().min(1, 'Please select a category'),
+  subcategory: z.string().optional(),
 });
 
 type ProductFormValues = z.infer<typeof productSchema>;
@@ -39,8 +48,11 @@ export default function NewListingPage() {
       price: undefined,
       imageUrl: '',
       category: '',
+      subcategory: '',
     },
   });
+
+  const category = form.watch('category');
 
   async function onSubmit(values: ProductFormValues) {
     if (!user || !firestore) {
@@ -56,6 +68,7 @@ export default function NewListingPage() {
         price: values.price,
         imageUrl: values.imageUrl || `https://picsum.photos/seed/${Math.random()}/400`,
         category: values.category,
+        subcategory: values.subcategory || '',
         status: 'active',
         stock: 1, // Defaulting stock to 1
         createdAt: serverTimestamp(),
@@ -118,7 +131,7 @@ export default function NewListingPage() {
                <FormField control={form.control} name="category" render={({ field }) => (
                 <FormItem>
                   <FormLabel>Category</FormLabel>
-                   <Select onValueChange={field.onChange} defaultValue={field.value}>
+                   <Select onValueChange={(value) => { field.onChange(value); form.setValue('subcategory', ''); }} defaultValue={field.value}>
                       <FormControl>
                         <SelectTrigger>
                           <SelectValue placeholder="Select a category" />
@@ -135,6 +148,26 @@ export default function NewListingPage() {
                   <FormMessage />
                 </FormItem>
               )} />
+               {category && CATEGORY_OPTIONS[category as keyof typeof CATEGORY_OPTIONS]?.length > 0 && (
+                 <FormField control={form.control} name="subcategory" render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Subcategory</FormLabel>
+                     <Select onValueChange={field.onChange} defaultValue={field.value}>
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select a subcategory" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {CATEGORY_OPTIONS[category as keyof typeof CATEGORY_OPTIONS].map(sub => (
+                            <SelectItem key={sub} value={sub}>{sub}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    <FormMessage />
+                  </FormItem>
+                )} />
+               )}
                <FormField control={form.control} name="imageUrl" render={({ field }) => (
                 <FormItem>
                   <FormLabel>Image URL</FormLabel>
