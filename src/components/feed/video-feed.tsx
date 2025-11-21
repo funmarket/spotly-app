@@ -1,9 +1,9 @@
 'use client';
-import { useState, useRef, useEffect, useCallback } from 'react';
+import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import type { EnrichedVideo, User, Favorite } from '@/lib/types';
 import { VideoCard } from './video-card';
 import { Button } from '@/components/ui/button';
-import { Search, Bell, X, Home, Compass, Upload, Inbox, User as UserIcon } from 'lucide-react';
+import { Search, Bell, X, Home, Compass, Upload, MessageCircle, User as UserIcon } from 'lucide-react';
 import { useRouter, usePathname } from 'next/navigation';
 import { useFirebase } from '@/firebase';
 import { collection, doc, writeBatch, increment, serverTimestamp, query, where, getDocs, limit, deleteDoc, addDoc } from 'firebase/firestore';
@@ -11,17 +11,17 @@ import { useToast } from '@/hooks/use-toast';
 import { useCollection } from '@/firebase/firestore/use-collection';
 
 function TopCategoryMenu({ activeFeedTab, setActiveFeedTab, onSearchClick }: { activeFeedTab: string, setActiveFeedTab: (tab: string) => void, onSearchClick: () => void }) {
-  const { user } = useFirebase();
+  const { user, firestore } = useFirebase();
   const router = useRouter();
 
   const notificationsQuery = useMemo(() => {
-    if (!user) return null;
+    if (!user || !firestore) return null;
     return query(
-      collection(getFirebase().firestore, 'notifications'),
+      collection(firestore, 'notifications'),
       where('recipientWallet', '==', user.uid),
       where('read', '==', false)
     );
-  }, [user]);
+  }, [user, firestore]);
 
   const { data: notifications } = useCollection(notificationsQuery);
   const unreadCount = notifications?.length || 0;
