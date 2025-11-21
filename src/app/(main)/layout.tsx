@@ -6,7 +6,7 @@ import { useFirebase } from '@/firebase';
 import { BottomNavBar } from '@/components/shared/bottom-nav-bar';
 import { Loader2 } from 'lucide-react';
 
-export default function MainLayout({ children }: { children: React.ReactNode }) {
+function AppContent({ children }: { children: React.ReactNode }) {
   const { firestore, user, isUserLoading } = useFirebase();
   const router = useRouter();
 
@@ -46,4 +46,9 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
       <BottomNavBar />
     </div>
   );
+}
+
+
+export default function MainLayout({ children }: { children: React.ReactNode }) {
+  return <AppContent>{children}</AppContent>
 }

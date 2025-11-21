@@ -10,15 +10,8 @@ import { getPerformance, Performance } from 'firebase/performance';
 
 // IMPORTANT: DO NOT MODIFY THIS FUNCTION
 export function initializeFirebase() {
-  if (getApps().length === 0) {
-    // If no app is initialized, initialize one with the provided config.
-    // This is the standard path for client-side initialization.
-    initializeApp(firebaseConfig);
-  }
-
-  // Get the initialized app and return the SDKs.
-  // This ensures we don't re-initialize the app on every render.
-  return getSdks(getApp());
+  const app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
+  return getSdks(app);
 }
 
 export function getSdks(firebaseApp: FirebaseApp) {
@@ -34,7 +27,11 @@ export function getSdks(firebaseApp: FirebaseApp) {
         analytics = getAnalytics(firebaseApp);
       }
     });
-    performance = getPerformance(firebaseApp);
+    try {
+        performance = getPerformance(firebaseApp);
+    } catch (e) {
+        // Performance seems to be not available in all contexts.
+    }
   }
   
   return {

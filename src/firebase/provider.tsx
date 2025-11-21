@@ -7,7 +7,7 @@ import { Auth, User, onAuthStateChanged } from 'firebase/auth';
 import { FirebaseErrorListener } from '@/components/FirebaseErrorListener';
 
 interface FirebaseProviderProps {
-  children: React.Node;
+  children: React.ReactNode;
   firebaseApp: FirebaseApp;
   firestore: Firestore;
   auth: Auth;

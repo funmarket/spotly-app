@@ -8,17 +8,35 @@ interface FirebaseClientProviderProps {
   children: ReactNode;
 }
 
+// Create a singleton instance of Firebase services on the client
+const firebaseServices = typeof window !== 'undefined' ? initializeFirebase() : null;
+
 export function FirebaseClientProvider({ children }: FirebaseClientProviderProps) {
-  const firebaseServices = useMemo(() => {
-    // Initialize Firebase on the client side, once per component mount.
-    return initializeFirebase();
-  }, []); // Empty dependency array ensures this runs only once on mount
+  // The value is memoized and will not change, preventing re-initializations
+  const value = useMemo(() => {
+    if (!firebaseServices) {
+      // This should ideally not happen on the client. 
+      // It might run on the server, in which case we provide nulls.
+      return {
+        firebaseApp: null,
+        auth: null,
+        firestore: null,
+      };
+    }
+    return firebaseServices;
+  }, []);
+
+  if (!value.firebaseApp || !value.auth || !value.firestore) {
+    // Render nothing or a loader on the server or if initialization failed.
+    // The actual app content will render once Firebase is available on the client.
+    return <>{children}</>;
+  }
 
   return (
     <FirebaseProvider
-      firebaseApp={firebaseServices.firebaseApp}
-      auth={firebaseServices.auth}
-      firestore={firebaseServices.firestore}
+      firebaseApp={value.firebaseApp}
+      auth={value.auth}
+      firestore={value.firestore}
     >
       {children}
     </FirebaseProvider>
