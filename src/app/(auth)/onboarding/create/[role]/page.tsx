@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
-import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -136,20 +136,6 @@ export default function CreateProfilePage() {
   const { watch, setValue } = form;
   const isArtist = watch('isArtist');
   const talentCategory = watch('talentCategory');
-
-  // If user has a profile, redirect them away from onboarding
-  useEffect(() => {
-    const checkExistingProfile = async () => {
-      if (publicKey && firestore) {
-        const userDocRef = doc(firestore, 'users', publicKey.toBase58());
-        const docSnap = await getDoc(userDocRef);
-        if (docSnap.exists()) {
-          router.replace('/');
-        }
-      }
-    };
-    checkExistingProfile();
-  }, [publicKey, firestore, router]);
   
   const onSubmit = async (values: ProfileFormValues) => {
     if (!publicKey || !firestore) return;
