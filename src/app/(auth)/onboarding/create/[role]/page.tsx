@@ -73,7 +73,7 @@ const ClientOnlyWalletButton = () => {
 };
 
 export default function CreateProfilePage() {
-  const { firestore, auth } = useFirebase();
+  const { firestore } = useFirebase();
   const { publicKey, connected } = useWallet();
   const router = useRouter();
   const params = useParams();
@@ -167,7 +167,6 @@ export default function CreateProfilePage() {
   const onSubmit = async (values: ProfileFormValues) => {
     if (!firestore) return;
     
-    // For artist/business, wallet must be connected. For fans, it's optional.
     if ((accountType === 'artist' || accountType === 'business') && !publicKey) {
         console.error("Wallet not connected for artist/business profile creation.");
         return;
@@ -176,17 +175,12 @@ export default function CreateProfilePage() {
     setIsSubmitting(true);
     try {
         let role: 'fan' | 'artist' | 'business' = 'fan';
-        if (accountType !== 'fan') {
-            if (values.isArtist && values.isBusiness) {
-                role = 'artist'; // Artist role takes precedence
-            } else if (values.isArtist) {
-                role = 'artist';
-            } else if (values.isBusiness) {
-                role = 'business';
-            }
+        if (values.isArtist) {
+            role = 'artist';
+        } else if (values.isBusiness) {
+            role = 'business';
         }
 
-        // Use wallet address for ID if available, otherwise generate a new ID for fans
         const docId = publicKey ? publicKey.toBase58() : doc(collection(firestore, 'users')).id;
         const userDocRef = doc(firestore, 'users', docId);
         
@@ -242,7 +236,6 @@ export default function CreateProfilePage() {
       setValue('talentSubcategories', newSubs);
   }
 
-  // Wallet connection is only required for Artist and Business accounts
   if ((accountType === 'artist' || accountType === 'business') && (!connected || !publicKey)) {
     return (
       <div className="flex min-h-screen items-center justify-center p-4">

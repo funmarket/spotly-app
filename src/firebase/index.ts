@@ -4,45 +4,21 @@ import { firebaseConfig } from '@/firebase/config';
 import { initializeApp, getApps, getApp, FirebaseApp } from 'firebase/app';
 import { getAuth, Auth } from 'firebase/auth';
 import { getFirestore, Firestore } from 'firebase/firestore';
-import { getAnalytics, isSupported as isAnalyticsSupported, Analytics } from 'firebase/analytics';
-import { getPerformance, Performance } from 'firebase/performance';
 
-
-// IMPORTANT: DO NOT MODIFY THIS FUNCTION
-export function initializeFirebase() {
-  const app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
-  return getSdks(app);
+// --- Centralized Firebase Instances ---
+let firebaseApp: FirebaseApp;
+if (!getApps().length) {
+  firebaseApp = initializeApp(firebaseConfig);
+} else {
+  firebaseApp = getApp();
 }
 
-export function getSdks(firebaseApp: FirebaseApp) {
-  const firestore = getFirestore(firebaseApp);
-  const auth = getAuth(firebaseApp);
+const auth: Auth = getAuth(firebaseApp);
+const firestore: Firestore = getFirestore(firebaseApp);
 
-  let analytics: Analytics | null = null;
-  let performance: Performance | null = null;
+export { firebaseApp, auth, firestore };
 
-  if (typeof window !== 'undefined') {
-    isAnalyticsSupported().then(yes => {
-      if (yes) {
-        analytics = getAnalytics(firebaseApp);
-      }
-    });
-    try {
-        performance = getPerformance(firebaseApp);
-    } catch (e) {
-        // Performance seems to be not available in all contexts.
-    }
-  }
-  
-  return {
-    firebaseApp,
-    auth,
-    firestore,
-    analytics,
-    performance,
-  };
-}
-
+// --- Provider and Hooks ---
 export * from './provider';
 export * from './client-provider';
 export * from './firestore/use-collection';
