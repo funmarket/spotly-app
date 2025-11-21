@@ -10,7 +10,7 @@ export function VideoFeed({ videos }: VideoFeedProps) {
   return (
     <div className="relative h-[calc(100vh)] w-full snap-y snap-mandatory overflow-y-scroll bg-black scrollbar-hide">
       {videos.map((video) => (
-        <VideoCard key={video.videoId} video={video} />
+        <VideoCard key={video.id} video={video} />
       ))}
       <style jsx global>{`
         .scrollbar-hide::-webkit-scrollbar {
