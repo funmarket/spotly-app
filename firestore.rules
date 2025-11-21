@@ -111,12 +111,16 @@ service cloud.firestore {
     
     match /videos/{videoId} {
       // Public read access for all videos (feed, profile viewing etc.)
-      allow read: if true;
+      allow get: if true;
 
       // Write rules
       allow create: if isSignedIn() && request.resource.data.artistId == request.auth.uid && isArtist(request.auth.uid);
       allow update: if (isOwner(resource.data.artistId) && !isAttemptingAdminVideoWrite()) || isAdmin();
       allow delete: if isOwner(resource.data.artistId) || isAdmin();
+    }
+
+    match /videos {
+        allow list: if true;
     }
     
     // ----------------------------------------------------------------------
