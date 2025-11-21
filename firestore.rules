@@ -92,24 +92,6 @@ service cloud.firestore {
      * Manages user profiles. Profiles are public to read, but a user can only create,
      * update, or delete their own profile document. Administrative fields are
      * protected and can only be modified by a designated admin.
-     *
-     * @path
-     * `/users/{walletAddress}`
-     *
-     * @allow
-     * (get) Any user, authenticated or not, reading the profile at `/users/user123`.
-     * (create) An authenticated user with UID 'user123' creating their own profile at `/users/user123`.
-     * (update) User 'user123' updating their own 'bio' at `/users/user123`.
-     * (update) An admin user updating the 'isBanned' field for user `/users/user123`.
-     *
-     * @deny
-     * (create) User 'user123' attempting to create a profile for someone else at `/users/user456`.
-     * (update) User 'user123' attempting to update their own `isBanned` field.
-     * (delete) User 'user123' attempting to delete the profile at `/users/user456`.
-     *
-     * @principle
-     * Enforces strict document ownership for writes while allowing public reads.
-     * Protects sensitive administrative fields from modification by non-admin users.
      */
     match /users/{walletAddress} {
       allow get, list: if true;
@@ -123,20 +105,15 @@ service cloud.firestore {
     
     /**
      * @description
-     * Manages video content. Videos are publicly readable. Only the artist who created
-     * the video can create or delete it. An artist can update their own video, but
-     * certain fields are admin-only.
-     *
-     * @path
-     * `/videos/{videoId}`
+     * Manages video content. Videos are publicly readable. Write operations are restricted.
      */
     match /videos/{videoId} {
+        // PUBLIC READ ACCESS: Anyone can read video data. This is essential for the feed.
         allow get, list: if true;
 
+        // WRITE ACCESS: Restricted to owners and admins.
         allow create: if isSignedIn() && request.resource.data.artistId == request.auth.uid;
-        
         allow update: if (isOwner(resource.data.artistId) && !isAttemptingAdminVideoWrite()) || isAdmin();
-        
         allow delete: if isOwner(resource.data.artistId) || isAdmin();
         
         function isAttemptingAdminVideoWrite() {
