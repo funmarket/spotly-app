@@ -1,5 +1,6 @@
+
 'use client';
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import { notFound, useRouter, useParams } from 'next/navigation';
 import { ProfileHeader } from '@/components/profile/profile-header';
 import { AdminAiInsights } from '@/components/profile/admin-ai-insights';
