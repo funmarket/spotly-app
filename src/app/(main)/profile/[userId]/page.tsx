@@ -1,6 +1,6 @@
 'use client';
 import { useMemo, useState } from 'react';
-import { notFound, useRouter } from 'next/navigation';
+import { notFound, useRouter, useParams } from 'next/navigation';
 import { ProfileHeader } from '@/components/profile/profile-header';
 import { AdminAiInsights } from '@/components/profile/admin-ai-insights';
 import { Card, CardContent, CardFooter } from '@/components/ui/card';
@@ -108,7 +108,7 @@ function ProfileVideos({ userId, canEdit }: { userId: string, canEdit: boolean }
           <Link href="#" key={video.id} className="group">
             <Card className="overflow-hidden">
               <div className="aspect-w-9 aspect-h-16 relative">
-                <Image src={`https://picsum.photos/seed/${video.id}/300/500`} alt={video.description} layout="fill" className="object-cover group-hover:scale-105 transition-transform duration-300" />
+                <Image src={`https://picsum.photos/seed/${video.id}/300/500`} alt={video.description} fill className="object-cover group-hover:scale-105 transition-transform duration-300" />
                 <div className="absolute inset-0 bg-black/20" />
                  {canEdit && (
                   <Button
@@ -132,8 +132,9 @@ function ProfileVideos({ userId, canEdit }: { userId: string, canEdit: boolean }
   )
 }
 
-export default function ProfilePage({ params }: { params: { userId: string } }) {
-  const { userId } = params;
+export default function ProfilePage() {
+  const params = useParams();
+  const userId = params.userId as string;
   const { user: authUser } = useUser();
   const firestore = useFirestore();
   const router = useRouter();
