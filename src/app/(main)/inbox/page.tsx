@@ -6,7 +6,7 @@ export default function InboxPage() {
     const router = useRouter();
 
     useEffect(() => {
-        router.replace('/gossip?tab=inbox');
+        router.replace('/gossip?openConversationWith=true');
     }, [router]);
 
     return (

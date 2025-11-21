@@ -1,7 +1,7 @@
 import type { User } from '@/lib/types';
 import Image from 'next/image';
 import { Button } from '@/components/ui/button';
-import { Mail, UserPlus, Twitter, Instagram, Youtube, Globe } from 'lucide-react';
+import { Mail, UserPlus, Twitter, Instagram, Youtube, Globe, Facebook, Music } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '../ui/avatar';
 import { Badge } from '../ui/badge';
 import Link from 'next/link';
@@ -10,10 +10,15 @@ const socialIcons: { [key: string]: React.ReactNode } = {
   twitter: <Twitter className="h-4 w-4" />,
   instagram: <Instagram className="h-4 w-4" />,
   youtube: <Youtube className="h-4 w-4" />,
+  facebook: <Facebook className="h-4 w-4" />,
+  tiktok: <Music className="h-4 w-4" />,
   website: <Globe className="h-4 w-4" />,
 };
 
 export function ProfileHeader({ user, isOwnProfile, onMessage }: { user: User, isOwnProfile: boolean, onMessage: () => void }) {
+  const socialLinks = typeof user.socialLinks === 'string' ? JSON.parse(user.socialLinks) : user.socialLinks;
+  const extraLinks = typeof user.extraLinks === 'string' ? JSON.parse(user.extraLinks) : user.extraLinks;
+
   return (
     <div className="relative">
       <div className="h-48 md:h-64 w-full overflow-hidden">
@@ -43,13 +48,20 @@ export function ProfileHeader({ user, isOwnProfile, onMessage }: { user: User, i
                 {user.username}
               </h1>
               <p className="text-muted-foreground mt-1 max-w-xl">{user.bio}</p>
-              <div className="mt-3 flex justify-center md:justify-start items-center gap-2">
+              <div className="mt-3 flex justify-center md:justify-start items-center gap-2 flex-wrap">
                 <Badge variant="secondary" className="capitalize">{user.role}</Badge>
                 {user.talentCategory && <Badge variant="outline" className="capitalize">{user.talentCategory}</Badge>}
+                 {extraLinks?.map((link: {label: string, url: string}, index: number) => (
+                   <Button key={index} variant="outline" size="sm" asChild>
+                      <a href={link.url} target="_blank" rel="noopener noreferrer">
+                        {link.label}
+                      </a>
+                    </Button>
+                 ))}
               </div>
             </div>
             <div className="mt-4 md:mt-0 flex items-center space-x-3">
-              {user.socialLinks && Object.entries(user.socialLinks).map(([platform, url]) => (
+              {socialLinks && Object.entries(socialLinks).map(([platform, url]) => (
                  url && socialIcons[platform] && (
                     <Button key={platform} variant="outline" size="icon" asChild>
                       <a href={url as string} target="_blank" rel="noopener noreferrer">
@@ -70,7 +82,7 @@ export function ProfileHeader({ user, isOwnProfile, onMessage }: { user: User, i
               )}
                {isOwnProfile && (
                   <Button variant="outline" asChild>
-                     <Link href="/onboarding/create/artist">Edit Profile</Link>
+                     <Link href={`/onboarding/create/${user.role}`}>Edit Profile</Link>
                   </Button>
                )}
             </div>

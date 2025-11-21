@@ -9,25 +9,15 @@ import {
   ThumbsUp,
   ThumbsDown,
   Share2,
+  Bookmark,
+  DollarSign
 } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '../ui/avatar';
 import { useFirebase } from '@/firebase';
-import {
-  collection,
-  doc,
-  increment,
-  writeBatch,
-  serverTimestamp,
-  query,
-  where,
-  getDocs,
-  deleteDoc,
-  addDoc,
-  limit,
-} from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { useRouter } from 'next/navigation';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '../ui/dialog';
+import { useCollection } from '@/firebase';
 
 const BookIcon = (props: React.SVGProps<SVGSVGElement>) => (
     <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"></path><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"></path></svg>
@@ -80,7 +70,7 @@ const ActionButton = ({
   </div>
 );
 
-export function VideoCard({ video, onVote, guestVoteCount, onGuestVote, currentUser, nextVideo }: { video: EnrichedVideo, onVote: (videoId: string, isTop: boolean) => Promise<void>, guestVoteCount: number, onGuestVote: () => void, currentUser: User | null, nextVideo: () => void }) {
+export function VideoCard({ video, onVote, onFavorite, guestVoteCount, onGuestVote, currentUser, nextVideo }: { video: EnrichedVideo, onVote: (videoId: string, isTop: boolean) => Promise<void>, onFavorite: (videoId: string) => Promise<void>, guestVoteCount: number, onGuestVote: () => void, currentUser: User | null, nextVideo: () => void }) {
   const cardRef = useRef<HTMLDivElement>(null);
   const isVisible = useOnScreen(cardRef);
   const { firestore, user } = useFirebase();
@@ -92,6 +82,15 @@ export function VideoCard({ video, onVote, guestVoteCount, onGuestVote, currentU
   const [userVote, setUserVote] = useState<'top' | 'flop' | null>(null);
   const [isVoteLoading, setIsVoteLoading] = useState(false);
   const [showVoteLimitModal, setShowVoteLimitModal] = useState(false);
+  
+  const favoritesQuery = useMemo(() => {
+    if (!user) return null;
+    return query(collection(firestore, 'favorites'), where('userId', '==', user.uid), where('itemId', '==', video.id));
+  }, [firestore, user, video.id]);
+
+  const { data: favorites } = useCollection<Favorite>(favoritesQuery);
+  const isFavorited = (favorites || []).length > 0;
+
 
   const getSubRole = (user: User) => {
     if (user.talentCategory) {
@@ -190,8 +189,9 @@ export function VideoCard({ video, onVote, guestVoteCount, onGuestVote, currentU
       <div className="absolute right-3 bottom-20 flex flex-col items-center gap-4">
         <ActionButton icon={ThumbsUp} label="Top" onClick={() => handleVote(true)} isActive={userVote === 'top'} isDisabled={isVoteLoading} />
         <ActionButton icon={ThumbsDown} label="Flop" onClick={() => handleVote(false)} isActive={userVote === 'flop'} isDisabled={isVoteLoading} />
+        <ActionButton icon={Bookmark} label="Save" onClick={() => onFavorite(video.id)} isActive={isFavorited} className={isFavorited ? '!bg-yellow-500' : ''} />
         <ActionButton icon={Share2} label="Share" onClick={() => toast({ title: 'Sharing not implemented yet.' })} />
-        {currentUser?.role === 'business' && (
+         {currentUser?.role === 'business' && (
             <>
                 <ActionButton icon={BookIcon} label="Hire" onClick={handleHireOrAdopt} className="hover:bg-cyan-500/80" />
                 <ActionButton icon={AdoptIcon} label="Adopt" onClick={handleHireOrAdopt} className="hover:bg-purple-500/80" />

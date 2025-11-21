@@ -1,8 +1,7 @@
-
 'use client';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { VideoFeed } from '@/components/feed/video-feed';
-import { useFirebase, useMemoFirebase } from '@/firebase';
+import { useFirebase } from '@/firebase';
 import { collection, query, where, orderBy, getDoc, doc, limit } from 'firebase/firestore';
 import type { EnrichedVideo, User, Video } from '@/lib/types';
 import { Loader2 } from 'lucide-react';
@@ -25,6 +24,9 @@ function Feed() {
       getDoc(userDocRef).then((docSnap) => {
         if (docSnap.exists()) {
            setCurrentUser({ userId: docSnap.id, ...docSnap.data() } as User);
+        } else {
+            // User is authenticated but has no profile, redirect to onboarding.
+            router.push('/onboarding');
         }
       });
     } else {
@@ -33,7 +35,7 @@ function Feed() {
   }, [user, isUserLoading, firestore, router]);
 
 
-  const videosQuery = useMemoFirebase(() => {
+  const videosQuery = useMemo(() => {
     if (!firestore) return null;
     
     const videosCollection = collection(firestore, 'videos');
@@ -72,22 +74,14 @@ function Feed() {
             }
           }
           
-          if (!artist) {
-             artist = {
-                userId: 'unknown',
-                walletAddress: 'unknown',
-                username: 'Unknown Artist',
-                profilePhotoUrl: '',
-                bannerPhotoUrl: '',
-                bio: '',
-                role: 'fan',
-             };
+          if (!artist || artist.isBanned || artist.isDeleted) {
+             return null;
           }
           return { ...video, user: artist } as EnrichedVideo;
         })
       );
       
-      setEnrichedVideos(enriched);
+      setEnrichedVideos(enriched.filter(v => v !== null) as EnrichedVideo[]);
       setIsEnriching(false);
     };
 

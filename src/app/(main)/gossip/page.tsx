@@ -1,24 +1,22 @@
 'use client';
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { useFirebase, useMemoFirebase } from '@/firebase';
+import { useFirebase } from '@/firebase';
 import { addDoc, collection, query, orderBy, serverTimestamp, doc, updateDoc, deleteDoc, where, getDocs, increment } from 'firebase/firestore';
-import { useCollection } from '@/firebase/firestore/use-collection';
+import { useCollection, useDoc, useMemoFirebase } from '@/firebase';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
-import { Card, CardContent } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Form, FormControl, FormField, FormItem, FormMessage } from '@/components/ui/form';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Loader2, Send, Star, MessageCircle, RefreshCw, Sparkles, User, Briefcase, Handshake, LogOut, Upload } from 'lucide-react';
 import { Skeleton } from '@/components/ui/skeleton';
 import { formatDistanceToNow } from 'date-fns';
-import type { User as AppUser, GossipPost, GossipComment, GossipRating } from '@/lib/types';
-import { useDoc } from '@/firebase/firestore/use-doc';
+import type { User as AppUser, GossipPost, GossipComment, GossipRating, GossipMessage } from '@/lib/types';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { Input } from '@/components/ui/input';
-
 
 const postSchema = z.object({
   content: z.string().min(1, 'Post cannot be empty').max(1000, 'Post is too long'),
@@ -77,7 +75,7 @@ function CommentsSection({ postId, currentUser }: { postId: string, currentUser:
     return (
         <div className="space-y-2">
             {comments?.map(comment => (
-                <CommentCard key={comment.id} comment={comment} currentUser={currentUser} />
+                <CommentCard key={comment.id} comment={comment as GossipComment & { id:string }} currentUser={currentUser} />
             ))}
         </div>
     )
@@ -86,7 +84,7 @@ function CommentsSection({ postId, currentUser }: { postId: string, currentUser:
 function CommentCard({ comment, currentUser }: { comment: GossipComment & {id: string}, currentUser: AppUser | null }) {
     const { firestore } = useFirebase();
     const authorDocRef = useMemoFirebase(() => {
-        if (!firestore) return null;
+        if (!firestore || !comment.authorId) return null;
         return doc(firestore, 'users', comment.authorId);
     }, [firestore, comment.authorId]);
     const { data: author } = useDoc<AppUser>(authorDocRef);
@@ -115,7 +113,7 @@ function CommentCard({ comment, currentUser }: { comment: GossipComment & {id: s
                             <div>
                                 <p className="font-semibold text-sm">{author?.username}</p>
                                 <p className="text-xs text-muted-foreground">
-                                    {comment.createdAt ? formatDistanceToNow(new Date(comment.createdAt.seconds * 1000), { addSuffix: true }) : 'just now'}
+                                    {comment.createdAt ? formatDistanceToNow(new Date((comment.createdAt as any).seconds * 1000), { addSuffix: true }) : 'just now'}
                                 </p>
                             </div>
                              {currentUser?.walletAddress === comment.authorId && (
@@ -143,7 +141,7 @@ function PostCard({ post }: { post: GossipPost & { id: string } }) {
   const { data: author } = useDoc<AppUser>(authorDocRef);
 
   const timeAgo = post.createdAt
-    ? formatDistanceToNow(new Date(post.createdAt.seconds * 1000), { addSuffix: true })
+    ? formatDistanceToNow(new Date((post.createdAt as any).seconds * 1000), { addSuffix: true })
     : 'just now';
 
   const handleCommentSubmit = async (e: React.FormEvent) => {
@@ -317,7 +315,7 @@ function GossipFeed() {
     )
 }
 
-function GossipInbox({ initialSelectedWallet }: { initialSelectedWallet: string | null, currentUser: AppUser | null }) {
+function GossipInbox({ initialSelectedWallet, currentUser }: { initialSelectedWallet: string | null, currentUser: AppUser | null }) {
     const { firestore, user } = useFirebase();
     const [conversations, setConversations] = useState<AppUser[]>([]);
     const [selectedUser, setSelectedUser] = useState<AppUser | null>(null);
@@ -355,14 +353,18 @@ function GossipInbox({ initialSelectedWallet }: { initialSelectedWallet: string 
         sentSnapshot.forEach(doc => userIds.add(doc.data().toId));
         receivedSnapshot.forEach(doc => userIds.add(doc.data().fromId));
 
+        if (initialSelectedWallet) {
+            userIds.add(initialSelectedWallet);
+        }
+
         if (userIds.size === 0) {
             setLoading(false);
             return;
         }
-
+        
         const usersQuery = query(collection(firestore, 'users'), where('walletAddress', 'in', Array.from(userIds)));
         const usersSnapshot = await getDocs(usersQuery);
-        const convUsers = usersSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as AppUser));
+        const convUsers = usersSnapshot.docs.map(doc => ({ userId: doc.id, ...doc.data() } as AppUser));
 
         setConversations(convUsers);
         setLoading(false);
@@ -374,26 +376,21 @@ function GossipInbox({ initialSelectedWallet }: { initialSelectedWallet: string 
 
     const messagesQuery = useMemoFirebase(() => {
         if (!firestore || !user || !selectedUser) return null;
-        const q1 = query(collection(firestore, 'gossip_messages'), where('fromId', '==', user.uid), where('toId', '==', selectedUser.walletAddress), orderBy('createdAt', 'asc'));
-        // Firestore limitation: cannot have two `where` on different fields and an `orderBy` on a third.
-        // So we fetch two queries and merge them client-side.
-        return q1;
+        // This is a simplified query. For a real app, you'd likely combine two queries.
+        return query(collection(firestore, 'gossip_messages'), where('fromId', 'in', [user.uid, selectedUser.walletAddress]), where('toId', 'in', [user.uid, selectedUser.walletAddress]), orderBy('createdAt', 'asc'));
     }, [firestore, user, selectedUser]);
     
-    // A bit of a hack to get bi-directional messages
-    const messagesQuery2 = useMemoFirebase(() => {
-        if (!firestore || !user || !selectedUser) return null;
-        return query(collection(firestore, 'gossip_messages'), where('toId', '==', user.uid), where('fromId', '==', selectedUser.walletAddress), orderBy('createdAt', 'asc'));
-    }, [firestore, user, selectedUser]);
+    const {data: allMessages} = useCollection<GossipMessage>(messagesQuery);
     
-    const {data: sentMessages} = useCollection<GossipMessage>(messagesQuery);
-    const {data: receivedMessages} = useCollection<GossipMessage>(messagesQuery2);
-
     useEffect(() => {
-        const allMessages = [...(sentMessages || []), ...(receivedMessages || [])];
-        allMessages.sort((a, b) => a.createdAt.seconds - b.createdAt.seconds);
-        setMessages(allMessages);
-    }, [sentMessages, receivedMessages]);
+        if (allMessages) {
+            const filtered = allMessages.filter(msg => 
+                (msg.fromId === user?.uid && msg.toId === selectedUser?.walletAddress) ||
+                (msg.fromId === selectedUser?.walletAddress && msg.toId === user?.uid)
+            )
+            setMessages(filtered);
+        }
+    }, [allMessages, user, selectedUser]);
 
     const handleSendMessage = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -436,7 +433,7 @@ function GossipInbox({ initialSelectedWallet }: { initialSelectedWallet: string 
                 </CardContent>
             </Card>
 
-            <Card className="md:col-span-2 flex flex-col">
+            <Card className="md:col-span-2 flex flex-col h-[60vh]">
                 {selectedUser ? (
                     <>
                         <CardHeader>

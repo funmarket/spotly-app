@@ -1,34 +1,31 @@
 'use client';
 import { useState, useRef, useEffect, useCallback } from 'react';
-import type { EnrichedVideo, User } from '@/lib/types';
+import type { EnrichedVideo, User, Favorite } from '@/lib/types';
 import { VideoCard } from './video-card';
 import { Button } from '@/components/ui/button';
 import { Search, Bell, X, Home, Compass, Upload, Inbox, User as UserIcon } from 'lucide-react';
 import { useRouter, usePathname } from 'next/navigation';
-import { Skeleton } from '@/components/ui/skeleton';
 import { useFirebase } from '@/firebase';
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import { cn } from '@/lib/utils';
-import Link from 'next/link';
-import {
-  collection,
-  doc,
-  writeBatch,
-  increment,
-  serverTimestamp,
-  query,
-  where,
-  getDocs,
-  limit,
-} from 'firebase/firestore';
+import { collection, doc, writeBatch, increment, serverTimestamp, query, where, getDocs, limit, deleteDoc, addDoc } from 'firebase/firestore';
+import { useToast } from '@/hooks/use-toast';
+import { useCollection } from '@/firebase/firestore/use-collection';
 
+function TopCategoryMenu({ activeFeedTab, setActiveFeedTab, onSearchClick }: { activeFeedTab: string, setActiveFeedTab: (tab: string) => void, onSearchClick: () => void }) {
+  const { user } = useFirebase();
+  const router = useRouter();
 
-function TopCategoryMenu({ activeFeedTab, setActiveFeedTab, onSearchClick, onNotificationClick, unreadCount }: { activeFeedTab: string, setActiveFeedTab: (tab: string) => void, onSearchClick: () => void, onNotificationClick: () => void, unreadCount: number }) {
+  const notificationsQuery = useMemo(() => {
+    if (!user) return null;
+    return query(
+      collection(getFirebase().firestore, 'notifications'),
+      where('recipientWallet', '==', user.uid),
+      where('read', '==', false)
+    );
+  }, [user]);
+
+  const { data: notifications } = useCollection(notificationsQuery);
+  const unreadCount = notifications?.length || 0;
+
   const getTabLabel = (tab: string) => {
     switch (tab) {
       case "music": return "Music";
@@ -43,6 +40,31 @@ function TopCategoryMenu({ activeFeedTab, setActiveFeedTab, onSearchClick, onNot
     <div className="fixed top-0 left-0 right-0 z-50 bg-black/80 backdrop-blur-md border-b border-white/10">
       <div className="container mx-auto h-14 flex items-center justify-between gap-2 overflow-x-auto scrollbar-hide">
         <div className="text-xl font-bold text-white font-headline">SPOTLY</div>
+         <div className="flex items-center gap-1 sm:gap-2 flex-shrink-0">
+          {["music", "acting", "creator", "rising"].map(cat => (
+            <button
+              key={cat}
+              onClick={() => setActiveFeedTab(cat)}
+              className={`px-2.5 py-1.5 rounded-full font-bold whitespace-nowrap text-xs sm:text-sm transition-all flex items-center justify-center min-h-[32px] ${activeFeedTab === cat ? 'bg-primary text-primary-foreground' : 'text-white/70 hover:bg-white/10 hover:text-white'}`}
+            >
+              {getTabLabel(cat)}
+            </button>
+          ))}
+        </div>
+        <div className="flex items-center gap-1">
+           <Button variant="ghost" size="icon" onClick={onSearchClick} className="text-white/80 hover:text-white hover:bg-white/10">
+            <Search className="h-5 w-5" />
+          </Button>
+          <Button variant="ghost" size="icon" onClick={() => router.push('/notifications')} className="text-white/80 hover:text-white hover:bg-white/10 relative">
+            <Bell className="h-5 w-5" />
+            {unreadCount > 0 && (
+                 <span className="absolute top-1.5 right-1.5 flex h-2.5 w-2.5">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75"></span>
+                    <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-primary"></span>
+                 </span>
+            )}
+          </Button>
+        </div>
       </div>
     </div>
   );
@@ -58,7 +80,7 @@ const BottomNavBar = () => {
       { href: '/', label: 'Home', icon: Home },
       { href: '/discover', label: 'Discover', icon: Compass },
       { href: '/submit-video', label: 'Upload', icon: Upload },
-      { href: '/inbox', label: 'Inbox', icon: Inbox },
+      { href: '/gossip', label: 'Gossip', icon: MessageCircle },
       { href: '/profile', label: 'Profile', icon: UserIcon },
     ];
 
@@ -72,10 +94,7 @@ const BottomNavBar = () => {
         return (
             <Link
                 href={finalHref}
-                className={cn(
-                    'flex flex-col items-center justify-center gap-1 text-xs text-muted-foreground transition-colors hover:text-primary',
-                    isActive && 'text-primary'
-                )}
+                className={`flex flex-col items-center justify-center gap-1 text-xs transition-colors ${isActive ? 'text-primary' : 'text-muted-foreground hover:text-primary'}`}
             >
             <Icon className="h-5 w-5" />
             <span>{label}</span>
@@ -98,6 +117,7 @@ export function VideoFeed({ videos, activeFeedTab, setActiveFeedTab, isLoading, 
   const router = useRouter();
   const feedRef = useRef<HTMLDivElement>(null);
   const { firestore, user } = useFirebase();
+  const { toast } = useToast();
   const [guestVoteCount, setGuestVoteCount] = useState(0);
 
   useEffect(() => {
@@ -114,6 +134,7 @@ export function VideoFeed({ videos, activeFeedTab, setActiveFeedTab, isLoading, 
 
    const handleVote = useCallback(async (videoId: string, isTop: boolean) => {
     if (!user && guestVoteCount >= 10) {
+      // Logic to show signup modal will be in VideoCard
       return; 
     }
     if (!firestore) return;
@@ -159,10 +180,33 @@ export function VideoFeed({ videos, activeFeedTab, setActiveFeedTab, isLoading, 
     feedRef.current?.scrollBy({ top: window.innerHeight, behavior: 'smooth' });
   }, []);
 
+   const handleFavorite = useCallback(async (videoId: string) => {
+    if (!user || !firestore) {
+      toast({ title: "Please log in to save favorites.", variant: "destructive" });
+      return;
+    }
+    
+    const favQuery = query(collection(firestore, 'favorites'), where('userId', '==', user.uid), where('itemId', '==', videoId), limit(1));
+    const existing = await getDocs(favQuery);
+
+    if (existing.empty) {
+      await addDoc(collection(firestore, 'favorites'), {
+        userId: user.uid,
+        itemId: videoId,
+        itemType: 'video',
+        createdAt: serverTimestamp()
+      });
+      toast({ title: "Added to favorites!" });
+    } else {
+      await deleteDoc(doc(firestore, 'favorites', existing.docs[0].id));
+      toast({ title: "Removed from favorites." });
+    }
+  }, [firestore, user, toast]);
+
   if (videos.length === 0 && !isLoading) {
     return (
       <div className="h-screen w-full flex flex-col bg-black">
-        <TopCategoryMenu activeFeedTab={activeFeedTab} setActiveFeedTab={setActiveFeedTab} onSearchClick={() => {}} onNotificationClick={() => router.push('/notifications')} unreadCount={0} />
+        <TopCategoryMenu activeFeedTab={activeFeedTab} setActiveFeedTab={setActiveFeedTab} onSearchClick={() => {}} />
         <div className="flex-1 flex items-center justify-center text-center px-4">
             <div>
                 <h2 className="text-2xl font-bold text-white mb-2">No Videos Found</h2>
@@ -177,13 +221,14 @@ export function VideoFeed({ videos, activeFeedTab, setActiveFeedTab, isLoading, 
 
   return (
     <div ref={feedRef} className="relative h-[calc(100vh)] w-full snap-y snap-mandatory overflow-y-scroll bg-black scrollbar-hide">
-      <TopCategoryMenu activeFeedTab={activeFeedTab} setActiveFeedTab={setActiveFeedTab} onSearchClick={() => {}} onNotificationClick={() => router.push('/notifications')} unreadCount={0} />
+      <TopCategoryMenu activeFeedTab={activeFeedTab} setActiveFeedTab={setActiveFeedTab} onSearchClick={() => {}} />
 
       {videos.map((video) => (
         <VideoCard 
             key={video.id} 
             video={video}
             onVote={handleVote}
+            onFavorite={handleFavorite}
             guestVoteCount={guestVoteCount}
             onGuestVote={handleGuestVote}
             currentUser={currentUser}

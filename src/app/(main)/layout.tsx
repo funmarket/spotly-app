@@ -3,8 +3,6 @@ import { useFirebase } from '@/firebase';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { Loader2 } from 'lucide-react';
-import { getDoc, doc } from 'firebase/firestore';
-
 
 function ClientOnly({ children }: { children: React.ReactNode }) {
   const [hasMounted, setHasMounted] = useState(false);
@@ -36,4 +34,3 @@ export default function MainLayout({
     </ClientOnly>
   );
 }
-

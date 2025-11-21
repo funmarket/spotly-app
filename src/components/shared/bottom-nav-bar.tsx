@@ -5,7 +5,7 @@ import {
   Home,
   Compass,
   Upload,
-  Inbox,
+  MessageCircle,
   User,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -15,7 +15,7 @@ const navItems = [
   { href: '/', label: 'Home', icon: Home },
   { href: '/discover', label: 'Discover', icon: Compass },
   { href: '/submit-video', label: 'Upload', icon: Upload },
-  { href: '/inbox', label: 'Inbox', icon: Inbox },
+  { href: '/gossip', label: 'Gossip', icon: MessageCircle },
   { href: '/profile', label: 'Profile', icon: User },
 ];
 
