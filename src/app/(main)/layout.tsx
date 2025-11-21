@@ -25,6 +25,8 @@ function AppContent({ children }: { children: React.ReactNode }) {
         }
       });
     } else {
+      // If there's no user, we don't need to check for a profile.
+      // The pages themselves will handle guest access.
       setIsCheckingProfile(false);
     }
   }, [user, isUserLoading, firestore, router]);
@@ -39,6 +41,7 @@ function AppContent({ children }: { children: React.ReactNode }) {
 
   return <>{children}</>;
 }
+
 
 function ClientOnly({ children }: { children: React.ReactNode }) {
   const [hasMounted, setHasMounted] = useState(false);
@@ -58,6 +61,7 @@ function ClientOnly({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
+
 export default function MainLayout({
   children,
 }: {
@@ -65,11 +69,11 @@ export default function MainLayout({
 }) {
   return (
     <main>
-        <ClientOnly>
-            <AppContent>
-                {children}
-            </AppContent>
-        </ClientOnly>
+      <ClientOnly>
+        <AppContent>
+            {children}
+        </AppContent>
+      </ClientOnly>
     </main>
   );
 }
