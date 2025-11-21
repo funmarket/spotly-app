@@ -20,7 +20,7 @@ function Feed() {
 
   useEffect(() => {
     if (isUserLoading) return;
-    if (user) {
+    if (user && firestore) {
       const userDocRef = doc(firestore, 'users', user.uid);
       getDoc(userDocRef).then((docSnap) => {
         if (docSnap.exists()) {
@@ -37,12 +37,11 @@ function Feed() {
     if (!firestore) return null;
     
     const videosCollection = collection(firestore, 'videos');
-    let q = query(videosCollection, where('status', '==', 'active'), where('isBanned', '==', false), where('hiddenFromFeed', '==', false));
-
+    
     if (activeFeedTab === 'rising') {
-      return query(q, orderBy('rankingScore', 'desc'), limit(50));
+       return query(videosCollection, orderBy('rankingScore', 'desc'), limit(50));
     } else {
-      return query(q, where('videoCategory', '==', activeFeedTab), orderBy('createdAt', 'desc'), limit(50));
+       return query(videosCollection, where('videoCategory', '==', activeFeedTab), orderBy('createdAt', 'desc'), limit(50));
     }
   }, [firestore, activeFeedTab]);
 
@@ -60,7 +59,9 @@ function Feed() {
       const userCache = new Map<string, User>();
 
       const enriched = await Promise.all(
-        videos.map(async (video) => {
+        videos
+        .filter(v => v.status === 'active' && !v.isBanned && !v.hiddenFromFeed)
+        .map(async (video) => {
           let artist: User | undefined = userCache.get(video.artistId);
           if (!artist) {
             const userRef = doc(firestore, 'users', video.artistId);
@@ -132,4 +133,3 @@ export default function HomePage() {
 
   return <Feed />;
 }
-
