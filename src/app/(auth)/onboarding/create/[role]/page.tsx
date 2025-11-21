@@ -419,16 +419,16 @@ export default function CreateProfilePage() {
                 <div className="space-y-4 rounded-lg border bg-background p-4">
                   <h3 className="font-medium">Social Media Links</h3>
                    <FormField control={form.control} name="socialLinks.youtube" render={({ field }) => (
-                        <FormItem><FormControl><Input placeholder="YouTube URL" {...field} value={field.value || ''} /></FormControl><FormMessage /></FormItem>
+                        <FormItem><FormControl><Input placeholder="YouTube URL" {...field} /></FormControl><FormMessage /></FormItem>
                    )}/>
                    <FormField control={form.control} name="socialLinks.twitter" render={({ field }) => (
-                        <FormItem><FormControl><Input placeholder="Twitter/X URL" {...field} value={field.value || ''} /></FormControl><FormMessage /></FormItem>
+                        <FormItem><FormControl><Input placeholder="Twitter/X URL" {...field} /></FormControl><FormMessage /></FormItem>
                    )}/>
                    <FormField control={form.control} name="socialLinks.instagram" render={({ field }) => (
-                        <FormItem><FormControl><Input placeholder="Instagram URL" {...field} value={field.value || ''} /></FormControl><FormMessage /></FormItem>
+                        <FormItem><FormControl><Input placeholder="Instagram URL" {...field} /></FormControl><FormMessage /></FormItem>
                    )}/>
                    <FormField control={form.control} name="socialLinks.tiktok" render={({ field }) => (
-                        <FormItem><FormControl><Input placeholder="TikTok URL" {...field} value={field.value || ''} /></FormControl><FormMessage /></FormItem>
+                        <FormItem><FormControl><Input placeholder="TikTok URL" {...field} /></FormControl><FormMessage /></FormItem>
                    )}/>
                 </div>
 
