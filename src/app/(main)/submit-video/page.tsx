@@ -1,5 +1,5 @@
 'use client';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { z } from 'zod';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -23,10 +23,11 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { PlusSquare, Loader2 } from 'lucide-react';
 import { useFirebase } from '@/firebase';
-import { addDoc, collection, serverTimestamp } from 'firebase/firestore';
+import { addDoc, collection, serverTimestamp, doc, getDoc } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import type { User } from '@/lib/types';
 
 const videoSchema = z.object({
   rawVideoInput: z.string().url({ message: 'Please enter a valid video URL.' }),
@@ -38,6 +39,8 @@ export default function SubmitVideoPage() {
   const { user, isUserLoading, firestore } = useFirebase();
   const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [userProfile, setUserProfile] = useState<User | null>(null);
+  const [isProfileLoading, setIsProfileLoading] = useState(true);
 
   const form = useForm<z.infer<typeof videoSchema>>({
     resolver: zodResolver(videoSchema),
@@ -47,6 +50,23 @@ export default function SubmitVideoPage() {
       videoCategory: '',
     },
   });
+  
+  useEffect(() => {
+    const fetchUserProfile = async () => {
+      if (user && firestore) {
+        const userDocRef = doc(firestore, 'users', user.uid);
+        const docSnap = await getDoc(userDocRef);
+        if (docSnap.exists()) {
+          setUserProfile(docSnap.data() as User);
+        }
+      }
+      setIsProfileLoading(false);
+    };
+
+    if (!isUserLoading) {
+        fetchUserProfile();
+    }
+  }, [user, firestore, isUserLoading]);
 
   async function onSubmit(values: z.infer<typeof videoSchema>) {
     if (!user || !firestore) {
@@ -58,9 +78,7 @@ export default function SubmitVideoPage() {
       return;
     }
     
-    // This check assumes the user object from useFirebase has the role property
-    // @ts-ignore
-    if (user.role !== 'artist') {
+    if (userProfile?.role !== 'artist') {
       toast({
         variant: 'destructive',
         title: 'Permission Denied',
@@ -74,14 +92,11 @@ export default function SubmitVideoPage() {
     const videosCollection = collection(firestore, 'videos');
 
     try {
-      // The Cloud Function 'processVideoUpload' will handle parsing the URL 
-      // and setting the final 'videoUrl' field and other computed properties.
       await addDoc(videosCollection, {
         artistId: user.uid,
         rawVideoInput: values.rawVideoInput,
         description: values.description,
         videoCategory: values.videoCategory,
-        // Default values that will be updated by the Cloud Function
         videoUrl: '', 
         status: 'pending',
         isBanned: false,
@@ -115,7 +130,7 @@ export default function SubmitVideoPage() {
     }
   }
 
-  if (isUserLoading) {
+  if (isUserLoading || isProfileLoading) {
     return (
       <div className="flex flex-1 items-center justify-center h-full">
         <Loader2 className="h-8 w-8 animate-spin" />
@@ -123,8 +138,7 @@ export default function SubmitVideoPage() {
     );
   }
 
-  // @ts-ignore
-  if (!user || user.role !== 'artist') {
+  if (!user || userProfile?.role !== 'artist') {
     return (
        <div className="flex flex-1 items-center justify-center h-full">
         <Card className="w-[380px] text-center">
