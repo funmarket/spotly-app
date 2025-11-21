@@ -76,10 +76,17 @@ export default function OnboardingRoleSelectionPage() {
         // If already connected, check for profile and redirect
         setIsCheckingProfile(true);
         const userDocRef = doc(firestore, 'users', publicKey.toBase58());
-        const userDoc = await getDoc(userDocRef);
-        if (userDoc.exists()) {
-            router.push(`/profile/${publicKey.toBase58()}`);
-        } else {
+        try {
+            const userDoc = await getDoc(userDocRef);
+            if (userDoc.exists()) {
+                router.push(`/profile/${publicKey.toBase58()}`);
+            } else {
+                router.push(`/onboarding/create/${role}`);
+            }
+        } catch (error) {
+            console.error("Error checking for profile:", error);
+            setIsCheckingProfile(false);
+            // Fallback to creation page on error
             router.push(`/onboarding/create/${role}`);
         }
     } else {
@@ -170,5 +177,3 @@ export default function OnboardingRoleSelectionPage() {
     </div>
   );
 }
-
-    

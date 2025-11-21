@@ -139,51 +139,48 @@ export default function CreateProfilePage() {
   const onSubmit = async (values: ProfileFormValues) => {
     if (!firestore) return;
     
-    // Per instructions, wallet is required for artist/business
-    if ((accountType === 'artist' || accountType === 'business') && !publicKey) {
+    const needsWallet = accountType === 'artist' || accountType === 'business';
+
+    if (needsWallet && !publicKey) {
         alert("A wallet connection is required to create this profile type.");
         return;
     }
-     // Username required
     if (!values.username) {
         alert("Username is required");
         return;
     }
-    // Account type required for non-fans
     if (accountType !== 'fan' && !values.isArtist && !values.isBusiness) {
         alert("Please select an account type (Artist or Business).");
         return;
     }
-    // Artist validation
-    if (values.isArtist && !values.subRole) {
-        alert("Please select a legacy talent type for artists.");
+    if (values.isArtist && !values.talentCategory) {
+        alert("Please select a talent category for artists.");
         return;
     }
 
     setIsSubmitting(true);
     try {
-        let role: 'fan' | 'artist' | 'business' | 'regular' = 'fan';
-        if (values.isArtist) {
-            role = 'artist';
-        } else if (values.isBusiness) {
-            role = 'business';
-        }
+        let role: 'fan' | 'artist' | 'business' = 'fan'; // Default to fan
+        if (values.isArtist) role = 'artist';
+        else if (values.isBusiness) role = 'business';
 
+        // For fans without a wallet, generate a unique ID.
+        // For artists/businesses, the wallet public key is the ID.
         const docId = publicKey ? publicKey.toBase58() : doc(collection(firestore, 'users')).id;
         const userDocRef = doc(firestore, 'users', docId);
 
         const sanitizeUrl = (url?: string) => {
             if (!url) return '';
             const trimmedUrl = url.trim();
-            if (!trimmedUrl.startsWith('http://') && !trimmedUrl.startsWith('https://')) {
-                return '';
+            try {
+                const urlObj = new URL(trimmedUrl);
+                if (urlObj.protocol !== 'http:' && urlObj.protocol !== 'https:') {
+                    return ''; // Reject non-http(s) protocols
+                }
+                return trimmedUrl;
+            } catch (error) {
+                return ''; // Invalid URL format
             }
-            // Basic sanitization to prevent javascript: or data: urls
-            const protocol = new URL(trimmedUrl).protocol;
-            if (protocol !== 'http:' && protocol !== 'https:') {
-                return '';
-            }
-            return trimmedUrl;
         }
         
         await setDoc(userDocRef, {
@@ -197,7 +194,7 @@ export default function CreateProfilePage() {
             talentSubcategories: values.isArtist ? JSON.stringify(values.talentSubcategories || []) : '[]',
             subRole: values.isArtist ? values.subRole : null,
             tags: values.tags || '',
-            skills: '', // Per spec, seems to be a legacy field
+            skills: '',
             location: values.location || '',
             socialLinks: JSON.stringify(values.socialLinks || {}),
             extraLinks: JSON.stringify(values.extraLinks || []),
@@ -207,14 +204,14 @@ export default function CreateProfilePage() {
             updatedAt: serverTimestamp(),
         }, { merge: true });
         
-        // Post-creation flow
         if (role === 'artist') {
             setStep(2);
-        } else { // Fan or Business
+        } else {
             router.push('/');
         }
     } catch (error) {
         console.error("Error creating profile:", error);
+        alert("Failed to create profile. Please check the console for details.");
     } finally {
         setIsSubmitting(false);
     }
@@ -252,7 +249,7 @@ export default function CreateProfilePage() {
           <CardContent>
             <WalletMultiButton />
           </CardContent>
-           <CardFooter>
+           <CardFooter className="justify-center">
                 <Button variant="link" onClick={() => router.push('/onboarding')}>
                     Choose a different role
                 </Button>
@@ -314,7 +311,10 @@ export default function CreateProfilePage() {
                                 render={({ field }) => (
                                 <FormItem className="flex flex-row items-start space-x-3 space-y-0">
                                     <FormControl>
-                                    <Checkbox checked={field.value} onCheckedChange={field.onChange} />
+                                    <Checkbox checked={field.value} onCheckedChange={(checked) => {
+                                        field.onChange(checked);
+                                        if(checked) setValue('isBusiness', false);
+                                    }} />
                                     </FormControl>
                                     <div className="space-y-1 leading-none">
                                     <FormLabel>Artist / Talent</FormLabel>
@@ -331,7 +331,10 @@ export default function CreateProfilePage() {
                                 render={({ field }) => (
                                 <FormItem className="flex flex-row items-start space-x-3 space-y-0">
                                     <FormControl>
-                                    <Checkbox checked={field.value} onCheckedChange={field.onChange} />
+                                    <Checkbox checked={field.value} onCheckedChange={(checked) => {
+                                        field.onChange(checked);
+                                        if(checked) setValue('isArtist', false);
+                                    }} />
                                     </FormControl>
                                     <div className="space-y-1 leading-none">
                                     <FormLabel>Business / Producer</FormLabel>
@@ -422,7 +425,7 @@ export default function CreateProfilePage() {
                  
                 <FormField control={form.control} name="subRole" render={({ field }) => (
                     <FormItem>
-                        <FormLabel>Legacy Talent Type*</FormLabel>
+                        <FormLabel>Legacy Talent Type</FormLabel>
                         <Select onValueChange={field.onChange} defaultValue={field.value}>
                         <FormControl>
                             <SelectTrigger><SelectValue placeholder="Select a legacy talent type" /></SelectTrigger>
@@ -437,6 +440,7 @@ export default function CreateProfilePage() {
                             <SelectItem value="cinema">Cinema</SelectItem>
                         </SelectContent>
                         </Select>
+                        <FormDescription>This is a legacy field, you can select an option if it applies.</FormDescription>
                         <FormMessage />
                     </FormItem>
                 )}/>
@@ -460,25 +464,25 @@ export default function CreateProfilePage() {
                 <div className="space-y-4 rounded-lg border bg-background p-4">
                   <h3 className="font-medium">Social Media Links</h3>
                    <FormField control={form.control} name="socialLinks.youtube" render={({ field }) => (
-                        <FormItem><FormControl><Input placeholder="YouTube URL" {...field} /></FormControl><FormMessage /></FormItem>
+                        <FormItem><FormControl><Input placeholder="YouTube URL" {...field} value={field.value ?? ''} /></FormControl><FormMessage /></FormItem>
                    )}/>
                    <FormField control={form.control} name="socialLinks.twitter" render={({ field }) => (
-                        <FormItem><FormControl><Input placeholder="Twitter/X URL" {...field} /></FormControl><FormMessage /></FormItem>
+                        <FormItem><FormControl><Input placeholder="Twitter/X URL" {...field} value={field.value ?? ''} /></FormControl><FormMessage /></FormItem>
                    )}/>
                    <FormField control={form.control} name="socialLinks.instagram" render={({ field }) => (
-                        <FormItem><FormControl><Input placeholder="Instagram URL" {...field} /></FormControl><FormMessage /></FormItem>
+                        <FormItem><FormControl><Input placeholder="Instagram URL" {...field} value={field.value ?? ''} /></FormControl><FormMessage /></FormItem>
                    )}/>
                    <FormField control={form.control} name="socialLinks.tiktok" render={({ field }) => (
-                        <FormItem><FormControl><Input placeholder="TikTok URL" {...field} /></FormControl><FormMessage /></FormItem>
+                        <FormItem><FormControl><Input placeholder="TikTok URL" {...field} value={field.value ?? ''} /></FormControl><FormMessage /></FormItem>
                    )}/>
                    <FormField control={form.control} name="socialLinks.facebook" render={({ field }) => (
-                        <FormItem><FormControl><Input placeholder="Facebook URL" {...field} /></FormControl><FormMessage /></FormItem>
+                        <FormItem><FormControl><Input placeholder="Facebook URL" {...field} value={field.value ?? ''} /></FormControl><FormMessage /></FormItem>
                    )}/>
                    <FormField control={form.control} name="socialLinks.telegram" render={({ field }) => (
-                        <FormItem><FormControl><Input placeholder="Telegram URL" {...field} /></FormControl><FormMessage /></FormItem>
+                        <FormItem><FormControl><Input placeholder="Telegram URL" {...field} value={field.value ?? ''} /></FormControl><FormMessage /></FormItem>
                    )}/>
                    <FormField control={form.control} name="socialLinks.website" render={({ field }) => (
-                        <FormItem><FormControl><Input placeholder="Website/Portfolio URL" {...field} /></FormControl><FormMessage /></FormItem>
+                        <FormItem><FormControl><Input placeholder="Website/Portfolio URL" {...field} value={field.value ?? ''} /></FormControl><FormMessage /></FormItem>
                    )}/>
                 </div>
 
@@ -527,5 +531,3 @@ export default function CreateProfilePage() {
     </div>
   );
 }
-
-    
