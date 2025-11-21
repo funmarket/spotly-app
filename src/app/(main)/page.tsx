@@ -12,6 +12,15 @@ const LoadingSkeleton = () => (
   </div>
 );
 
+const HomeSkeleton = () => (
+    <div className="relative h-[calc(100vh)] w-full snap-y snap-mandatory overflow-y-scroll bg-black scrollbar-hide">
+        <LoadingSkeleton />
+        <LoadingSkeleton />
+        <LoadingSkeleton />
+    </div>
+);
+
+
 export default function HomePage() {
   const { firestore, isUserLoading } = useFirebase();
   const [enrichedVideos, setEnrichedVideos] = useState<EnrichedVideo[]>([]);
@@ -35,7 +44,7 @@ export default function HomePage() {
     const enrichVideos = async () => {
       // Don't enrich if there are no videos or if the initial query is still loading.
       if (!videos || !firestore) {
-        if (!areVideosLoading) setIsEnriching(false);
+        if (!areVideosLoading && !isUserLoading) setIsEnriching(false);
         return;
       }
       
@@ -69,20 +78,14 @@ export default function HomePage() {
     };
 
     enrichVideos();
-  }, [videos, firestore, areVideosLoading]);
+  }, [videos, firestore, areVideosLoading, isUserLoading]);
 
   // Combined loading state is now robust.
   // We wait for auth, then for the video query, then for enrichment.
   const isLoading = isUserLoading || areVideosLoading || isEnriching;
 
   if (isLoading) {
-    return (
-       <div className="relative h-[calc(100vh)] w-full snap-y snap-mandatory overflow-y-scroll bg-black scrollbar-hide">
-        <LoadingSkeleton />
-        <LoadingSkeleton />
-        <LoadingSkeleton />
-      </div>
-    );
+    return <HomeSkeleton />;
   }
 
   return <VideoFeed videos={enrichedVideos} />;
