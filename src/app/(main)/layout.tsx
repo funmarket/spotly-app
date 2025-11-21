@@ -11,27 +11,26 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
   const router = useRouter();
 
   useEffect(() => {
+    // If the user's authentication state is still loading, do nothing.
     if (isUserLoading) {
-      return; // Wait until user auth state is determined
-    }
-
-    if (!user) {
-      // User is not logged in. For now, we'll let them see public content.
-      // A future update could redirect to a login page.
-      // Example: router.replace('/login');
       return;
     }
 
-    // User is logged in, check if they have a profile
-    const userDocRef = doc(firestore, 'users', user.uid);
-    getDoc(userDocRef).then((docSnap) => {
-      if (!docSnap.exists()) {
-        // User profile doesn't exist, redirect to onboarding
-        router.replace('/onboarding');
-      }
-    });
+    // If the user is logged in (not a guest), check if they have a profile.
+    if (user && firestore) {
+      const userDocRef = doc(firestore, 'users', user.uid);
+      getDoc(userDocRef).then((docSnap) => {
+        // If the user is logged in but their profile document doesn't exist,
+        // redirect them to the onboarding flow to create one.
+        if (!docSnap.exists()) {
+          router.replace('/onboarding');
+        }
+      });
+    }
+    // If the user is a guest (user is null), do nothing and allow them to browse.
   }, [user, isUserLoading, firestore, router]);
 
+  // While checking the user's auth state, show a global loader.
   if (isUserLoading) {
     return (
       <div className="flex h-screen items-center justify-center bg-background">
@@ -40,6 +39,7 @@ export default function MainLayout({ children }: { children: React.ReactNode }) 
     );
   }
   
+  // Once auth state is resolved, render the main app layout.
   return (
     <div className="flex flex-col min-h-screen bg-background">
       <main className="flex-1 w-full h-full">{children}</main>
