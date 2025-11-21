@@ -1,5 +1,5 @@
 'use client';
-import { Compass, User, Video, ShoppingCart } from 'lucide-react';
+import { Compass, User, Video, ShoppingCart, Search } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
