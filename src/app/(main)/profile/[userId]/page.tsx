@@ -135,7 +135,7 @@ function ProfileVideos({ userId, canEdit }: { userId: string, canEdit: boolean }
 export default function ProfilePage() {
   const params = useParams();
   const userId = params.userId as string;
-  const { user: authUser } = useUser();
+  const { user: authUser, isUserLoading: isAuthLoading } = useUser();
   const firestore = useFirestore();
   const router = useRouter();
 
@@ -143,11 +143,25 @@ export default function ProfilePage() {
       if (!firestore || !userId) return null;
       return doc(firestore, 'users', userId);
   }, [firestore, userId]);
-  const { data: viewingUser, isLoading: isUserLoading } = useDoc<User>(userDocRef);
+  const { data: viewingUser, isLoading: isProfileLoading } = useDoc<User>(userDocRef);
 
-  if (!isUserLoading && !viewingUser) {
-    notFound();
-  }
+  const isLoading = isAuthLoading || isProfileLoading;
+
+  // New redirection logic
+  useEffect(() => {
+    if (!isLoading) {
+      if (!viewingUser) {
+        // If the profile doesn't exist...
+        if (authUser && authUser.uid === userId) {
+          // ...and the viewer is the owner, redirect to create it.
+          router.push('/onboarding');
+        } else {
+          // ...and the viewer is someone else, it's a 404.
+          notFound();
+        }
+      }
+    }
+  }, [isLoading, viewingUser, authUser, userId, router]);
   
   const videosQuery = useMemoFirebase(() => {
     if (!firestore || !viewingUser?.walletAddress) return null;
@@ -172,7 +186,8 @@ export default function ProfilePage() {
   const isAdmin = authUser?.uid === 'HZ2GQg1Qdh4kmGSTjRBAHVwTw88JVqkL1Hda2Y1Tqxgs';
   const isOwnProfile = authUser?.uid === viewingUser?.walletAddress;
 
-  if (isUserLoading || !viewingUser) {
+  if (isLoading || !viewingUser) {
+      // Show a loading skeleton while we determine the user's status
       return <div className="min-h-screen"><Skeleton className="h-64 w-full" /><div className="container mx-auto p-4 sm:p-6 lg:p-8 mt-6"><Skeleton className="h-32 w-full" /></div></div>
   }
 
