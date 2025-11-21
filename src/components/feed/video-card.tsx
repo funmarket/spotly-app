@@ -183,7 +183,7 @@ export function VideoCard({ video, onVote, onFavorite, guestVoteCount, onGuestVo
        </div>
 
       {/* Right Action Bar */}
-        <div className="absolute right-3 sm:right-4 top-1/2 -translate-y-[70px] flex flex-col gap-4 z-20">
+        <div className="absolute right-3 sm:right-4 top-1/2 -translate-y-1/2 flex flex-col gap-4 z-20">
             <ActionButton icon={Bookmark} label={`${isFavorited ? 'Saved' : 'Save'}`} onClick={handleFavoriteClick} isActive={isFavorited} iconClassName={isFavorited ? 'fill-white' : ''} />
             
             <button
@@ -208,7 +208,6 @@ export function VideoCard({ video, onVote, onFavorite, guestVoteCount, onGuestVo
                 <span className="text-xs font-semibold drop-shadow-md">Flop</span>
             </button>
             
-            <ActionButton icon={ArrowDown} onClick={nextVideo} iconClassName="text-gray-400" />
             <ActionButton icon={DollarSign} label="Tip" onClick={handleTip} iconClassName="text-yellow-400 group-hover:drop-shadow-[0_0_8px_rgba(234,179,8,0.8)]" />
             
             {currentUser?.role === 'business' && (
@@ -219,6 +218,11 @@ export function VideoCard({ video, onVote, onFavorite, guestVoteCount, onGuestVo
             )}
             <ActionButton icon={Share2} label="Share" onClick={() => toast({title: 'Share not implemented'})} />
         </div>
+        
+       {/* Right-side down arrow, aligned with left-side up arrow */}
+       <div className="absolute right-3 sm:right-4 top-1/2 -translate-y-1/2 z-20">
+         <ActionButton icon={ArrowDown} onClick={nextVideo} />
+       </div>
 
     </div>
   );
