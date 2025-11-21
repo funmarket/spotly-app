@@ -33,8 +33,8 @@ export interface Video {
   rawVideoInput?: string;
   videoCategory?: string;
   hiddenFromFeed?: boolean;
-  createdAt: Timestamp | string; // Allow string for mock data
-  updatedAt?: Timestamp | string;
+  createdAt: Timestamp | { seconds: number; nanoseconds: number };
+  updatedAt?: Timestamp | { seconds: number; nanoseconds: number };
 }
 
 export type EnrichedVideo = Omit<Video, 'videoId'> & {
@@ -43,6 +43,7 @@ export type EnrichedVideo = Omit<Video, 'videoId'> & {
 };
 
 export interface GossipPost {
+  id: string;
   authorId: string;
   content: string;
   commentsCount: number;
@@ -98,10 +99,22 @@ export interface Favorite {
 }
 
 export interface Referral {
-    id?: string;
-    referrerWallet: string;
-    referredWallet: string;
-    rewardAmount: number;
-    rewardStatus: 'pending' | 'paid';
+  id?: string;
+  referrerWallet: string;
+  referredWallet: string;
+  rewardAmount: number;
+  rewardStatus: 'pending' | 'paid';
+  createdAt: Timestamp;
+}
+
+export interface MarketplaceProduct {
+    id: string;
+    sellerId: string;
+    name: string;
+    description: string;
+    price: number;
+    stock: number;
+    status: 'active' | 'inactive' | 'sold_out';
+    imageUrl: string;
     createdAt: Timestamp;
 }
