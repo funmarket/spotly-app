@@ -2,7 +2,7 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
     match /{document=**} {
-      // Grant read access to all documents if the user is authenticated (including anonymous).
+      // Grant universal, unconditional public read access to all documents.
       allow read: if true;
       
       // Require authentication for all write operations (create, update, delete).
