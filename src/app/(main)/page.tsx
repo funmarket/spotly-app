@@ -17,10 +17,9 @@ export default function HomePage() {
   const [enrichedVideos, setEnrichedVideos] = useState<EnrichedVideo[]>([]);
   const [isEnriching, setIsEnriching] = useState(true);
 
-  // The query no longer needs to wait for `isUserLoading` because the parent
-  // provider now handles the auth-gating.
+  // The query will be null until Firebase has resolved its auth state.
   const videosQuery = useMemoFirebase(() => {
-    if (!firestore) return null;
+    if (!firestore || isUserLoading) return null;
     return query(
       collection(firestore, 'videos'),
       where('status', '==', 'active'),
@@ -28,12 +27,13 @@ export default function HomePage() {
       where('hiddenFromFeed', '==', false),
       orderBy('createdAt', 'desc')
     );
-  }, [firestore]);
+  }, [firestore, isUserLoading]);
 
   const { data: videos, isLoading: areVideosLoading } = useCollection<Video & { id: string }>(videosQuery);
 
   useEffect(() => {
     const enrichVideos = async () => {
+      // Don't enrich if there are no videos or if the initial query is still loading.
       if (!videos || !firestore) {
         if (!areVideosLoading) setIsEnriching(false);
         return;
@@ -71,8 +71,9 @@ export default function HomePage() {
     enrichVideos();
   }, [videos, firestore, areVideosLoading]);
 
-  // The combined loading state is now simpler. We just wait for video fetching & enriching.
-  const isLoading = areVideosLoading || isEnriching;
+  // Combined loading state is now robust.
+  // We wait for auth, then for the video query, then for enrichment.
+  const isLoading = isUserLoading || areVideosLoading || isEnriching;
 
   if (isLoading) {
     return (

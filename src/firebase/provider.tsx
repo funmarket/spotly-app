@@ -3,9 +3,8 @@
 import React, { createContext, useContext, ReactNode, useMemo, useState, useEffect } from 'react';
 import { FirebaseApp } from 'firebase/app';
 import { Firestore } from 'firebase/firestore';
-import { Auth, User, onAuthStateChanged, signInAnonymously } from 'firebase/auth';
+import { Auth, User, onAuthStateChanged } from 'firebase/auth';
 import { FirebaseErrorListener } from '@/components/FirebaseErrorListener';
-import { Loader2 } from 'lucide-react';
 
 interface FirebaseProviderProps {
   children: React.Node;
@@ -20,7 +19,7 @@ export interface FirebaseContextState {
   firestore: Firestore;
   auth: Auth;
   user: User | null;
-  isUserLoading: boolean; // Maintained for components that might still need it
+  isUserLoading: boolean; 
 }
 
 // Return type for useFirebase()
@@ -31,8 +30,6 @@ export const FirebaseContext = createContext<FirebaseContextState | undefined>(u
 
 /**
  * FirebaseProvider manages and provides Firebase services and user authentication state.
- * It now includes an "auth-gate" which ensures a user (including anonymous) is authenticated
- * before rendering the main application, preventing race-condition permission errors.
  */
 export const FirebaseProvider: React.FC<FirebaseProviderProps> = ({
   children,
@@ -41,25 +38,12 @@ export const FirebaseProvider: React.FC<FirebaseProviderProps> = ({
   auth,
 }) => {
   const [user, setUser] = useState<User | null>(null);
-  const [authReady, setAuthReady] = useState(false); // The new auth-gate state
+  const [isUserLoading, setIsUserLoading] = useState(true);
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
-      if (!firebaseUser) {
-        // Force an anonymous sign-in if no user exists.
-        // onAuthStateChanged will fire again with the new anonymous user.
-        try {
-          await signInAnonymously(auth);
-        } catch (error) {
-          console.error("FirebaseProvider: Failed to sign in anonymously", error);
-          // If even anonymous sign-in fails, we unblock the app but with no user.
-          setAuthReady(true);
-        }
-      } else {
-        // A user (regular or anonymous) exists.
+    const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
         setUser(firebaseUser);
-        setAuthReady(true);
-      }
+        setIsUserLoading(false);
     });
 
     return () => unsubscribe(); // Cleanup on unmount
@@ -71,19 +55,9 @@ export const FirebaseProvider: React.FC<FirebaseProviderProps> = ({
     firestore,
     auth,
     user,
-    isUserLoading: !authReady,
-  }), [firebaseApp, firestore, auth, user, authReady]);
+    isUserLoading,
+  }), [firebaseApp, firestore, auth, user, isUserLoading]);
   
-  // Do not render children until authentication is ready.
-  // This is the auth-gate.
-  if (!authReady) {
-    return (
-      <div className="flex h-screen w-full items-center justify-center bg-background">
-        <Loader2 className="h-12 w-12 animate-spin text-primary" />
-      </div>
-    );
-  }
-
   return (
     <FirebaseContext.Provider value={contextValue}>
       <FirebaseErrorListener />
