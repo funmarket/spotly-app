@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import './globals.css';
+import '@solana/wallet-adapter-react-ui/styles.css';
 import { Toaster } from '@/components/ui/toaster';
 import { FirebaseClientProvider } from '@/firebase';
 import { SolanaProvider } from '@/firebase/solana-provider';
