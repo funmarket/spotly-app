@@ -6,37 +6,35 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Wand2 } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from '../ui/alert';
 import { Badge } from '../ui/badge';
-import { useFirebase } from '@/firebase';
+import { useDevapp } from '@/hooks/use-devapp';
 
 type AiInsightsProps = {
   artistId: string;
 };
 
 export function AiInsights({ artistId }: AiInsightsProps) {
-  const { user } = useFirebase();
+  const { userWallet } = useDevapp();
   const [insights, setInsights] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   // Determine if the current user is an admin
-  const isAdmin = user?.uid === 'ADMIN_WALLET_PLACEHOLDER';
+  const isAdmin = userWallet === 'ADMIN_WALLET_PLACEHOLDER';
 
   useEffect(() => {
     async function fetchInsights() {
-      if (!user) {
+      if (!userWallet) {
         setError("You must be logged in to view insights.");
         setLoading(false);
         return;
       }
       
       // Regular artists should not see admin insights.
-      // This is a simple client-side check; real security would be on the backend.
       if (isAdmin) {
           setError("Admin insights should be viewed on the admin dashboard.");
           setLoading(false);
           return;
       }
-
 
       setLoading(true);
       setError(null);
@@ -59,7 +57,7 @@ export function AiInsights({ artistId }: AiInsightsProps) {
       }
     }
     fetchInsights();
-  }, [artistId, user, isAdmin]);
+  }, [artistId, userWallet, isAdmin]);
 
   if (loading) {
     return (

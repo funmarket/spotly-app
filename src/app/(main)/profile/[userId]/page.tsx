@@ -9,7 +9,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import Image from 'next/image';
 import Link from 'next/link';
 import { BarChart, Eye, ThumbsUp, Wallet, Video as VideoIcon, Trash2 } from 'lucide-react';
-import { useCollection, useFirestore, useMemoFirebase, useUser, useDoc } from '@/firebase';
+import { useCollection, useFirestore, useMemoFirebase, useDoc } from '@/firebase';
+import { useDevapp } from '@/hooks/use-devapp';
 import { collection, query, where, orderBy, doc, deleteDoc } from 'firebase/firestore';
 import type { Video, User } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -136,7 +137,7 @@ function ProfileVideos({ userId, canEdit }: { userId: string, canEdit: boolean }
 export default function ProfilePage() {
   const params = useParams();
   const userId = params.userId as string;
-  const { user: authUser, isUserLoading: isAuthLoading } = useUser();
+  const { userWallet } = useDevapp();
   const firestore = useFirestore();
   const router = useRouter();
 
@@ -145,24 +146,6 @@ export default function ProfilePage() {
       return doc(firestore, 'users', userId);
   }, [firestore, userId]);
   const { data: viewingUser, isLoading: isProfileLoading } = useDoc<User>(userDocRef);
-
-  const isLoading = isAuthLoading || isProfileLoading;
-
-  // New redirection logic
-  useEffect(() => {
-    if (!isLoading) {
-      if (!viewingUser) {
-        // If the profile doesn't exist...
-        if (authUser && authUser.uid === userId) {
-          // ...and the viewer is the owner, redirect to create it.
-          router.push('/onboarding');
-        } else {
-          // ...and the viewer is someone else, it's a 404.
-          notFound();
-        }
-      }
-    }
-  }, [isLoading, viewingUser, authUser, userId, router]);
   
   const videosQuery = useMemoFirebase(() => {
     if (!firestore || !viewingUser?.walletAddress) return null;
@@ -184,12 +167,17 @@ export default function ProfilePage() {
     }, { totalViews: 0, totalTops: 0, totalVideos: 0 });
   }, [videos]);
   
-  const isAdmin = authUser?.uid === 'HZ2GQg1Qdh4kmGSTjRBAHVwTw88JVqkL1Hda2Y1Tqxgs';
-  const isOwnProfile = authUser?.uid === viewingUser?.walletAddress;
+  // NOTE: Admin role check is hardcoded as per original structure.
+  // In a real app, this would use custom claims or a database role.
+  const isAdmin = userWallet === 'HZ2GQg1Qdh4kmGSTjRBAHVwTw88JVqkL1Hda2Y1Tqxgs';
+  const isOwnProfile = userWallet === viewingUser?.walletAddress;
 
-  if (isLoading || !viewingUser) {
-      // Show a loading skeleton while we determine the user's status
+  if (isProfileLoading) {
       return <div className="min-h-screen"><Skeleton className="h-64 w-full" /><div className="container mx-auto p-4 sm:p-6 lg:p-8 mt-6"><Skeleton className="h-32 w-full" /></div></div>
+  }
+
+  if (!viewingUser) {
+    notFound();
   }
 
   const handleMessage = () => {

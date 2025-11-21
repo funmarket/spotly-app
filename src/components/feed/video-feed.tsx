@@ -7,23 +7,23 @@ import { Button } from '@/components/ui/button';
 import { Search, Bell, X, Home, Compass, Upload, MessageCircle, User as UserIcon } from 'lucide-react';
 import { useRouter, usePathname } from 'next/navigation';
 import Link from 'next/link';
-import { useFirebase, useMemoFirebase } from '@/firebase';
+import { useDevapp } from '@/hooks/use-devapp';
 import { collection, doc, writeBatch, increment, serverTimestamp, query, where, getDocs, limit, deleteDoc, addDoc } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
-import { useCollection } from '@/firebase/firestore/use-collection';
+import { useCollection, useMemoFirebase } from '@/firebase';
 
 function TopCategoryMenu({ activeFeedTab, setActiveFeedTab, onSearchClick }: { activeFeedTab: string, setActiveFeedTab: (tab: string) => void, onSearchClick: () => void }) {
-  const { user, firestore } = useFirebase();
+  const { userWallet, firestore } = useDevapp();
   const router = useRouter();
 
   const notificationsQuery = useMemoFirebase(() => {
-    if (!user || !firestore) return null;
+    if (!userWallet || !firestore) return null;
     return query(
       collection(firestore, 'notifications'),
-      where('recipientWallet', '==', user.uid),
+      where('recipientWallet', '==', userWallet),
       where('read', '==', false)
     );
-  }, [user, firestore]);
+  }, [userWallet, firestore]);
 
   const { data: notifications } = useCollection(notificationsQuery);
   const unreadCount = notifications?.length || 0;
@@ -74,7 +74,7 @@ function TopCategoryMenu({ activeFeedTab, setActiveFeedTab, onSearchClick }: { a
 
 
 const BottomNavBar = () => {
-    const { user } = useFirebase();
+    const { userWallet } = useDevapp();
     const router = useRouter();
     const pathname = usePathname();
 
@@ -90,7 +90,7 @@ const BottomNavBar = () => {
         const isActive = href === '/' ? pathname === href : pathname.startsWith(href);
         let finalHref = href;
         if (label === 'Profile') {
-            finalHref = user ? `/profile/${user.uid}` : '/onboarding';
+            finalHref = userWallet ? `/profile/${userWallet}` : '/onboarding';
         }
 
         return (
@@ -118,16 +118,16 @@ const BottomNavBar = () => {
 export function VideoFeed({ videos, activeFeedTab, setActiveFeedTab, isLoading, currentUser }: { videos: EnrichedVideo[], activeFeedTab: string, setActiveFeedTab: (tab: string) => void, isLoading: boolean, currentUser: User | null }) {
   const router = useRouter();
   const feedRef = useRef<HTMLDivElement>(null);
-  const { firestore, user } = useFirebase();
+  const { firestore, userWallet } = useDevapp();
   const { toast } = useToast();
   const [guestVoteCount, setGuestVoteCount] = useState(0);
 
   useEffect(() => {
-    if (!user) { // Only track for guests
+    if (!userWallet) { // Only track for guests
         const storedCount = localStorage.getItem('guestVoteCount');
         setGuestVoteCount(storedCount ? parseInt(storedCount) : 0);
     }
-  }, [user]);
+  }, [userWallet]);
 
   const handleGuestVote = () => {
     const newCount = guestVoteCount + 1;
@@ -136,7 +136,7 @@ export function VideoFeed({ videos, activeFeedTab, setActiveFeedTab, isLoading, 
   }
 
    const handleVote = useCallback(async (videoId: string, isTop: boolean) => {
-    if (!user && guestVoteCount >= 10) {
+    if (!userWallet && guestVoteCount >= 10) {
       // Logic to show signup modal is in VideoCard
       return; 
     }
@@ -148,8 +148,8 @@ export function VideoFeed({ videos, activeFeedTab, setActiveFeedTab, isLoading, 
     let existingVote: 'top' | 'flop' | null = null;
     let voteDocId: string | null = null;
 
-    if (user) {
-        const voteQuery = query(collection(firestore, 'user_votes'), where('userId', '==', user.uid), where('videoId', '==', videoId), limit(1));
+    if (userWallet) {
+        const voteQuery = query(collection(firestore, 'user_votes'), where('userId', '==', userWallet), where('videoId', '==', videoId), limit(1));
         const voteSnapshot = await getDocs(voteQuery);
         if (!voteSnapshot.empty) {
             voteDocId = voteSnapshot.docs[0].id;
@@ -162,12 +162,12 @@ export function VideoFeed({ videos, activeFeedTab, setActiveFeedTab, isLoading, 
     // Revert existing vote if there is one
     if (existingVote === 'top') batch.update(videoRef, { topCount: increment(-1), rankingScore: increment(-1) });
     if (existingVote === 'flop') batch.update(videoRef, { flopCount: increment(-1), rankingScore: increment(1) });
-    if (voteDocId && user) batch.delete(doc(firestore, 'user_votes', voteDocId));
+    if (voteDocId && userWallet) batch.delete(doc(firestore, 'user_votes', voteDocId));
 
     // Apply new vote
     if (newVoteType) {
-        if(user) {
-            batch.set(doc(collection(firestore, 'user_votes')), { videoId: videoId, userId: user.uid, isPositive: isTop, createdAt: serverTimestamp() });
+        if(userWallet) {
+            batch.set(doc(collection(firestore, 'user_votes')), { videoId: videoId, userId: userWallet, isPositive: isTop, createdAt: serverTimestamp() });
         }
         if (newVoteType === 'top') {
             batch.update(videoRef, { topCount: increment(1), rankingScore: increment(1) });
@@ -176,7 +176,7 @@ export function VideoFeed({ videos, activeFeedTab, setActiveFeedTab, isLoading, 
         }
     }
     await batch.commit();
-  }, [firestore, user, guestVoteCount]);
+  }, [firestore, userWallet, guestVoteCount]);
 
 
    const nextVideo = useCallback(() => {
@@ -188,17 +188,17 @@ export function VideoFeed({ videos, activeFeedTab, setActiveFeedTab, isLoading, 
   }, []);
 
    const handleFavorite = useCallback(async (videoId: string) => {
-    if (!user || !firestore) {
+    if (!userWallet || !firestore) {
       toast({ title: "Please log in to save favorites.", variant: "destructive" });
       return;
     }
     
-    const favQuery = query(collection(firestore, 'favorites'), where('userId', '==', user.uid), where('itemId', '==', videoId), limit(1));
+    const favQuery = query(collection(firestore, 'favorites'), where('userId', '==', userWallet), where('itemId', '==', videoId), limit(1));
     const existing = await getDocs(favQuery);
 
     if (existing.empty) {
       await addDoc(collection(firestore, 'favorites'), {
-        userId: user.uid,
+        userId: userWallet,
         itemId: videoId,
         itemType: 'video',
         createdAt: serverTimestamp()
@@ -208,7 +208,7 @@ export function VideoFeed({ videos, activeFeedTab, setActiveFeedTab, isLoading, 
       await deleteDoc(doc(firestore, 'favorites', existing.docs[0].id));
       toast({ title: "Removed from favorites." });
     }
-  }, [firestore, user, toast]);
+  }, [firestore, userWallet, toast]);
 
   if (videos.length === 0 && !isLoading) {
     return (

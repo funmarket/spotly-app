@@ -18,12 +18,13 @@ import {
   ArrowDown,
 } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '../ui/avatar';
-import { useFirebase, useMemoFirebase } from '@/firebase';
+import { useDevapp } from '@/hooks/use-devapp';
 import { useToast } from '@/hooks/use-toast';
 import { useRouter } from 'next/navigation';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '../ui/dialog';
 import { useCollection } from '@/firebase/firestore/use-collection';
-import { collection, query, where } from 'firebase/firestore';
+import { collection, query, where, doc } from 'firebase/firestore';
+import { useMemoFirebase } from '@/firebase';
 
 
 const BookIcon = (props: React.SVGProps<SVGSVGElement>) => (
@@ -66,7 +67,7 @@ const ActionButton = ({
 export function VideoCard({ video, onVote, onFavorite, guestVoteCount, onGuestVote, currentUser, nextVideo, prevVideo }: { video: EnrichedVideo, onVote: (videoId: string, isTop: boolean) => Promise<void>, onFavorite: (videoId:string) => Promise<void>, guestVoteCount: number, onGuestVote: () => void, currentUser: User | null, nextVideo: () => void, prevVideo: () => void }) {
   const cardRef = useRef<HTMLDivElement>(null);
   const isVisible = useOnScreen(cardRef);
-  const { firestore, user } = useFirebase();
+  const { firestore, userWallet } = useDevapp();
   const { toast } = useToast();
   const router = useRouter();
 
@@ -77,9 +78,9 @@ export function VideoCard({ video, onVote, onFavorite, guestVoteCount, onGuestVo
   const [showVoteLimitModal, setShowVoteLimitModal] = useState(false);
   
   const favoritesQuery = useMemoFirebase(() => {
-    if (!user || !firestore) return null;
-    return query(collection(firestore, 'favorites'), where('userId', '==', user.uid), where('itemId', '==', video.id));
-  }, [firestore, user, video.id]);
+    if (!userWallet || !firestore) return null;
+    return query(collection(firestore, 'favorites'), where('userId', '==', userWallet), where('itemId', '==', video.id));
+  }, [firestore, userWallet, video.id]);
 
   const { data: favorites } = useCollection<Favorite>(favoritesQuery);
   const isFavorited = (favorites || []).length > 0;
@@ -99,7 +100,7 @@ export function VideoCard({ video, onVote, onFavorite, guestVoteCount, onGuestVo
   const handleVote = async (isTop: boolean) => {
     if (isVoteLoading) return;
 
-    if (!user) { // Guest user
+    if (!userWallet) { // Guest user
       if (guestVoteCount >= 10) {
         setShowVoteLimitModal(true);
         return;
@@ -149,7 +150,7 @@ export function VideoCard({ video, onVote, onFavorite, guestVoteCount, onGuestVo
   }
   
   const handleTip = () => {
-      if(!user) {
+      if(!userWallet) {
           toast({ title: 'Please log in to tip artists.', variant: 'destructive' });
           return;
       }
@@ -157,7 +158,7 @@ export function VideoCard({ video, onVote, onFavorite, guestVoteCount, onGuestVo
   }
 
   const handleFavoriteClick = () => {
-    if (!user) {
+    if (!userWallet) {
         toast({ title: 'Please log in to save videos.', variant: 'destructive' });
         return;
     }

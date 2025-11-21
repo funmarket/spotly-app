@@ -1,5 +1,6 @@
 'use client';
-import { useFirebase, useMemoFirebase } from '@/firebase';
+import { useDevapp } from '@/hooks/use-devapp';
+import { useMemoFirebase } from '@/firebase';
 import { collection, query, where, orderBy } from 'firebase/firestore';
 import { useCollection } from '@/firebase/firestore/use-collection';
 import {
@@ -27,21 +28,21 @@ import type { Referral } from '@/lib/types';
 import { format } from 'date-fns';
 
 export default function ReferralsPage() {
-  const { user, firestore, isUserLoading } = useFirebase();
+  const { userWallet, firestore } = useDevapp();
   const { toast } = useToast();
 
   const referralsQuery = useMemoFirebase(() => {
-    if (!firestore || !user) return null;
+    if (!firestore || !userWallet) return null;
     return query(
       collection(firestore, 'referrals'),
-      where('referrerWallet', '==', user.uid),
+      where('referrerWallet', '==', userWallet),
       orderBy('createdAt', 'desc')
     );
-  }, [firestore, user]);
+  }, [firestore, userWallet]);
 
   const { data: referrals, isLoading } = useCollection<Referral>(referralsQuery);
 
-  const referralCode = user ? user.uid.slice(0, 8) : '';
+  const referralCode = userWallet ? userWallet.slice(0, 8) : '';
   const referralLink =
     typeof window !== 'undefined'
       ? `${window.location.origin}/?ref=${referralCode}`
@@ -55,7 +56,7 @@ export default function ReferralsPage() {
     });
   };
 
-  if (isUserLoading) {
+  if (userWallet === undefined) {
     return (
       <div className="container mx-auto p-4 sm:p-6 lg:p-8">
         <Loader2 className="mx-auto h-8 w-8 animate-spin" />
@@ -63,7 +64,7 @@ export default function ReferralsPage() {
     );
   }
 
-  if (!user) {
+  if (!userWallet) {
     return (
       <div className="flex flex-1 items-center justify-center h-full">
         <Card className="w-[350px] text-center">

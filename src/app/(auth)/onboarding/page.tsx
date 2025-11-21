@@ -1,12 +1,13 @@
 'use client';
+
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { useWallet } from '@solana/wallet-adapter-react';
-import { WalletMultiButton } from '@solana/wallet-adapter-react-ui';
-import { useFirebase } from '@/firebase';
+import { useDevapp } from '@/hooks/use-devapp';
 import { doc, getDoc } from 'firebase/firestore';
 import { Loader2 } from 'lucide-react';
+import { UserButton } from '@devfunlabs/web-sdk';
 
+// Main Role Choice Button Component
 function RoleChoiceButton({
   label,
   subLabel,
@@ -37,103 +38,119 @@ function RoleChoiceButton({
   );
 }
 
-export default function OnboardingRoleSelectionPage() {
-  const { publicKey, connected } = useWallet();
-  const { firestore } = useFirebase();
+// Wallet Connection Prompt Component
+function WalletConnectPrompt({ accountType, onBack }: { accountType: string, onBack: () => void }) {
+  const { userWallet, firestore } = useDevapp();
   const router = useRouter();
-  const [showWalletConnectForRole, setShowWalletConnectForRole] = useState<string | null>(null);
-  const [isCheckingProfile, setIsCheckingProfile] = useState(false);
+  const [isChecking, setIsChecking] = useState(false);
 
   useEffect(() => {
-    // This effect runs when the wallet connects to check for an existing profile
-    const checkProfileAndRedirect = async () => {
-      if (connected && publicKey && firestore && showWalletConnectForRole) {
-        setIsCheckingProfile(true);
-        const userDocRef = doc(firestore, 'users', publicKey.toBase58());
-        const userDoc = await getDoc(userDocRef);
-        if (userDoc.exists()) {
-          // Profile exists, go to profile page
-          router.push(`/profile/${publicKey.toBase58()}`);
-        } else {
-          // No profile, go to creation page for the selected role
-          router.push(`/onboarding/create/${showWalletConnectForRole}`);
+    const checkAndRedirect = async () => {
+      if (userWallet && firestore && !isChecking) {
+        setIsChecking(true);
+        try {
+          const userDocRef = doc(firestore, 'users', userWallet);
+          const userDoc = await getDoc(userDocRef);
+          
+          if (!userDoc.exists()) {
+            router.push(`/onboarding/create/${accountType}`);
+          } else {
+             const user = userDoc.data();
+             // If profile exists with matching role, go to profile, otherwise allow creation of new type
+             if (user.role === accountType) {
+                router.push(`/profile/${userWallet}`);
+             } else {
+                router.push(`/onboarding/create/${accountType}`);
+             }
+          }
+        } catch (error) {
+          console.error('Error checking profile:', error);
+          router.push(`/onboarding/create/${accountType}`);
         }
       }
     };
-    checkProfileAndRedirect();
-  }, [connected, publicKey, firestore, router, showWalletConnectForRole]);
+    checkAndRedirect();
+  }, [userWallet, accountType, router, firestore, isChecking]);
 
+  const getWalletConnectText = () => {
+      switch (accountType) {
+        case 'fan': return 'Connect your wallet to create a free Fan account';
+        case 'artist': return 'Artists need a wallet to receive payments and bookings';
+        case 'business': return 'Connect your wallet to create a business account';
+        default: return 'Connect your wallet to continue';
+      }
+  };
+
+  return (
+    <div className="min-h-screen bg-background text-white pt-20 pb-20 flex items-center justify-center px-4">
+      <div className="max-w-2xl w-full mx-auto">
+        <div className="text-center mb-12">
+          <h1 className="text-4xl md:text-5xl font-bold mb-3 bg-gradient-to-r from-pink-500 via-purple-500 to-blue-500 bg-clip-text text-transparent">
+            Connect Your Wallet
+          </h1>
+          <p className="text-white/60 text-lg">{getWalletConnectText()}</p>
+        </div>
+
+        <div className="bg-gradient-to-br from-gray-900/80 to-gray-800/80 backdrop-blur-xl rounded-3xl p-8 md:p-10 border border-white/10 shadow-[0_20px_60px_rgb(0,0,0,0.3)]">
+          <div className="flex flex-col items-center gap-6">
+            <div className="w-full flex justify-center">
+              <div className="scale-110">
+                <UserButton height="48px" primaryColor="#ec4899" radius="24px" />
+              </div>
+            </div>
+            <p className="text-white/60 text-center text-sm">
+              Click above to connect your Solana wallet
+            </p>
+            {isChecking && <p className="text-pink-400 flex items-center gap-2"><Loader2 className="animate-spin h-4 w-4"/>Checking profile...</p>}
+            <button 
+              onClick={onBack} 
+              className="px-6 py-2 rounded-full bg-gray-700 hover:bg-gray-600 transition-colors text-sm"
+            >
+              Go Back
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Main Onboarding Page Component
+export default function OnboardingRoleSelectionPage() {
+  const { userWallet, firestore } = useDevapp();
+  const router = useRouter();
+  const [showWalletConnectForRole, setShowWalletConnectForRole] = useState<string | null>(null);
 
   const handleRoleClick = async (role: string) => {
-    // Fans do not need to connect a wallet to create a profile
+    // Fans do not need to connect a wallet to create a profile, as per the spec.
     if (role === 'fan') {
       router.push(`/onboarding/create/fan`);
       return;
     }
     
-    // Artists and Businesses require a wallet
-    if (connected && publicKey && firestore) {
-        // If already connected, check for profile and redirect
-        setIsCheckingProfile(true);
-        const userDocRef = doc(firestore, 'users', publicKey.toBase58());
-        try {
-            const userDoc = await getDoc(userDocRef);
-            if (userDoc.exists()) {
-                router.push(`/profile/${publicKey.toBase58()}`);
-            } else {
-                router.push(`/onboarding/create/${role}`);
-            }
-        } catch (error) {
-            console.error("Error checking for profile:", error);
-            setIsCheckingProfile(false);
-            // Fallback to creation page on error
+    // For Artists and Businesses, check wallet connection.
+    if (userWallet && firestore) {
+      // If already connected, check for profile and redirect immediately.
+      const userDocRef = doc(firestore, 'users', userWallet);
+      const userDoc = await getDoc(userDocRef);
+      if (userDoc.exists()) {
+         const user = userDoc.data();
+         if (user.role === role) {
+            router.push(`/profile/${userWallet}`);
+         } else {
             router.push(`/onboarding/create/${role}`);
-        }
+         }
+      } else {
+        router.push(`/onboarding/create/${role}`);
+      }
     } else {
-        // If not connected, show the wallet connection prompt
-        setShowWalletConnectForRole(role);
+      // If not connected, show the wallet connection prompt.
+      setShowWalletConnectForRole(role);
     }
   };
 
-  const getWalletConnectText = () => {
-    switch (showWalletConnectForRole) {
-      case 'artist': return 'Artists need a wallet to receive tips and payments';
-      case 'business': return 'Connect your wallet to create a business account';
-      default: return 'Please connect your wallet to continue';
-    }
-  }
-  
-  const WalletConnectPrompt = () => (
-     <div className="flex min-h-screen items-center justify-center bg-background p-4">
-        <div className="w-full max-w-md rounded-2xl bg-card p-8 text-center">
-          {isCheckingProfile ? (
-             <>
-                <h1 className="text-2xl font-headline font-bold mb-3">Checking for existing profile...</h1>
-                <Loader2 className="h-10 w-10 animate-spin mx-auto text-primary" />
-            </>
-          ) : (
-            <>
-              <h1 className="text-2xl font-headline font-bold mb-3">Connect Your Wallet</h1>
-              <p className="text-muted-foreground mb-6">
-                {getWalletConnectText()}
-              </p>
-              <div className="flex flex-col items-center gap-6">
-                <WalletMultiButton />
-                <button
-                  onClick={() => setShowWalletConnectForRole(null)}
-                  className="mt-2 text-sm text-muted-foreground hover:text-foreground"
-                >
-                  Go Back
-                </button>
-              </div>
-            </>
-          )}
-        </div>
-      </div>
-  )
-
   if (showWalletConnectForRole) {
-    return <WalletConnectPrompt />;
+    return <WalletConnectPrompt accountType={showWalletConnectForRole} onBack={() => setShowWalletConnectForRole(null)} />;
   }
 
   return (

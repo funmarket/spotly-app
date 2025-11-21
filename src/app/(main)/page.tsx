@@ -2,40 +2,42 @@
 'use client';
 import { useEffect, useState } from 'react';
 import { VideoFeed } from '@/components/feed/video-feed';
-import { useFirebase, useMemoFirebase } from '@/firebase';
+import { useDevapp } from '@/hooks/use-devapp';
 import { collection, query, where, orderBy, getDoc, doc, limit } from 'firebase/firestore';
 import type { EnrichedVideo, User, Video } from '@/lib/types';
 import { Loader2 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import { useCollection } from '@/firebase';
+import { useCollection, useMemoFirebase } from '@/firebase';
 
 function Feed() {
-  const { firestore, user, isUserLoading } = useFirebase();
+  const { firestore, userWallet } = useDevapp();
   const router = useRouter();
 
   const [enrichedVideos, setEnrichedVideos] = useState<EnrichedVideo[]>([]);
   const [isEnriching, setIsEnriching] = useState(true);
   const [activeFeedTab, setActiveFeedTab] = useState('music');
   const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const [isLoadingUser, setIsLoadingUser] = useState(true);
 
   useEffect(() => {
-    if (isUserLoading) return;
-    if (user && firestore) {
-      const userDocRef = doc(firestore, 'users', user.uid);
+    setIsLoadingUser(true);
+    if (userWallet && firestore) {
+      const userDocRef = doc(firestore, 'users', userWallet);
       getDoc(userDocRef).then((docSnap) => {
         if (docSnap.exists()) {
            setCurrentUser({ userId: docSnap.id, ...docSnap.data() } as User);
         } else {
-            // User is authenticated but has no profile.
-            // Treat them as a guest for browsing purposes.
+            // AuthHandler should create a minimal profile, but handle case where it might not exist yet
             setCurrentUser(null);
         }
-      });
+        setIsLoadingUser(false);
+      }).catch(() => setIsLoadingUser(false));
     } else {
       // No authenticated user, treat as guest.
       setCurrentUser(null);
+      setIsLoadingUser(false);
     }
-  }, [user, isUserLoading, firestore, router]);
+  }, [userWallet, firestore, router]);
 
 
   const videosQuery = useMemoFirebase(() => {
@@ -98,7 +100,7 @@ function Feed() {
     enrichVideos();
   }, [videos, firestore, areVideosLoading, activeFeedTab]);
 
-  const isLoading = isUserLoading || areVideosLoading || isEnriching;
+  const isLoading = isLoadingUser || areVideosLoading || isEnriching;
 
   if (isLoading && enrichedVideos.length === 0) {
     return (

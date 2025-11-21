@@ -1,5 +1,6 @@
 'use client';
-import { useDoc, useFirestore, useUser, useMemoFirebase } from '@/firebase';
+import { useDoc, useFirestore, useMemoFirebase } from '@/firebase';
+import { useDevapp } from '@/hooks/use-devapp';
 import { doc } from 'firebase/firestore';
 import { notFound, useRouter } from 'next/navigation';
 import type { MarketplaceProduct, User } from '@/lib/types';
@@ -32,7 +33,7 @@ export default function ProductDetailPage({ params }: { params: { productId: str
   const { productId } = params;
   const firestore = useFirestore();
   const router = useRouter();
-  const { user: currentUser } = useUser();
+  const { userWallet: currentUserWallet } = useDevapp();
 
   const productRef = useMemoFirebase(() => {
     if (!firestore || !productId) return null;
@@ -61,7 +62,7 @@ export default function ProductDetailPage({ params }: { params: { productId: str
     alert(`Purchasing "${product.name}" is not yet implemented.`);
   };
 
-  const isOwnProduct = currentUser?.uid === product.sellerId;
+  const isOwnProduct = currentUserWallet === product.sellerId;
 
   return (
     <div className="container mx-auto p-4 sm:p-6 lg:p-8">

@@ -16,8 +16,8 @@ const socialIcons: { [key: string]: React.ReactNode } = {
 };
 
 export function ProfileHeader({ user, isOwnProfile, onMessage }: { user: User, isOwnProfile: boolean, onMessage: () => void }) {
-  const socialLinks = typeof user.socialLinks === 'string' ? JSON.parse(user.socialLinks) : user.socialLinks;
-  const extraLinks = typeof user.extraLinks === 'string' ? JSON.parse(user.extraLinks) : user.extraLinks;
+  const socialLinks = typeof user.socialLinks === 'string' && user.socialLinks ? JSON.parse(user.socialLinks) : user.socialLinks;
+  const extraLinks = typeof user.extraLinks === 'string' && user.extraLinks ? JSON.parse(user.extraLinks) : user.extraLinks;
 
   return (
     <div className="relative">

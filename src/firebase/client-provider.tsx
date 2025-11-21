@@ -9,9 +9,9 @@ interface FirebaseClientProviderProps {
 }
 
 /**
- * Provides Firebase services to its children.
- * This component is marked as a client component and wraps the main FirebaseProvider,
- * passing the singleton instances of the Firebase services.
+ * Provides Firebase services to its children by wrapping the FirebaseProvider
+ * and passing the singleton instances of the Firebase services. This is intended
+ * for client-side usage.
  */
 export function FirebaseClientProvider({ children }: FirebaseClientProviderProps) {
   return (

@@ -1,5 +1,6 @@
 'use client';
-import { useFirebase, useMemoFirebase } from '@/firebase';
+import { useDevapp } from '@/hooks/use-devapp';
+import { useMemoFirebase } from '@/firebase';
 import { collection, query, where, getDocs, doc } from 'firebase/firestore';
 import { useCollection } from '@/firebase/firestore/use-collection';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
@@ -37,25 +38,25 @@ const FavoriteVideoCard = ({ video }: { video: Video }) => {
 };
 
 export default function FavoritesPage() {
-  const { user, firestore, isUserLoading } = useFirebase();
+  const { userWallet, firestore } = useDevapp();
   const [enrichedFavorites, setEnrichedFavorites] = useState<EnrichedFavorite[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   const favoritesQuery = useMemoFirebase(() => {
-    if (!firestore || !user) return null;
+    if (!firestore || !userWallet) return null;
     return query(
       collection(firestore, 'favorites'),
-      where('userId', '==', user.uid),
+      where('userId', '==', userWallet),
       where('itemType', '==', 'video')
     );
-  }, [firestore, user]);
+  }, [firestore, userWallet]);
 
   const { data: favorites } = useCollection<Favorite>(favoritesQuery);
 
   useEffect(() => {
     const enrichFavorites = async () => {
       if (!favorites || !firestore) {
-         if(!isUserLoading) setIsLoading(false);
+         if(userWallet === undefined) setIsLoading(false);
         return;
       }
       setIsLoading(true);
@@ -83,9 +84,9 @@ export default function FavoritesPage() {
     };
 
     enrichFavorites();
-  }, [favorites, firestore, isUserLoading]);
+  }, [favorites, firestore, userWallet]);
 
-  if (isUserLoading || isLoading) {
+  if (isLoading) {
     return (
       <div className="container mx-auto p-4 sm:p-6 lg:p-8">
         <h1 className="text-3xl font-headline flex items-center gap-2 mb-6">
@@ -105,7 +106,7 @@ export default function FavoritesPage() {
     );
   }
   
-  if (!user) {
+  if (!userWallet) {
     return (
       <div className="flex flex-1 items-center justify-center h-full">
         <Card className="w-[350px] text-center">

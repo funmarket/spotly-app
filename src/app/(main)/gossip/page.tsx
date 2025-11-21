@@ -3,7 +3,7 @@ import { useState, useEffect, useRef, useMemo } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { useFirebase } from '@/firebase';
+import { useDevapp } from '@/hooks/use-devapp';
 import { addDoc, collection, query, orderBy, serverTimestamp, doc, updateDoc, deleteDoc, where, getDocs, increment } from 'firebase/firestore';
 import { useCollection, useDoc, useMemoFirebase } from '@/firebase';
 import { Button } from '@/components/ui/button';
@@ -59,7 +59,7 @@ function StarRating({ postId, currentRating, ratingCount, onRate }: { postId: st
 }
 
 function CommentsSection({ postId, currentUser }: { postId: string, currentUser: AppUser | null }) {
-    const { firestore } = useFirebase();
+    const { firestore } = useDevapp();
     
     const commentsQuery = useMemoFirebase(() => {
         if (!firestore) return null;
@@ -82,7 +82,7 @@ function CommentsSection({ postId, currentUser }: { postId: string, currentUser:
 }
 
 function CommentCard({ comment, currentUser }: { comment: GossipComment & {id: string}, currentUser: AppUser | null }) {
-    const { firestore } = useFirebase();
+    const { firestore } = useDevapp();
     const authorDocRef = useMemoFirebase(() => {
         if (!firestore || !comment.authorId) return null;
         return doc(firestore, 'users', comment.authorId);
@@ -129,7 +129,7 @@ function CommentCard({ comment, currentUser }: { comment: GossipComment & {id: s
 }
 
 function PostCard({ post }: { post: GossipPost & { id: string } }) {
-  const { firestore, user } = useFirebase();
+  const { firestore, userWallet } = useDevapp();
   const [expanded, setExpanded] = useState(false);
   const [comment, setComment] = useState("");
 
@@ -146,12 +146,12 @@ function PostCard({ post }: { post: GossipPost & { id: string } }) {
 
   const handleCommentSubmit = async (e: React.FormEvent) => {
       e.preventDefault();
-      if (!firestore || !user || !comment.trim()) return;
+      if (!firestore || !userWallet || !comment.trim()) return;
 
       try {
           await addDoc(collection(firestore, 'gossip_comments'), {
               postId: post.id,
-              authorId: user.uid,
+              authorId: userWallet,
               content: comment,
               createdAt: serverTimestamp(),
           });
@@ -164,16 +164,13 @@ function PostCard({ post }: { post: GossipPost & { id: string } }) {
   }
 
   const handleRate = async (postId: string, score: number) => {
-      if (!firestore || !user) return;
-      // Simplified: This doesn't prevent re-rating, a real implementation would need to.
+      if (!firestore || !userWallet) return;
       try {
           await addDoc(collection(firestore, 'gossip_ratings'), {
               postId,
-              raterId: user.uid,
+              raterId: userWallet,
               rating: score,
           });
-          // Note: Aggregating ratings would typically be done via a backend function for efficiency.
-          // For client-side only, this is complex. We'll let the UI be optimistic.
       } catch (error) {
           console.error("Error submitting rating: ", error);
       }
@@ -197,20 +194,20 @@ function PostCard({ post }: { post: GossipPost & { id: string } }) {
           </div>
         </div>
         <div className="flex items-center justify-between mt-4 border-t pt-2">
-            <StarRating postId={post.id} currentRating={post.avgRating || 0} ratingCount={post.ratingCount || 0} onRate={user ? handleRate : null} />
+            <StarRating postId={post.id} currentRating={post.avgRating || 0} ratingCount={post.ratingCount || 0} onRate={userWallet ? handleRate : null} />
             <Button variant="ghost" onClick={() => setExpanded(!expanded)}>
                 Comments ({post.commentsCount || 0})
             </Button>
         </div>
         {expanded && (
             <div className="mt-4">
-                {user && (
+                {userWallet && (
                     <form onSubmit={handleCommentSubmit} className="flex gap-2 mb-4">
                         <Input value={comment} onChange={e => setComment(e.target.value)} placeholder="Add a comment..." />
                         <Button type="submit" disabled={!comment.trim()}>Post</Button>
                     </form>
                 )}
-                <CommentsSection postId={post.id} currentUser={user as AppUser | null} />
+                <CommentsSection postId={post.id} currentUser={{ walletAddress: userWallet } as AppUser | null} />
             </div>
         )}
       </CardContent>
@@ -219,7 +216,7 @@ function PostCard({ post }: { post: GossipPost & { id: string } }) {
 }
 
 function PostComposer() {
-  const { firestore, user } = useFirebase();
+  const { firestore, userWallet } = useDevapp();
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const form = useForm<z.infer<typeof postSchema>>({
@@ -228,12 +225,12 @@ function PostComposer() {
   });
 
   async function onSubmit(values: z.infer<typeof postSchema>) {
-    if (!firestore || !user) return;
+    if (!firestore || !userWallet) return;
     setIsSubmitting(true);
     try {
       const postsCollection = collection(firestore, 'gossip_posts');
       await addDoc(postsCollection, {
-        authorId: user.uid,
+        authorId: userWallet,
         content: values.content,
         category: values.category,
         imageUrl: values.imageUrl || '',
@@ -290,7 +287,7 @@ function PostComposer() {
 }
 
 function GossipFeed() {
-    const { firestore, isUserLoading } = useFirebase();
+    const { firestore } = useDevapp();
     const postsQuery = useMemoFirebase(() => {
         if (!firestore) return null;
         return query(collection(firestore, 'gossip_posts'), orderBy('createdAt', 'desc'));
@@ -301,7 +298,7 @@ function GossipFeed() {
         <div>
             <PostComposer />
             <div className="space-y-4 mt-6">
-                {isLoading || isUserLoading ? (
+                {isLoading ? (
                 <>
                     <Skeleton className="h-24 w-full" />
                     <Skeleton className="h-24 w-full" />
@@ -315,19 +312,33 @@ function GossipFeed() {
     )
 }
 
-function GossipInbox({ initialSelectedWallet, currentUser }: { initialSelectedWallet: string | null, currentUser: AppUser | null }) {
-    const { firestore, user } = useFirebase();
+function GossipInbox({ initialSelectedWallet }: { initialSelectedWallet: string | null }) {
+    const { firestore, userWallet } = useDevapp();
     const [conversations, setConversations] = useState<AppUser[]>([]);
     const [selectedUser, setSelectedUser] = useState<AppUser | null>(null);
     const [messages, setMessages] = useState<(GossipMessage & { id: string })[]>([]);
     const [messageText, setMessageText] = useState('');
     const [loading, setLoading] = useState(true);
     const messagesEndRef = useRef<null | HTMLDivElement>(null);
+    
+    const [currentUser, setCurrentUser] = useState<AppUser | null>(null);
 
     useEffect(() => {
-        if (!user) return;
+        const fetchCurrentUser = async () => {
+            if(userWallet && firestore) {
+                const userDoc = await getDoc(doc(firestore, 'users', userWallet));
+                if(userDoc.exists()){
+                    setCurrentUser(userDoc.data() as AppUser);
+                }
+            }
+        }
+        fetchCurrentUser();
+    }, [userWallet, firestore]);
+
+    useEffect(() => {
+        if (!userWallet) return;
         loadConversations();
-    }, [user]);
+    }, [userWallet]);
 
     useEffect(() => {
         if (initialSelectedWallet && conversations.length > 0) {
@@ -343,10 +354,10 @@ function GossipInbox({ initialSelectedWallet, currentUser }: { initialSelectedWa
     }, [messages]);
 
     const loadConversations = async () => {
-        if (!firestore || !user) return;
+        if (!firestore || !userWallet) return;
         setLoading(true);
-        const sentMessagesQuery = query(collection(firestore, 'gossip_messages'), where('fromId', '==', user.uid));
-        const receivedMessagesQuery = query(collection(firestore, 'gossip_messages'), where('toId', '==', user.uid));
+        const sentMessagesQuery = query(collection(firestore, 'gossip_messages'), where('fromId', '==', userWallet));
+        const receivedMessagesQuery = query(collection(firestore, 'gossip_messages'), where('toId', '==', userWallet));
 
         const [sentSnapshot, receivedSnapshot] = await Promise.all([getDocs(sentMessagesQuery), getDocs(receivedMessagesQuery)]);
         const userIds = new Set<string>();
@@ -375,30 +386,29 @@ function GossipInbox({ initialSelectedWallet, currentUser }: { initialSelectedWa
     };
 
     const messagesQuery = useMemoFirebase(() => {
-        if (!firestore || !user || !selectedUser) return null;
-        // This is a simplified query. For a real app, you'd likely combine two queries.
-        return query(collection(firestore, 'gossip_messages'), where('fromId', 'in', [user.uid, selectedUser.walletAddress]), where('toId', 'in', [user.uid, selectedUser.walletAddress]), orderBy('createdAt', 'asc'));
-    }, [firestore, user, selectedUser]);
+        if (!firestore || !userWallet || !selectedUser) return null;
+        return query(collection(firestore, 'gossip_messages'), where('fromId', 'in', [userWallet, selectedUser.walletAddress]), where('toId', 'in', [userWallet, selectedUser.walletAddress]), orderBy('createdAt', 'asc'));
+    }, [firestore, userWallet, selectedUser]);
     
     const {data: allMessages} = useCollection<GossipMessage>(messagesQuery);
     
     useEffect(() => {
         if (allMessages) {
             const filtered = allMessages.filter(msg => 
-                (msg.fromId === user?.uid && msg.toId === selectedUser?.walletAddress) ||
-                (msg.fromId === selectedUser?.walletAddress && msg.toId === user?.uid)
+                (msg.fromId === userWallet && msg.toId === selectedUser?.walletAddress) ||
+                (msg.fromId === selectedUser?.walletAddress && msg.toId === userWallet)
             )
             setMessages(filtered);
         }
-    }, [allMessages, user, selectedUser]);
+    }, [allMessages, userWallet, selectedUser]);
 
     const handleSendMessage = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!firestore || !user || !selectedUser || !messageText.trim()) return;
+        if (!firestore || !userWallet || !selectedUser || !messageText.trim()) return;
 
         try {
             await addDoc(collection(firestore, 'gossip_messages'), {
-                fromId: user.uid,
+                fromId: userWallet,
                 toId: selectedUser.walletAddress,
                 content: messageText,
                 createdAt: serverTimestamp(),
@@ -441,9 +451,9 @@ function GossipInbox({ initialSelectedWallet, currentUser }: { initialSelectedWa
                         </CardHeader>
                         <CardContent className="flex-1 overflow-y-auto space-y-4">
                              {messages.map(msg => (
-                                <div key={msg.id} className={`flex items-end gap-2 ${msg.fromId === user?.uid ? 'justify-end' : 'justify-start'}`}>
-                                    {msg.fromId !== user?.uid && <Avatar className="h-6 w-6"><AvatarImage src={selectedUser.profilePhotoUrl} /><AvatarFallback>{selectedUser.username?.charAt(0)}</AvatarFallback></Avatar>}
-                                    <p className={`max-w-[70%] p-3 rounded-lg ${msg.fromId === user?.uid ? 'bg-primary text-primary-foreground' : 'bg-muted'}`}>{msg.content}</p>
+                                <div key={msg.id} className={`flex items-end gap-2 ${msg.fromId === userWallet ? 'justify-end' : 'justify-start'}`}>
+                                    {msg.fromId !== userWallet && <Avatar className="h-6 w-6"><AvatarImage src={selectedUser.profilePhotoUrl} /><AvatarFallback>{selectedUser.username?.charAt(0)}</AvatarFallback></Avatar>}
+                                    <p className={`max-w-[70%] p-3 rounded-lg ${msg.fromId === userWallet ? 'bg-primary text-primary-foreground' : 'bg-muted'}`}>{msg.content}</p>
                                 </div>
                              ))}
                             <div ref={messagesEndRef} />
@@ -466,7 +476,7 @@ function GossipInbox({ initialSelectedWallet, currentUser }: { initialSelectedWa
 }
 
 export default function GossipPageContainer() {
-    const { user } = useFirebase();
+    const { userWallet } = useDevapp();
     const router = useRouter();
     const searchParams = useSearchParams();
     const openConversationWith = searchParams.get('openConversationWith');
@@ -479,7 +489,7 @@ export default function GossipPageContainer() {
         }
     }, [openConversationWith]);
 
-    if (!user) {
+    if (!userWallet) {
         return (
             <div className="flex flex-1 items-center justify-center h-full">
                 <Card className="w-[380px] text-center">
@@ -511,7 +521,7 @@ export default function GossipPageContainer() {
                     </button>
                 </nav>
             </div>
-            {activeTab === 'feed' ? <GossipFeed /> : <GossipInbox currentUser={user as AppUser} initialSelectedWallet={openConversationWith} />}
+            {activeTab === 'feed' ? <GossipFeed /> : <GossipInbox initialSelectedWallet={openConversationWith} />}
         </div>
     );
 }

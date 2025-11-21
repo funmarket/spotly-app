@@ -8,7 +8,7 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { PlusSquare, Loader2, DollarSign, List, FileText, Type } from 'lucide-react';
-import { useFirebase } from '@/firebase';
+import { useDevapp } from '@/hooks/use-devapp';
 import { addDoc, collection, serverTimestamp } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { Textarea } from '@/components/ui/textarea';
@@ -35,7 +35,7 @@ const productSchema = z.object({
 type ProductFormValues = z.infer<typeof productSchema>;
 
 export default function NewListingPage() {
-  const { user, firestore } = useFirebase();
+  const { userWallet, firestore } = useDevapp();
   const router = useRouter();
   const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -55,14 +55,14 @@ export default function NewListingPage() {
   const category = form.watch('category');
 
   async function onSubmit(values: ProductFormValues) {
-    if (!user || !firestore) {
+    if (!userWallet || !firestore) {
       toast({ variant: 'destructive', title: 'Error', description: 'You must be logged in to create a listing.' });
       return;
     }
     setIsSubmitting(true);
     try {
       await addDoc(collection(firestore, 'marketplace_products'), {
-        sellerId: user.uid,
+        sellerId: userWallet,
         name: values.name,
         description: values.description,
         price: values.price,

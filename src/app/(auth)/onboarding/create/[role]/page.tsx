@@ -2,7 +2,6 @@
 import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { doc, setDoc, serverTimestamp, collection } from 'firebase/firestore';
-import { useFirebase } from '@/firebase';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -14,8 +13,8 @@ import { zodResolver } from '@hookform/resolvers/zod';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
 import { ChevronDown, ChevronUp, Loader2, Plus, Trash2 } from 'lucide-react';
-import { useWallet } from '@solana/wallet-adapter-react';
-import { WalletMultiButton } from '@solana/wallet-adapter-react-ui';
+import { useDevapp } from '@/hooks/use-devapp';
+import { UserButton } from '@devfunlabs/web-sdk';
 
 const TALENT_CATEGORIES = {
   music: {
@@ -90,8 +89,7 @@ const profileSchema = z.object({
 type ProfileFormValues = z.infer<typeof profileSchema>;
 
 export default function CreateProfilePage() {
-  const { firestore } = useFirebase();
-  const { publicKey, connected } = useWallet();
+  const { firestore, userWallet } = useDevapp();
   const router = useRouter();
   const params = useParams();
   const accountType = params.role as string;
@@ -120,16 +118,11 @@ export default function CreateProfilePage() {
   });
   
   useEffect(() => {
-    if(accountType === 'fan') {
-      form.setValue('isArtist', false);
-      form.setValue('isBusiness', false);
-    } else if(accountType === 'artist') {
-      form.setValue('isArtist', true);
-      form.setValue('isBusiness', false);
-    } else if(accountType === 'business') {
-      form.setValue('isBusiness', true);
-      form.setValue('isArtist', false);
-    }
+    form.reset({
+        ...form.getValues(),
+        isArtist: accountType === 'artist',
+        isBusiness: accountType === 'business',
+    });
   }, [accountType, form]);
 
   const { watch, setValue } = form;
@@ -141,7 +134,7 @@ export default function CreateProfilePage() {
     
     const needsWallet = accountType === 'artist' || accountType === 'business';
 
-    if (needsWallet && !publicKey) {
+    if (needsWallet && !userWallet) {
         alert("A wallet connection is required to create this profile type.");
         return;
     }
@@ -150,13 +143,13 @@ export default function CreateProfilePage() {
         return;
     }
     
-    if (accountType !== 'fan') {
-        if (!values.isArtist && !values.isBusiness) {
-            alert("Please select an account type (Artist or Business).");
-            return;
-        }
+    // Spec: Account type selection required for Artist/Business
+    if (accountType !== 'fan' && !values.isArtist && !values.isBusiness) {
+        alert("Please select an account type (Artist or Business).");
+        return;
     }
    
+    // Spec: Artist must select talent category
     if (values.isArtist && !values.talentCategory) {
         alert("Please select a talent category for artists.");
         return;
@@ -164,14 +157,11 @@ export default function CreateProfilePage() {
 
     setIsSubmitting(true);
     try {
-        let role: 'fan' | 'artist' | 'business';
+        let role: 'fan' | 'artist' | 'business' | 'regular' = 'fan';
         if (values.isArtist) role = 'artist';
         else if (values.isBusiness) role = 'business';
-        else role = 'fan';
 
-        // For fans without a wallet, generate a unique ID.
-        // For artists/businesses, the wallet public key is the ID.
-        const docId = publicKey ? publicKey.toBase58() : doc(collection(firestore, 'users')).id;
+        const docId = userWallet ? userWallet : doc(collection(firestore, 'users')).id;
         const userDocRef = doc(firestore, 'users', docId);
 
         const sanitizeUrl = (url?: string) => {
@@ -186,28 +176,30 @@ export default function CreateProfilePage() {
             } catch (error) {
                 return ''; // Invalid URL format
             }
-        }
+        };
+
+        const profileData = {
+          walletAddress: docId,
+          username: values.username,
+          bio: values.bio || '',
+          skills: '', // per spec
+          tags: values.tags || '',
+          location: values.location || '',
+          profilePhotoUrl: sanitizeUrl(values.profilePhotoUrl) || `https://picsum.photos/seed/${docId}/400`,
+          bannerPhotoUrl: sanitizeUrl(values.bannerPhotoUrl) || `https://picsum.photos/seed/banner-${docId}/1200/400`,
+          socialLinks: JSON.stringify(values.socialLinks || {}),
+          extraLinks: JSON.stringify(values.extraLinks || []),
+          role: role,
+          subRole: values.isArtist ? (values.subRole || '') : '',
+          talentCategory: values.isArtist ? (values.talentCategory || '') : '',
+          talentSubcategories: values.isArtist ? JSON.stringify(values.talentSubcategories || []) : '[]',
+          rankingScore: 0,
+          escrowBalance: 0,
+          createdAt: serverTimestamp(),
+          updatedAt: serverTimestamp(),
+        };
         
-        await setDoc(userDocRef, {
-            walletAddress: publicKey ? publicKey.toBase58() : docId,
-            username: values.username,
-            bio: values.bio || '',
-            role: role,
-            profilePhotoUrl: sanitizeUrl(values.profilePhotoUrl) || `https://picsum.photos/seed/${docId}/400`,
-            bannerPhotoUrl: sanitizeUrl(values.bannerPhotoUrl) || `https://picsum.photos/seed/banner-${docId}/1200/400`,
-            talentCategory: values.isArtist ? values.talentCategory : null,
-            talentSubcategories: values.isArtist ? JSON.stringify(values.talentSubcategories || []) : '[]',
-            subRole: values.isArtist ? values.subRole : null,
-            tags: values.tags || '',
-            skills: '',
-            location: values.location || '',
-            socialLinks: JSON.stringify(values.socialLinks || {}),
-            extraLinks: JSON.stringify(values.extraLinks || []),
-            rankingScore: 0,
-            escrowBalance: 0,
-            createdAt: serverTimestamp(),
-            updatedAt: serverTimestamp(),
-        }, { merge: true });
+        await setDoc(userDocRef, profileData, { merge: true });
         
         if (role === 'artist') {
             setStep(2);
@@ -242,8 +234,8 @@ export default function CreateProfilePage() {
       setValue('talentSubcategories', newSubs);
   }
 
-  // Wallet Connection Check for Artist/Business
-  if ((accountType === 'artist' || accountType === 'business') && !connected) {
+  // Wallet Connection Check for Artist/Business, as per spec
+  if ((accountType === 'artist' || accountType === 'business') && !userWallet) {
     return (
       <div className="flex min-h-screen items-center justify-center p-4">
         <Card className="w-full max-w-md text-center">
@@ -251,8 +243,8 @@ export default function CreateProfilePage() {
             <CardTitle className="font-headline text-3xl">Connect Your Wallet</CardTitle>
             <CardDescription>A Solana wallet is required to create an {accountType} profile.</CardDescription>
           </CardHeader>
-          <CardContent>
-            <WalletMultiButton />
+          <CardContent className="flex justify-center">
+            <UserButton height="48px" primaryColor="#ec4899" radius="24px" />
           </CardContent>
            <CardFooter className="justify-center">
                 <Button variant="link" onClick={() => router.push('/onboarding')}>
@@ -276,7 +268,7 @@ export default function CreateProfilePage() {
       business: "Discover and hire amazing talent"
   }[accountType] || "Tell us about yourself";
 
-  // Step 2 for artists
+  // Step 2 for artists, per spec
   if (step === 2) {
       return (
           <div className="flex min-h-screen items-center justify-center p-4">

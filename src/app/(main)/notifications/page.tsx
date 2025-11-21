@@ -1,5 +1,6 @@
 'use client';
-import { useFirebase, useMemoFirebase } from '@/firebase';
+import { useDevapp } from '@/hooks/use-devapp';
+import { useMemoFirebase } from '@/firebase';
 import { collection, query, where, orderBy, updateDoc, doc } from 'firebase/firestore';
 import { useCollection } from '@/firebase/firestore/use-collection';
 import { Bell, Loader2 } from 'lucide-react';
@@ -24,7 +25,7 @@ interface Notification {
 }
 
 function NotificationItem({ notification }: { notification: Notification }) {
-  const { firestore } = useFirebase();
+  const { firestore } = useDevapp();
   
   const senderDocRef = useMemoFirebase(() => {
       if (!firestore || !notification.senderWallet) return null;
@@ -87,20 +88,20 @@ function NotificationItem({ notification }: { notification: Notification }) {
 
 
 export default function NotificationsPage() {
-    const { user, firestore, isUserLoading } = useFirebase();
+    const { userWallet, firestore } = useDevapp();
 
     const notificationsQuery = useMemoFirebase(() => {
-        if (!firestore || !user) return null;
+        if (!firestore || !userWallet) return null;
         return query(
             collection(firestore, 'notifications'),
-            where('recipientWallet', '==', user.uid),
+            where('recipientWallet', '==', userWallet),
             orderBy('createdAt', 'desc')
         );
-    }, [firestore, user]);
+    }, [firestore, userWallet]);
 
     const { data: notifications, isLoading } = useCollection<Notification>(notificationsQuery);
     
-    if (isUserLoading || (isLoading && !notifications)) {
+    if (isLoading && !notifications) {
         return (
             <div className="container mx-auto max-w-2xl p-4 space-y-6">
                 <h1 className="text-3xl font-headline flex items-center gap-2"><Bell /> Notifications</h1>
@@ -113,7 +114,7 @@ export default function NotificationsPage() {
         );
     }
 
-    if (!user) {
+    if (!userWallet) {
         return (
              <div className="flex flex-1 items-center justify-center h-full">
                 <Card className="w-[380px] text-center">

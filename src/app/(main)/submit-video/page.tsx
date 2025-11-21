@@ -22,7 +22,7 @@ import {
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { PlusSquare, Loader2, AlertCircle } from 'lucide-react';
-import { useFirebase } from '@/firebase';
+import { useDevapp } from '@/hooks/use-devapp';
 import { addDoc, collection, serverTimestamp, doc, getDoc } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { Textarea } from '@/components/ui/textarea';
@@ -39,7 +39,7 @@ const videoSchema = z.object({
 });
 
 export default function SubmitVideoPage() {
-  const { user, isUserLoading, firestore } = useFirebase();
+  const { userWallet, firestore } = useDevapp();
   const { toast } = useToast();
   const router = useRouter();
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -62,9 +62,9 @@ export default function SubmitVideoPage() {
   useEffect(() => {
     const fetchUserProfile = async () => {
       setIsProfileLoading(true);
-      if (user && firestore) {
+      if (userWallet && firestore) {
         try {
-          const userDocRef = doc(firestore, 'users', user.uid);
+          const userDocRef = doc(firestore, 'users', userWallet);
           const docSnap = await getDoc(userDocRef);
           if (docSnap.exists()) {
             setUserProfile(docSnap.data() as User);
@@ -77,16 +77,16 @@ export default function SubmitVideoPage() {
         } finally {
           setIsProfileLoading(false);
         }
-      } else if (!isUserLoading) {
+      } else {
         setIsProfileLoading(false);
         setUserProfile(null);
       }
     };
     fetchUserProfile();
-  }, [user, firestore, isUserLoading]);
+  }, [userWallet, firestore]);
 
   async function onSubmit(values: z.infer<typeof videoSchema>) {
-    if (!user || !firestore || !userProfile) {
+    if (!userWallet || !firestore || !userProfile) {
       toast({
         variant: 'destructive',
         title: 'Authentication Error',
@@ -115,7 +115,7 @@ export default function SubmitVideoPage() {
 
     try {
       await addDoc(videosCollection, {
-        artistId: user.uid,
+        artistId: userWallet,
         rawVideoInput: values.rawVideoInput,
         description: values.description,
         videoCategory: values.videoCategory.toLowerCase().trim(),
@@ -153,7 +153,7 @@ export default function SubmitVideoPage() {
     }
   }
 
-  const isLoading = isUserLoading || isProfileLoading;
+  const isLoading = isProfileLoading;
 
   if (isLoading) {
     return (
@@ -163,7 +163,7 @@ export default function SubmitVideoPage() {
     );
   }
   
-  if (!user || !userProfile || userProfile.role !== 'artist') {
+  if (!userWallet || !userProfile || userProfile.role !== 'artist') {
     return (
       <div className="flex flex-1 items-center justify-center h-full p-4">
         <Card className="w-[380px] text-center">
@@ -175,7 +175,7 @@ export default function SubmitVideoPage() {
             <CardDescription>
               This feature is available for artists only. Please ensure you have an artist profile to submit videos.
             </CardDescription>
-             {!user && (
+             {!userWallet && (
                 <CardFooter>
                     <Button onClick={() => router.push('/onboarding')} className="w-full mt-4">Create a Profile</Button>
                 </CardFooter>
