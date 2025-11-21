@@ -1,32 +1,21 @@
 /**
- * Core Philosophy: This ruleset enforces a strict user-ownership model centered around user profiles.
- * The fundamental principle is that users have complete control over their own data. While profile
- * information is publicly readable to support discovery and interaction within the app, only the
- * authenticated owner of a profile can create, modify, or delete it.
+ * # Core Philosophy
+ * This ruleset enforces a user-centric security model where user profiles are publicly readable, but each user has exclusive control over their own data. The primary goal is to secure user profiles while allowing for rapid application development.
  *
- * Data Structure: The data architecture is flat and straightforward, consisting of a single top-level
- * collection: `/users`. Each document in this collection represents a user profile, and the document
- * ID is the user's unique Firebase Authentication UID, which corresponds to their Solana wallet address.
+ * # Data Structure
+ * All user data is stored in a single, top-level collection: `/users/{walletAddress}`. The document ID (`walletAddress`) is the user's Solana wallet public key, which also serves as their unique Firebase Authentication UID. This flat structure ensures that authorization checks are fast and efficient, without needing to access other documents.
  *
- * Key Security Decisions:
- * - Public Readability: User profiles are considered public information. Anyone, authenticated or not,
- *   can read individual profiles (`get`) and list all users (`list`). This is essential for features
- *   like user search and viewing profiles.
- * - Strict Ownership for Writes: All write operations (`create`, `update`, `delete`) are strictly
- *   limited to the authenticated user who owns the document. An anonymous user cannot write any data.
- * - Self-Creation: A user can only create a profile document that corresponds to their own UID.
- *   This prevents one user from creating a profile for another.
- * - Data Integrity: To ensure the link between a user's auth UID, the document ID, and the internal
- *   `walletAddress` field is unbreakable, the rules enforce that the `walletAddress` field must match
- *   the document ID upon creation and must be immutable thereafter.
+ * # Key Security Decisions
+ * - **Public Profiles**: User profile data is publicly readable to support features like user discovery and profile viewing. Anyone, including unauthenticated users, can read profile documents.
+ * - **Strict Ownership for Writes**: A user can only create, update, or delete the document that corresponds to their own UID. They cannot affect any other user's data.
+ * - **Protected Admin Fields**: Certain fields within a user's profile (e.g., `isBanned`, `rankingScore`, `adminNotes`) are designated as admin-only. A regular user is explicitly blocked from modifying these fields on their own profile. Only a designated admin user can modify them.
+ * - **No User Listing Deletion**: To prevent accidental mass deletion, there are no rules that allow a `delete` operation on the entire `/users` collection path. Deletion is only permitted on individual documents by their owner.
  *
- * Denormalization for Authorization: The security model is highly performant as it relies on the document's
- * path (`/users/{userId}`) for authorization decisions. The user's UID is the document key, eliminating
- * the need for any slow and costly `get()` or `exists()` calls to other documents to verify ownership.
+ * # Denormalization for Authorization
+ * The security model relies on the denormalized fact that the document ID in the `/users` collection is the same as the owner's `request.auth.uid`. This direct mapping (`/users/{request.auth.uid}`) is the foundation for all ownership-based rules and completely avoids slow and costly `get()` calls to other documents for authorization purposes.
  *
- * Structural Segregation: This principle is not heavily applied in this simple, flat structure, as
- * there are no nested subcollections or mixed public/private data within a single document tree. The
- * entire `/users` collection is treated as a single unit with public read and owner-only write access.
+ * # Structural Segregation
+ * This ruleset does not require structural segregation as there is no mixed public/private data at the collection level. All documents within the `/users` collection share the same access control pattern: public read, owner-only write (with admin overrides for specific fields).
  */
 rules_version = '2';
 service cloud.firestore {
@@ -37,76 +26,99 @@ service cloud.firestore {
     // ----------------------------------------------------------------------
 
     /**
-     * Checks if the user is authenticated via Firebase Auth.
+     * Checks if the user is authenticated.
      */
     function isSignedIn() {
       return request.auth != null;
     }
 
     /**
-     * Checks if the currently authenticated user's UID matches the provided userId.
-     * This is the core function for verifying document ownership.
+     * Checks if the requester's UID matches the provided userId.
+     * This is the foundation of the ownership model.
      */
     function isOwner(userId) {
       return isSignedIn() && request.auth.uid == userId;
     }
 
     /**
-     * Verifies that a document already exists.
-     * CRITICAL: Must be used for all update and delete operations to prevent
-     * acting on non-existent data.
+     * Checks if the requester is the owner of an existing document.
+     * CRITICAL: Used for all update and delete operations to prevent
+     * acting on documents that don't exist.
      */
-    function isExistingDocument() {
-      return resource != null;
+    function isExistingOwner(userId) {
+      return isOwner(userId) && resource != null;
     }
 
     /**
-     * Validates the creation of a new user profile.
-     * Ensures the creator is the owner and that the internal `walletAddress`
-     * field correctly matches the document ID (which is the user's UID).
+     * Checks if the requester is the designated admin user.
+     * TODO: Replace 'ADMIN_WALLET_PLACEHOLDER' with the actual admin's Solana wallet address / UID.
      */
-    function isCreatingOwnProfile(userId) {
-      return isOwner(userId) && request.resource.data.walletAddress == userId;
+    function isAdmin() {
+      return isSignedIn() && request.auth.uid == 'ADMIN_WALLET_PLACEHOLDER';
     }
 
     /**
-     * Validates an update to an existing user profile.
-     * Ensures the user is the owner, the document exists, and that the
-     * critical `walletAddress` field is not changed.
+     * Validates that a user creating their own profile document sets the
+     * internal 'walletAddress' field correctly to match their auth UID.
+     * This enforces relational integrity from the moment of creation.
      */
-    function isUpdatingOwnProfile(userId) {
-      return isOwner(userId) && isExistingDocument() && request.resource.data.walletAddress == resource.data.walletAddress;
+    function hasValidWalletAddressOnCreate(walletAddress) {
+      return request.resource.data.walletAddress == walletAddress;
     }
 
     /**
-     * Validates the deletion of a user profile.
-     * Ensures the user is the owner and the document actually exists.
+     * Ensures that once the 'walletAddress' is set, it cannot be changed.
+     * This prevents re-assigning a profile document to a different user.
      */
-    function isDeletingOwnProfile(userId) {
-      return isOwner(userId) && isExistingDocument();
+    function isWalletAddressImmutable() {
+      return request.resource.data.walletAddress == resource.data.walletAddress;
     }
 
-
-    // ----------------------------------------------------------------------
-    // Collection Rules
-    // ----------------------------------------------------------------------
+    /**
+     * Checks if a write request attempts to modify any admin-only fields.
+     * This uses `request.writeFields`, which contains the list of fields
+     * being modified in an `update` operation.
+     */
+    function isAttemptingAdminWrite() {
+      let adminFields = [
+        'rankingScore', 'escrowBalance', 'isBanned', 'isSuspended',
+        'suspensionReason', 'warnings', 'adminNotes'
+      ];
+      return request.writeFields.hasAny(adminFields);
+    }
 
     /**
-     * @description Manages user profile documents. Profiles are publicly readable but can
-     *              only be created, updated, or deleted by their owner.
-     * @path /users/{userId}
-     * @allow (get) Any user, authenticated or not, can read any user's profile.
-     * @allow (create) An authenticated user can create their own profile document (e.g., `create /users/USER_UID` where auth.uid is 'USER_UID').
-     * @deny (create) An authenticated user cannot create a profile for another user (e.g., `create /users/OTHER_UID`).
-     * @deny (update) A user cannot update another user's profile.
-     * @principle Enforces strict document ownership for all write operations while allowing public read access. It also validates relational integrity by ensuring the document's internal `walletAddress` matches the document ID (`userId`).
+     * @description
+     * Manages user profiles. Profiles are public to read, but a user can only create,
+     * update, or delete their own profile document. Administrative fields are
+     * protected and can only be modified by a designated admin.
+     *
+     * @path
+     * `/users/{walletAddress}`
+     *
+     * @allow
+     * (get) Any user, authenticated or not, reading the profile at `/users/user123`.
+     * (create) An authenticated user with UID 'user123' creating their own profile at `/users/user123`.
+     * (update) User 'user123' updating their own 'bio' at `/users/user123`.
+     * (update) An admin user updating the 'isBanned' field for user `/users/user123`.
+     *
+     * @deny
+     * (create) User 'user123' attempting to create a profile for someone else at `/users/user456`.
+     * (update) User 'user123' attempting to update their own `isBanned` field.
+     * (delete) User 'user123' attempting to delete the profile at `/users/user456`.
+     *
+     * @principle
+     * Enforces strict document ownership for writes while allowing public reads.
+     * Protects sensitive administrative fields from modification by non-admin users.
      */
-    match /users/{userId} {
-      allow get: if true;
-      allow list: if true;
-      allow create: if isCreatingOwnProfile(userId);
-      allow update: if isUpdatingOwnProfile(userId);
-      allow delete: if isDeletingOwnProfile(userId);
+    match /users/{walletAddress} {
+      allow get, list: if true;
+
+      allow create: if isOwner(walletAddress) && hasValidWalletAddressOnCreate(walletAddress);
+
+      allow update: if (isExistingOwner(walletAddress) && !isAttemptingAdminWrite() && isWalletAddressImmutable()) || (isAdmin() && resource != null);
+
+      allow delete: if isExistingOwner(walletAddress);
     }
   }
 }

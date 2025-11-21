@@ -4,20 +4,20 @@
       "$schema": "http://json-schema.org/draft-07/schema#",
       "title": "User",
       "type": "object",
-      "description": "Represents a user profile in the system, linked to a Solana wallet and Firebase Authentication.",
+      "description": "Represents a user profile within the Spotly application, mirroring the structure stored in Firestore.",
       "properties": {
         "walletAddress": {
           "type": "string",
-          "description": "Unique identifier for the user, corresponding to their Solana wallet address and Firebase Auth UID. This is the primary key.",
-          "format": "string"
+          "description": "The Solana wallet address of the user, used as the unique identifier (document ID) in Firestore and the Firebase Auth uid."
         },
         "username": {
           "type": "string",
-          "description": "The user's display name."
+          "description": "The user's display name or username."
         },
         "role": {
           "type": "string",
-          "description": "The user's role in the application (regular, fan, artist, business)."
+          "description": "The user's role within the application ('regular', 'fan', 'artist', 'business').",
+          "format": "string"
         },
         "bio": {
           "type": "string",
@@ -45,11 +45,11 @@
         },
         "skills": {
           "type": "string",
-          "description": "Comma-separated list of the user's skills."
+          "description": "A comma-separated list of the user's skills."
         },
         "tags": {
           "type": "string",
-          "description": "Comma-separated list of tags associated with the user."
+          "description": "A comma-separated list of tags associated with the user."
         },
         "location": {
           "type": "string",
@@ -61,7 +61,7 @@
         },
         "escrowBalance": {
           "type": "number",
-          "description": "The user's escrow balance."
+          "description": "The user's current escrow balance."
         },
         "isBanned": {
           "type": "boolean",
@@ -69,7 +69,7 @@
         },
         "isSuspended": {
           "type": "boolean",
-          "description": "Indicates whether the user is suspended."
+          "description": "Indicates whether the user's account is suspended."
         },
         "suspensionReason": {
           "type": "string",
@@ -85,28 +85,29 @@
         },
         "isDeleted": {
           "type": "boolean",
-          "description": "Indicates whether the user's account is deleted."
+          "description": "Indicates whether the user's account is marked as deleted."
         },
         "talentCategory": {
           "type": "string",
-          "description": "The primary category of talent the user represents (e.g., music, acting, creator)."
+          "description": "The primary talent category of the user (e.g., 'music', 'acting', 'creator')."
         },
         "talentSubcategories": {
           "type": "string",
-          "description": "JSON string containing an array of talent subcategories."
+          "description": "JSON string containing an array of subcategories related to the user's talent.",
+          "format": "string"
         },
         "subRole": {
           "type": "string",
-          "description": "A more specific role or title for the user (e.g., singer, actor)."
+          "description": "A more specific role or sub-role of the user (e.g., 'singer', 'actor')."
         },
         "createdAt": {
           "type": "string",
-          "description": "Timestamp indicating when the user account was created.",
+          "description": "Timestamp indicating when the user's profile was created.",
           "format": "date-time"
         },
         "updatedAt": {
           "type": "string",
-          "description": "Timestamp indicating when the user account was last updated.",
+          "description": "Timestamp indicating when the user's profile was last updated.",
           "format": "date-time"
         }
       },
@@ -147,22 +148,22 @@
   "firestore": {
     "structure": [
       {
-        "path": "/users/{userId}",
+        "path": "/users/{walletAddress}",
         "definition": {
           "entityName": "User",
           "schema": {
             "$ref": "#/backend/entities/User"
           },
-          "description": "Stores user profile information. The 'userId' parameter corresponds to the user's Solana wallet address (public key) and Firebase Auth UID. This serves as the document ID. Includes fields like 'walletAddress', 'username', 'role', 'bio', etc.",
+          "description": "Stores user profile information. The 'walletAddress' serves as both the document ID and the Firebase Auth UID (Solana public key), ensuring direct ownership and simplifying security rules. Includes all user profile data as defined in the provided schema.",
           "params": [
             {
-              "name": "userId",
-              "description": "The user's Solana wallet address and Firebase Auth UID. This is the document ID."
+              "name": "walletAddress",
+              "description": "The Solana wallet address of the user, functioning as the document ID and Firebase Auth UID."
             }
           ]
         }
       }
     ],
-    "reasoning": "The Firestore data structure is designed to manage user authentication and profiles efficiently and securely, leveraging Firebase Auth and Firestore. The core principle is Authorization Independence, achieved by storing all necessary authorization data directly within the documents, eliminating the need for `get()` calls in security rules.  \n\nThe primary collection is `/users/{userId}`, where `{userId}` corresponds to the user's Solana wallet address, which is also the UID from Firebase Auth.  \n\nThis structure ensures that security rules can be written based solely on the data present in the user document and the `request.auth.uid`.  \n\nQAPs (Rules are not Filters) are supported by segregating the data by ownership (`/users/{userId}`) which enables secure `list` operations based on user ID."
+    "reasoning": "This Firestore structure is designed to manage user authentication and profiles using Firebase, focusing on replacing the existing Devbase user management system with Firebase Auth and Firestore. It prioritizes Authorization Independence by avoiding hierarchical `get()` calls in security rules. The `users` collection stores user profiles, with the document ID matching the Firebase Auth `uid` (Solana wallet address), ensuring direct access and simplifying security rules based on user ownership. All data in `users` collection has the same security requirements. The structure enables secure `list` operations (QAPs) by storing user data directly in the `users` collection, avoiding the need to filter based on parent document data.  Specifically, this structure avoids hierarchical dependencies, enabling atomic operations. Roles are stored directly in the database (DBAC), relying solely on `request.auth.uid` for authorization."
   }
 }
