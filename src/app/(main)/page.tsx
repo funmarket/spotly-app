@@ -45,10 +45,11 @@ function Feed() {
     
     if (activeFeedTab === 'rising') {
        return query(videosCollection, orderBy('rankingScore', 'desc'), limit(50));
-    } else {
-       // For specific categories, we also order by creation date as a primary sort key
-       return query(videosCollection, where('videoCategory', '==', activeFeedTab), orderBy('createdAt', 'desc'), limit(100));
     }
+    
+    // Simplified query: Only sort by creation date. Filtering will be done client-side.
+    return query(videosCollection, orderBy('createdAt', 'desc'), limit(200));
+
   }, [firestore, activeFeedTab]);
 
   const { data: videos, isLoading: areVideosLoading } = useCollection<Video & { id: string }>(videosQuery);
@@ -64,7 +65,10 @@ function Feed() {
       
       const userCache = new Map<string, User>();
 
-      const filteredVideos = videos; // Query now handles category filtering
+      // Client-side filtering
+      const filteredVideos = activeFeedTab === 'rising' 
+        ? videos 
+        : videos.filter(v => v.videoCategory === activeFeedTab);
 
       const enriched = await Promise.all(
         filteredVideos
