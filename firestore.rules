@@ -118,7 +118,7 @@ service cloud.firestore {
 
       allow update: if (isExistingOwner(walletAddress) && !isAttemptingAdminWrite() && isWalletAddressImmutable()) || (isAdmin() && resource != null);
 
-      allow delete: if isExistingOwner(walletAddress);
+      allow delete: if isExistingOwner(walletAddress) || isAdmin();
     }
     
     /**
@@ -137,7 +137,7 @@ service cloud.firestore {
         
         allow update: if (isOwner(resource.data.artistId) && !isAttemptingAdminVideoWrite()) || isAdmin();
         
-        allow delete: if isOwner(resource.data.artistId);
+        allow delete: if isOwner(resource.data.artistId) || isAdmin();
         
         function isAttemptingAdminVideoWrite() {
           let adminFields = [
@@ -177,7 +177,7 @@ service cloud.firestore {
     }
 
     match /gossip_messages/{messageId} {
-        allow read, delete: if isSignedIn() && (request.auth.uid == resource.data.fromId || request.auth.uid == resource.data.toId);
+        allow read, delete: if isSignedIn() && (request.auth.uid == resource.data.fromId || request.auth.uid == resource.data.toId || isAdmin());
         allow create: if isSignedIn() && request.resource.data.fromId == request.auth.uid;
     }
     
@@ -247,6 +247,19 @@ service cloud.firestore {
        // The rule for create and delete needs to check the incoming data.
        allow create: if isSignedIn() && request.resource.data.userId == request.auth.uid;
        allow delete: if isSignedIn() && resource.data.userId == request.auth.uid;
+    }
+    
+    // ----------------------------------------------------------------------
+    // Admin-Specific Rules
+    // ----------------------------------------------------------------------
+
+    match /warnings/{warningId} {
+      allow read, write: if isAdmin();
+    }
+
+    match /admin_ads/{adId} {
+      allow read: if true;
+      allow write: if isAdmin();
     }
   }
 }

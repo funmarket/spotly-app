@@ -3,13 +3,13 @@ import { useMemo } from 'react';
 import { getUser } from '@/lib/data';
 import { notFound } from 'next/navigation';
 import { ProfileHeader } from '@/components/profile/profile-header';
-import { AiInsights } from '@/components/profile/ai-insights';
+import { AdminAiInsights } from '@/components/profile/admin-ai-insights';
 import { Card, CardContent, CardFooter } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import Image from 'next/image';
 import Link from 'next/link';
 import { BarChart, Eye, ThumbsUp, Wallet, Video as VideoIcon } from 'lucide-react';
-import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
+import { useCollection, useFirestore, useMemoFirebase, useUser } from '@/firebase';
 import { collection, query, where, orderBy } from 'firebase/firestore';
 import type { Video } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -76,8 +76,9 @@ function ProfileVideos({ userId }: { userId: string }) {
 }
 
 export default function ProfilePage({ params }: { params: { userId: string } }) {
-  const user = getUser(params.userId); // Still using mock data for user profile
-  if (!user) {
+  const { user: authUser } = useUser();
+  const viewingUser = getUser(params.userId); // Still using mock data for user profile
+  if (!viewingUser) {
     notFound();
   }
   
@@ -86,9 +87,9 @@ export default function ProfilePage({ params }: { params: { userId: string } }) 
     if (!firestore) return null;
     return query(
       collection(firestore, 'videos'),
-      where('artistId', '==', user.walletAddress)
+      where('artistId', '==', viewingUser.walletAddress)
     );
-  }, [firestore, user.walletAddress]);
+  }, [firestore, viewingUser.walletAddress]);
 
   const { data: videos, isLoading: videosLoading } = useCollection<Video>(videosQuery);
 
@@ -101,7 +102,9 @@ export default function ProfilePage({ params }: { params: { userId: string } }) 
       return acc;
     }, { totalViews: 0, totalTops: 0, totalVideos: 0 });
   }, [videos]);
-
+  
+  const isAdmin = authUser?.uid === 'ADMIN_WALLET_PLACEHOLDER';
+  const isOwnProfile = authUser?.uid === viewingUser.walletAddress;
 
   const mainContent = (
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -114,9 +117,9 @@ export default function ProfilePage({ params }: { params: { userId: string } }) 
 
   return (
     <div className="min-h-screen">
-      <ProfileHeader user={user} />
+      <ProfileHeader user={viewingUser} />
       <div className="container mx-auto p-4 sm:p-6 lg:p-8 mt-6">
-        {user.role === 'artist' ? (
+        {(isOwnProfile || isAdmin) && viewingUser.role === 'artist' ? (
           <Tabs defaultValue="overview" className="w-full">
             <TabsList className="grid w-full grid-cols-3">
               <TabsTrigger value="overview">Overview</TabsTrigger>
@@ -127,10 +130,10 @@ export default function ProfilePage({ params }: { params: { userId: string } }) 
               {mainContent}
             </TabsContent>
             <TabsContent value="videos" className="mt-6">
-               <ProfileVideos userId={user.walletAddress} />
+               <ProfileVideos userId={viewingUser.walletAddress} />
             </TabsContent>
             <TabsContent value="insights" className="mt-6">
-              <AiInsights artistId={user.walletAddress} />
+              <AdminAiInsights />
             </TabsContent>
           </Tabs>
         ) : (
@@ -140,5 +143,3 @@ export default function ProfilePage({ params }: { params: { userId: string } }) 
     </div>
   );
 }
-
-    

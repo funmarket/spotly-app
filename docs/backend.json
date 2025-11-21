@@ -323,6 +323,32 @@
         "createdAt": { "type": "string", "format": "date-time", "description": "Timestamp of when the item was favorited." }
       },
       "required": ["itemId", "itemType", "userId", "createdAt"]
+    },
+     "Warning": {
+      "title": "Warning",
+      "description": "A warning issued to a user by an admin.",
+      "type": "object",
+      "properties": {
+        "userId": { "type": "string", "description": "The ID of the user receiving the warning." },
+        "reason": { "type": "string", "description": "The reason for the warning." },
+        "adminId": { "type": "string", "description": "The ID of the admin who issued the warning." },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Timestamp of when the warning was created." }
+      },
+      "required": ["userId", "reason", "adminId", "createdAt"]
+    },
+    "AdminAd": {
+      "title": "Admin Ad",
+      "description": "An advertisement created by an admin.",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string", "description": "The title of the ad." },
+        "content": { "type": "string", "description": "The content of the ad." },
+        "imageUrl": { "type": "string", "format": "uri", "description": "URL of the ad image." },
+        "targetUrl": { "type": "string", "format": "uri", "description": "URL the ad links to." },
+        "isActive": { "type": "boolean", "description": "Whether the ad is currently active." },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Timestamp of when the ad was created." }
+      },
+      "required": ["title", "content", "targetUrl", "isActive", "createdAt"]
     }
   },
   "auth": {
@@ -467,6 +493,22 @@
           "entityName": "Favorite",
           "schema": { "$ref": "#/backend/entities/Favorite" },
           "description": "Stores items favorited by users."
+        }
+      },
+      {
+        "path": "/warnings/{warningId}",
+        "definition": {
+          "entityName": "Warning",
+          "schema": { "$ref": "#/backend/entities/Warning" },
+          "description": "Stores warnings issued to users by administrators."
+        }
+      },
+      {
+        "path": "/admin_ads/{adId}",
+        "definition": {
+          "entityName": "AdminAd",
+          "schema": { "$ref": "#/backend/entities/AdminAd" },
+          "description": "Stores advertisements created by administrators."
         }
       }
     ],
