@@ -60,17 +60,34 @@ const TALENT_CATEGORIES = {
   },
 };
 
-const ClientOnlyWalletButton = () => {
-  const [hasMounted, setHasMounted] = useState(false);
-  useEffect(() => {
-    setHasMounted(true);
-  }, []);
+const profileSchema = z.object({
+  username: z.string().min(1, 'Username is required').max(30, 'Username must be 30 characters or less'),
+  bio: z.string().max(280, 'Bio must be 280 characters or less').optional(),
+  profilePhotoUrl: z.string().url('Please enter a valid URL.').optional().or(z.literal('')),
+  bannerPhotoUrl: z.string().url('Please enter a valid URL.').optional().or(z.literal('')),
+  isArtist: z.boolean().default(false),
+  isBusiness: z.boolean().default(false),
+  talentCategory: z.string().optional(),
+  talentSubcategories: z.array(z.string()).optional(),
+  subRole: z.string().optional(), // Legacy Talent Type
+  tags: z.string().optional(),
+  location: z.string().optional(),
+  socialLinks: z.object({
+    youtube: z.string().optional(),
+    twitter: z.string().optional(),
+    instagram: z.string().optional(),
+    tiktok: z.string().optional(),
+    facebook: z.string().optional(),
+    telegram: z.string().optional(),
+    website: z.string().optional(),
+  }).optional(),
+  extraLinks: z.array(z.object({
+    label: z.string().min(1, "Label is required"),
+    url: z.string().url("Must be a valid URL"),
+  })).optional(),
+});
 
-  if (!hasMounted) {
-    return null;
-  }
-  return <WalletMultiButton />;
-};
+type ProfileFormValues = z.infer<typeof profileSchema>;
 
 export default function CreateProfilePage() {
   const { firestore } = useFirebase();
@@ -82,55 +99,6 @@ export default function CreateProfilePage() {
   const [step, setStep] = useState(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showExtraLinks, setShowExtraLinks] = useState(false);
-
-  const profileSchema = z.object({
-    username: z.string().min(3, 'Username must be at least 3 characters').max(30, 'Username must be 30 characters or less'),
-    bio: z.string().max(280, 'Bio must be 280 characters or less').optional(),
-    profilePhotoUrl: z.string().url('Please enter a valid URL.').optional().or(z.literal('')),
-    bannerPhotoUrl: z.string().url('Please enter a valid URL.').optional().or(z.literal('')),
-    isArtist: z.boolean().default(false),
-    isBusiness: z.boolean().default(false),
-    talentCategory: z.string().optional(),
-    talentSubcategories: z.array(z.string()).optional(),
-    subRole: z.string().optional(), // Legacy Talent Type
-    tags: z.string().optional(),
-    location: z.string().optional(),
-    socialLinks: z.object({
-      youtube: z.string().optional(),
-      twitter: z.string().optional(),
-      instagram: z.string().optional(),
-      tiktok: z.string().optional(),
-      facebook: z.string().optional(),
-      telegram: z.string().optional(),
-      website: z.string().optional(),
-    }).optional(),
-    extraLinks: z.array(z.object({
-      label: z.string().min(1, "Label is required"),
-      url: z.string().url("Must be a valid URL"),
-    })).optional(),
-  }).refine(data => {
-      if (accountType === 'artist' || accountType === 'business') {
-          if (data.isArtist || data.isBusiness) return true;
-          // For combined roles, we need to allow both.
-          // This check is primarily for the single role selection pages.
-          if (accountType === 'artist' && data.isArtist) return true;
-          if (accountType === 'business' && data.isBusiness) return true;
-      }
-      return accountType === 'fan'; // Fans don't need to select a type.
-  }, {
-      message: 'Please select at least one account type (Artist or Business).',
-      path: ['isArtist'],
-  }).refine(data => {
-      if (data.isArtist) {
-          return !!data.talentCategory;
-      }
-      return true;
-  }, {
-      message: 'Please select your primary talent category.',
-      path: ['talentCategory'],
-  });
-
-  type ProfileFormValues = z.infer<typeof profileSchema>;
 
   const form = useForm<ProfileFormValues>({
     resolver: zodResolver(profileSchema),
@@ -171,8 +139,24 @@ export default function CreateProfilePage() {
   const onSubmit = async (values: ProfileFormValues) => {
     if (!firestore) return;
     
+    // Per instructions, wallet is required for artist/business
     if ((accountType === 'artist' || accountType === 'business') && !publicKey) {
-        console.error("Wallet not connected for artist/business profile creation.");
+        alert("A wallet connection is required to create this profile type.");
+        return;
+    }
+     // Username required
+    if (!values.username) {
+        alert("Username is required");
+        return;
+    }
+    // Account type required for non-fans
+    if (accountType !== 'fan' && !values.isArtist && !values.isBusiness) {
+        alert("Please select an account type (Artist or Business).");
+        return;
+    }
+    // Artist validation
+    if (values.isArtist && !values.subRole) {
+        alert("Please select a legacy talent type for artists.");
         return;
     }
 
@@ -187,18 +171,33 @@ export default function CreateProfilePage() {
 
         const docId = publicKey ? publicKey.toBase58() : doc(collection(firestore, 'users')).id;
         const userDocRef = doc(firestore, 'users', docId);
+
+        const sanitizeUrl = (url?: string) => {
+            if (!url) return '';
+            const trimmedUrl = url.trim();
+            if (!trimmedUrl.startsWith('http://') && !trimmedUrl.startsWith('https://')) {
+                return '';
+            }
+            // Basic sanitization to prevent javascript: or data: urls
+            const protocol = new URL(trimmedUrl).protocol;
+            if (protocol !== 'http:' && protocol !== 'https:') {
+                return '';
+            }
+            return trimmedUrl;
+        }
         
         await setDoc(userDocRef, {
             walletAddress: publicKey ? publicKey.toBase58() : docId,
             username: values.username,
             bio: values.bio || '',
             role: role,
-            profilePhotoUrl: values.profilePhotoUrl || `https://picsum.photos/seed/${docId}/400`,
-            bannerPhotoUrl: values.bannerPhotoUrl || `https://picsum.photos/seed/banner-${docId}/1200/400`,
+            profilePhotoUrl: sanitizeUrl(values.profilePhotoUrl) || `https://picsum.photos/seed/${docId}/400`,
+            bannerPhotoUrl: sanitizeUrl(values.bannerPhotoUrl) || `https://picsum.photos/seed/banner-${docId}/1200/400`,
             talentCategory: values.isArtist ? values.talentCategory : null,
-            talentSubcategories: values.isArtist ? JSON.stringify(values.talentSubcategories) : '[]',
+            talentSubcategories: values.isArtist ? JSON.stringify(values.talentSubcategories || []) : '[]',
             subRole: values.isArtist ? values.subRole : null,
             tags: values.tags || '',
+            skills: '', // Per spec, seems to be a legacy field
             location: values.location || '',
             socialLinks: JSON.stringify(values.socialLinks || {}),
             extraLinks: JSON.stringify(values.extraLinks || []),
@@ -208,9 +207,10 @@ export default function CreateProfilePage() {
             updatedAt: serverTimestamp(),
         }, { merge: true });
         
+        // Post-creation flow
         if (role === 'artist') {
             setStep(2);
-        } else {
+        } else { // Fan or Business
             router.push('/');
         }
     } catch (error) {
@@ -240,16 +240,17 @@ export default function CreateProfilePage() {
       setValue('talentSubcategories', newSubs);
   }
 
+  // Wallet Connection Check for Artist/Business
   if ((accountType === 'artist' || accountType === 'business') && !connected) {
     return (
       <div className="flex min-h-screen items-center justify-center p-4">
         <Card className="w-full max-w-md text-center">
           <CardHeader>
             <CardTitle className="font-headline text-3xl">Connect Your Wallet</CardTitle>
-            <CardDescription>A wallet is required to create an {accountType} profile on SPOTLY.</CardDescription>
+            <CardDescription>A Solana wallet is required to create an {accountType} profile.</CardDescription>
           </CardHeader>
           <CardContent>
-            <ClientOnlyWalletButton />
+            <WalletMultiButton />
           </CardContent>
            <CardFooter>
                 <Button variant="link" onClick={() => router.push('/onboarding')}>
@@ -273,6 +274,7 @@ export default function CreateProfilePage() {
       business: "Discover and hire amazing talent"
   }[accountType] || "Tell us about yourself";
 
+  // Step 2 for artists
   if (step === 2) {
       return (
           <div className="flex min-h-screen items-center justify-center p-4">
@@ -290,6 +292,7 @@ export default function CreateProfilePage() {
       )
   }
 
+  // Step 1: Profile creation form
   return (
     <div className="flex min-h-screen items-center justify-center p-4">
       <Card className="w-full max-w-2xl">
@@ -382,15 +385,19 @@ export default function CreateProfilePage() {
                     render={({ field }) => (
                     <FormItem>
                         <FormLabel>Talent Category*</FormLabel>
-                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                            {Object.entries(TALENT_CATEGORIES).map(([key, cat]) => (
-                                <Button key={key} type="button" variant={field.value === key ? 'default' : 'secondary'}
-                                onClick={() => {
-                                    field.onChange(key);
-                                    setValue('talentSubcategories', []);
-                                }}>{cat.label}</Button>
-                            ))}
-                        </div>
+                        <Select onValueChange={(value) => {
+                            field.onChange(value);
+                            setValue('talentSubcategories', []);
+                        }} defaultValue={field.value}>
+                        <FormControl>
+                            <SelectTrigger><SelectValue placeholder="Select a talent category" /></SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                            <SelectItem value="music">Music</SelectItem>
+                            <SelectItem value="acting">Acting</SelectItem>
+                            <SelectItem value="creator">Creator</SelectItem>
+                        </SelectContent>
+                        </Select>
                         <FormMessage />
                     </FormItem>
                 )}/>
@@ -399,7 +406,7 @@ export default function CreateProfilePage() {
                     <FormField control={form.control} name="talentSubcategories"
                         render={({ field }) => (
                         <FormItem>
-                            <FormLabel>Subcategories</FormLabel>
+                            <FormLabel>Subcategories (select multiple)</FormLabel>
                             <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                                 {TALENT_CATEGORIES[talentCategory as keyof typeof TALENT_CATEGORIES]?.subcategories.map(sub => (
                                     <Button key={sub.value} type="button" 
@@ -415,7 +422,7 @@ export default function CreateProfilePage() {
                  
                 <FormField control={form.control} name="subRole" render={({ field }) => (
                     <FormItem>
-                        <FormLabel>Legacy Talent Type</FormLabel>
+                        <FormLabel>Legacy Talent Type*</FormLabel>
                         <Select onValueChange={field.onChange} defaultValue={field.value}>
                         <FormControl>
                             <SelectTrigger><SelectValue placeholder="Select a legacy talent type" /></SelectTrigger>
@@ -520,3 +527,5 @@ export default function CreateProfilePage() {
     </div>
   );
 }
+
+    

@@ -45,14 +45,17 @@ export default function OnboardingRoleSelectionPage() {
   const [isCheckingProfile, setIsCheckingProfile] = useState(false);
 
   useEffect(() => {
+    // This effect runs when the wallet connects to check for an existing profile
     const checkProfileAndRedirect = async () => {
-      if (connected && publicKey && firestore && showWalletConnectForRole && showWalletConnectForRole !== 'fan') {
+      if (connected && publicKey && firestore && showWalletConnectForRole) {
         setIsCheckingProfile(true);
         const userDocRef = doc(firestore, 'users', publicKey.toBase58());
         const userDoc = await getDoc(userDocRef);
         if (userDoc.exists()) {
+          // Profile exists, go to profile page
           router.push(`/profile/${publicKey.toBase58()}`);
         } else {
+          // No profile, go to creation page for the selected role
           router.push(`/onboarding/create/${showWalletConnectForRole}`);
         }
       }
@@ -61,7 +64,7 @@ export default function OnboardingRoleSelectionPage() {
   }, [connected, publicKey, firestore, router, showWalletConnectForRole]);
 
 
-  const handleRoleClick = (role: string) => {
+  const handleRoleClick = async (role: string) => {
     // Fans do not need to connect a wallet to create a profile
     if (role === 'fan') {
       router.push(`/onboarding/create/fan`);
@@ -69,11 +72,20 @@ export default function OnboardingRoleSelectionPage() {
     }
     
     // Artists and Businesses require a wallet
-    if (!connected) {
-      setShowWalletConnectForRole(role);
-      return;
+    if (connected && publicKey) {
+        // If already connected, check for profile and redirect
+        setIsCheckingProfile(true);
+        const userDocRef = doc(firestore, 'users', publicKey.toBase58());
+        const userDoc = await getDoc(userDocRef);
+        if (userDoc.exists()) {
+            router.push(`/profile/${publicKey.toBase58()}`);
+        } else {
+            router.push(`/onboarding/create/${role}`);
+        }
+    } else {
+        // If not connected, show the wallet connection prompt
+        setShowWalletConnectForRole(role);
     }
-     router.push(`/onboarding/create/${role}`);
   };
 
   const getWalletConnectText = () => {
@@ -83,10 +95,9 @@ export default function OnboardingRoleSelectionPage() {
       default: return 'Please connect your wallet to continue';
     }
   }
-
-  if (showWalletConnectForRole) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-background p-4">
+  
+  const WalletConnectPrompt = () => (
+     <div className="flex min-h-screen items-center justify-center bg-background p-4">
         <div className="w-full max-w-md rounded-2xl bg-card p-8 text-center">
           {isCheckingProfile ? (
              <>
@@ -112,7 +123,10 @@ export default function OnboardingRoleSelectionPage() {
           )}
         </div>
       </div>
-    );
+  )
+
+  if (showWalletConnectForRole) {
+    return <WalletConnectPrompt />;
   }
 
   return (
@@ -156,3 +170,5 @@ export default function OnboardingRoleSelectionPage() {
     </div>
   );
 }
+
+    
