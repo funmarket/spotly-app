@@ -10,6 +10,8 @@ export interface User {
   role: 'artist' | 'business' | 'fan';
   talentCategory?: 'music' | 'acting' | 'creator';
   socialLinks?: { platform: string; url: string }[];
+  createdAt?: Timestamp;
+  updatedAt?: Timestamp;
 }
 
 export interface Video {

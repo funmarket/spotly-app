@@ -33,13 +33,19 @@ const NavItem = ({
   icon: React.ElementType;
 }) => {
   const pathname = usePathname();
-  const isActive = href === '/' ? pathname === href : pathname.startsWith(href);
   const { user } = useUser();
 
+  // For the root path, we want an exact match.
+  // For other paths, we check if the path starts with the href.
+  const isActive = href === '/' ? pathname === href : pathname.startsWith(href);
+  
   let finalHref = href;
   if (label === 'Profile') {
-    finalHref = user ? `/profile/${user.uid}` : '/'; // Fallback to home if no user
+    // If the user is logged in, link to their profile page.
+    // Otherwise, link to the onboarding page as a fallback.
+    finalHref = user ? `/profile/${user.uid}` : '/onboarding';
   }
+
 
   return (
     <Link
