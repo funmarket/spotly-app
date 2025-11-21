@@ -2,7 +2,7 @@
 import { useEffect, useState } from 'react';
 import { VideoFeed } from '@/components/feed/video-feed';
 import { useCollection, useFirebase, useMemoFirebase } from '@/firebase';
-import { collection, query, where, orderBy, getDoc, doc } from 'firebase/firestore';
+import { collection, query, where, orderBy, getDoc, doc, limit } from 'firebase/firestore';
 import type { EnrichedVideo, User, Video } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
 
@@ -20,28 +20,34 @@ const HomeSkeleton = () => (
     </div>
 );
 
-
 export default function HomePage() {
   const { firestore, isUserLoading } = useFirebase();
   const [enrichedVideos, setEnrichedVideos] = useState<EnrichedVideo[]>([]);
   const [isEnriching, setIsEnriching] = useState(true);
+  const [activeFeedTab, setActiveFeedTab] = useState('music'); // music, acting, creator, rising
 
-  // The query will be null until Firebase has resolved its auth state.
   const videosQuery = useMemoFirebase(() => {
     if (!firestore || isUserLoading) return null;
-    // SIMPLIFIED QUERY: Removed multiple 'where' clauses to avoid needing a composite index.
-    // This is a temporary fix to unblock development.
-    return query(
-      collection(firestore, 'videos'),
-      orderBy('createdAt', 'desc')
-    );
-  }, [firestore, isUserLoading]);
+    
+    // Base query
+    const videosCollection = collection(firestore, 'videos');
+    
+    // Common filters
+    let q = query(videosCollection, where('status', '==', 'active'), where('isBanned', '==', false), where('hiddenFromFeed', '==', false));
+
+    if (activeFeedTab === 'rising') {
+      // For 'rising', we sort by rankingScore
+      return query(q, orderBy('rankingScore', 'desc'), limit(50));
+    } else {
+      // For categories, we filter by category and sort by creation date
+      return query(q, where('videoCategory', '==', activeFeedTab), orderBy('createdAt', 'desc'), limit(50));
+    }
+  }, [firestore, isUserLoading, activeFeedTab]);
 
   const { data: videos, isLoading: areVideosLoading } = useCollection<Video & { id: string }>(videosQuery);
 
   useEffect(() => {
     const enrichVideos = async () => {
-      // Don't enrich if there are no videos or if the initial query is still loading.
       if (!videos || !firestore) {
         if (!areVideosLoading && !isUserLoading) setIsEnriching(false);
         return;
@@ -79,13 +85,18 @@ export default function HomePage() {
     enrichVideos();
   }, [videos, firestore, areVideosLoading, isUserLoading]);
 
-  // Combined loading state is now robust.
-  // We wait for auth, then for the video query, then for enrichment.
   const isLoading = isUserLoading || areVideosLoading || isEnriching;
 
-  if (isLoading) {
+  if (isLoading && enrichedVideos.length === 0) {
     return <HomeSkeleton />;
   }
 
-  return <VideoFeed videos={enrichedVideos} />;
+  return (
+    <VideoFeed 
+      videos={enrichedVideos} 
+      activeFeedTab={activeFeedTab}
+      setActiveFeedTab={setActiveFeedTab}
+      isLoading={isLoading}
+    />
+  );
 }
