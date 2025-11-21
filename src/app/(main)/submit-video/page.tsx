@@ -61,36 +61,41 @@ export default function SubmitVideoPage() {
 
   useEffect(() => {
     const fetchUserProfile = async () => {
+      setIsProfileLoading(true);
       if (user && firestore) {
         try {
           const userDocRef = doc(firestore, 'users', user.uid);
           const docSnap = await getDoc(userDocRef);
           if (docSnap.exists()) {
             setUserProfile(docSnap.data() as User);
+          } else {
+            setUserProfile(null);
           }
         } catch (error) {
           console.error("Error fetching user profile:", error);
+          setUserProfile(null);
         } finally {
           setIsProfileLoading(false);
         }
       } else if (!isUserLoading) {
         setIsProfileLoading(false);
+        setUserProfile(null);
       }
     };
     fetchUserProfile();
   }, [user, firestore, isUserLoading]);
 
   async function onSubmit(values: z.infer<typeof videoSchema>) {
-    if (!user || !firestore) {
+    if (!user || !firestore || !userProfile) {
       toast({
         variant: 'destructive',
         title: 'Authentication Error',
-        description: 'You must be logged in to submit a video.',
+        description: 'You must be logged in as an artist to submit a video.',
       });
       return;
     }
 
-    if (userProfile?.role !== 'artist') {
+    if (userProfile.role !== 'artist') {
       toast({
         variant: 'destructive',
         title: 'Permission Denied',
@@ -115,7 +120,7 @@ export default function SubmitVideoPage() {
         description: values.description,
         videoCategory: values.videoCategory.toLowerCase().trim(),
         videoUrl: finalParseResult.embedUrl,
-        status: 'active', // Changed from 'pending' to 'active' for immediate visibility
+        status: 'active',
         isBanned: false,
         hiddenFromFeed: false,
         topCount: 0,
@@ -157,8 +162,8 @@ export default function SubmitVideoPage() {
       </div>
     );
   }
-
-  if (!user || userProfile?.role !== 'artist') {
+  
+  if (!user || !userProfile || userProfile.role !== 'artist') {
     return (
       <div className="flex flex-1 items-center justify-center h-full p-4">
         <Card className="w-[380px] text-center">
@@ -170,6 +175,11 @@ export default function SubmitVideoPage() {
             <CardDescription>
               This feature is available for artists only. Please ensure you have an artist profile to submit videos.
             </CardDescription>
+             {!user && (
+                <CardFooter>
+                    <Button onClick={() => router.push('/onboarding')} className="w-full mt-4">Create a Profile</Button>
+                </CardFooter>
+             )}
           </CardHeader>
         </Card>
       </div>
