@@ -108,15 +108,9 @@ service cloud.firestore {
       allow delete: if isOwner(walletAddress) || isAdmin();
     }
     
-    // PUBLIC READ-ONLY access for querying the collection.
-    // This allows unauthenticated users to see the video feed.
-    match /videos {
-      allow list: if true;
-    }
     
-    // SECURE rules for individual video documents.
     match /videos/{videoId} {
-      allow get: if true;
+      allow read: if true;
       allow create: if isSignedIn() && request.resource.data.artistId == request.auth.uid && isArtist(request.auth.uid);
       allow update: if (isOwner(resource.data.artistId) && !isAttemptingAdminVideoWrite()) || isAdmin();
       allow delete: if isOwner(resource.data.artistId) || isAdmin();
