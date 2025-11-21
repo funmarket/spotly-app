@@ -270,6 +270,22 @@
             "createdAt": { "type": "string", "format": "date-time", "description": "Timestamp of when the review was created." }
         },
         "required": ["productId", "buyerId", "rating", "comment", "createdAt"]
+    },
+    "Notification": {
+      "title": "Notification",
+      "description": "Represents a user notification.",
+      "type": "object",
+      "properties": {
+        "recipientWallet": { "type": "string", "description": "The wallet address of the user who receives the notification." },
+        "message": { "type": "string", "description": "The notification message content." },
+        "type": { "type": "string", "description": "The type of notification (e.g., 'tip', 'booking', 'follow')." },
+        "read": { "type": "boolean", "description": "Indicates if the notification has been read." },
+        "relatedId": { "type": "string", "description": "ID of the related entity (e.g., booking ID, message ID)." },
+        "senderWallet": { "type": "string", "description": "The wallet address of the user who triggered the notification." },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Timestamp of when the notification was created." },
+        "data": { "type": "string", "description": "JSON string containing additional data for the notification." }
+      },
+      "required": ["recipientWallet", "message", "type", "read", "createdAt"]
     }
   },
   "auth": {
@@ -383,6 +399,14 @@
               "schema": { "$ref": "#/backend/entities/MarketplaceReview" },
               "description": "Stores reviews for products in the marketplace."
           }
+      },
+      {
+        "path": "/notifications/{notificationId}",
+        "definition": {
+          "entityName": "Notification",
+          "schema": { "$ref": "#/backend/entities/Notification" },
+          "description": "Stores user notifications for various events."
+        }
       }
     ],
     "reasoning": "This Firestore structure is designed to manage user authentication, profiles and videos using Firebase, focusing on replacing the existing Devbase user management system with Firebase Auth and Firestore. It prioritizes Authorization Independence by avoiding hierarchical `get()` calls in security rules. The `users` collection stores user profiles, with the document ID matching the Firebase Auth `uid` (Solana wallet address), ensuring direct access and simplifying security rules based on user ownership. The `videos` collection stores all video data, with `artistId` linking back to a user. All data in `users` and `videos` collections have the same security requirements. The structure enables secure `list` operations (QAPs) by storing user and video data directly in their respective collections, avoiding the need to filter based on parent document data.  Specifically, this structure avoids hierarchical dependencies, enabling atomic operations. Roles are stored directly in the database (DBAC), relying solely on `request.auth.uid` for authorization."

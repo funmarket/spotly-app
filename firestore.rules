@@ -209,5 +209,18 @@ service cloud.firestore {
         allow create: if isSignedIn() && get(/databases/$(database)/documents/marketplace_orders/$(request.resource.data.orderId)).data.buyerId == request.auth.uid;
         allow update, delete: if isOwner(resource.data.buyerId) || isAdmin();
     }
+
+    // ----------------------------------------------------------------------
+    // Notification Rules
+    // ----------------------------------------------------------------------
+
+    match /notifications/{notificationId} {
+      // Users can only read, update (mark as read), or delete their own notifications.
+      allow read, update, delete: if isSignedIn() && isOwner(resource.data.recipientWallet);
+      
+      // Notifications are created by backend Cloud Functions, so clients cannot create them directly.
+      // However, allowing create if the recipient is the one creating it can be a fallback.
+      allow create: if isSignedIn() && isOwner(request.resource.data.recipientWallet);
+    }
   }
 }
