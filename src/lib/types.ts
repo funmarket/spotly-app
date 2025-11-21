@@ -15,6 +15,7 @@ export interface User {
 }
 
 export interface Video {
+  id?: string;
   videoId: string;
   artistId: string;
   videoUrl: string;
@@ -50,9 +51,14 @@ export interface GossipPost {
   content: string;
   commentsCount: number;
   createdAt: Timestamp;
+  imageUrl?: string;
+  category?: string;
+  avgRating?: number;
+  ratingCount?: number;
 }
 
 export interface GossipComment {
+  id?: string;
   postId: string;
   authorId: string;
   content: string;
@@ -71,6 +77,7 @@ export interface GossipUserFollow {
 }
 
 export interface GossipMessage {
+  id?: string;
   fromId: string;
   toId: string;
   content: string;
