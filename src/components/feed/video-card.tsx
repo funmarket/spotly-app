@@ -77,151 +77,151 @@ export function VideoCard({ video, onVote, onFavorite, guestVoteCount, onGuestVo
   }
   
   const handleTip = async (amount: number) => {
-    if (!userWallet || !wallet.publicKey || !wallet.sendTransaction) {
-      toast({ title: 'Please connect your wallet to tip artists.', variant: 'destructive' });
-      return;
+    if (!wallet.publicKey || !wallet.signAndSendTransaction) {
+        toast({ title: "Please connect your wallet to tip.", variant: "destructive" });
+        return;
     }
     setIsSubmitting(true);
+    const FUNCTIONS_BASE_URL = "https://us-central1-studio-8433025498-13bb2.cloudfunctions.net";
     try {
-      // 1. Call backend to get unsigned transaction
-      const createResponse = await fetch("https://us-central1-studio-8433025498-13bb2.cloudfunctions.net/createTipTransaction", {
-        method: "POST",
-        mode: 'cors',
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          fromWallet: userWallet,
-          toWallet: video.user.walletAddress,
-          amountSol: amount,
-          videoId: video.id,
-        }),
-      });
-
-      if (!createResponse.ok) throw new Error('Failed to create tip transaction.');
-      const { tipId, txBase64 } = await createResponse.json();
-      
-      // 2. Deserialize, sign, and send transaction
-      const tx = Transaction.from(Buffer.from(txBase64, "base64"));
-      const connection = new Connection("https://api.mainnet-beta.solana.com", "confirmed");
-      const signature = await wallet.sendTransaction(tx, connection);
-
-      // 3. Confirm with backend
-      await fetch("https://us-central1-studio-8433025498-13bb2.cloudfunctions.net/confirmTip", {
-         method: "POST",
-         mode: 'cors',
-         headers: { "Content-Type": "application/json" },
-         body: JSON.stringify({ tipId, txSignature: signature }),
-      });
-  
-      toast({ title: 'Tip sent!', description: `You sent ${amount} SOL to ${video.user.username}` });
-    } catch (error: any) {
-      console.error(error);
-      toast({ title: 'Tip Failed', description: error.message || 'The transaction could not be completed.', variant: 'destructive' });
-    } finally {
-      setIsSubmitting(false);
-      setTipOpen(false);
-    }
-  };
-  
-  const handleBook = async (payload: { date: string; time: string; budget: number; notes: string; }) => {
-    if (!userWallet || !wallet.publicKey || !wallet.sendTransaction) {
-      toast({ title: 'Please connect your wallet to book artists.', variant: 'destructive' });
-      return;
-    }
-    
-    setIsSubmitting(true);
-    try {
-      // 1. Call backend to create records and get transaction
-      const createResponse = await fetch("https://us-central1-studio-8433025498-13bb2.cloudfunctions.net/createBookingEscrowTransaction", {
-        method: "POST",
-        mode: 'cors',
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          businessWallet: userWallet,
-          artistWallet: video.user.walletAddress,
-          videoId: video.id,
-          budgetSol: payload.budget,
-          date: payload.date,
-          time: payload.time,
-          details: payload.notes,
-        }),
-      });
-
-      if (!createResponse.ok) throw new Error('Failed to create booking transaction.');
-      const { bookingId, escrowId, txBase64 } = await createResponse.json();
-
-      // 2. Deserialize, sign, and send transaction to fund escrow
-      const tx = Transaction.from(Buffer.from(txBase64, "base64"));
-      const connection = new Connection("https://api.mainnet-beta.solana.com", "confirmed");
-      const signature = await wallet.sendTransaction(tx, connection);
-
-      // 3. Confirm with backend
-      await fetch("https://us-central1-studio-8433025498-13bb2.cloudfunctions.net/confirmBookingEscrow", {
-        method: "POST",
-        mode: 'cors',
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ bookingId, escrowId, txSignature: signature }),
-      });
-
-      toast({ title: 'Booking Request Sent!', description: `Your request has been sent to ${video.user.username}` });
-    } catch (error: any) {
-       console.error(error);
-      toast({ title: 'Booking Failed', description: error.message || 'The transaction could not be completed.', variant: 'destructive' });
-    } finally {
-      setIsSubmitting(false);
-      setBookOpen(false);
-    }
-  };
-  
-  const handleAdopt = async (payload: { tier: string; amount: number; recurring: boolean; message: string; }) => {
-    if (!userWallet || !wallet.publicKey || !wallet.sendTransaction) {
-      toast({ title: 'Please connect your wallet to adopt artists.', variant: 'destructive' });
-      return;
-    }
-    
-    setIsSubmitting(true);
-    try {
-       // 1. Call backend to create records and get transaction
-        const createResponse = await fetch("https://us-central1-studio-8433025498-13bb2.cloudfunctions.net/createAdoptionEscrowTransaction", {
-          method: "POST",
-          mode: 'cors',
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            businessWallet: userWallet,
-            artistWallet: video.user.walletAddress,
-            videoId: video.id,
-            amountSol: payload.amount,
-            tier: payload.tier,
-            recurring: payload.recurring,
-            message: payload.message
-          }),
-        });
-
-        if (!createResponse.ok) throw new Error('Failed to create adoption transaction.');
-        const { adoptionId, escrowId, txBase64 } = await createResponse.json();
-        
-        // 2. Deserialize, sign, and send transaction
-        const tx = Transaction.from(Buffer.from(txBase64, "base64"));
-        const connection = new Connection("https://api.mainnet-beta.solana.com", "confirmed");
-        const signature = await wallet.sendTransaction(tx, connection);
-
-        // 3. Confirm with backend
-        await fetch("https://us-central1-studio-8433025498-13bb2.cloudfunctions.net/confirmAdoptionEscrow", {
+        const res = await fetch(`${FUNCTIONS_BASE_URL}/createTipTransaction`, {
             method: "POST",
             mode: 'cors',
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ adoptionId, escrowId, txSignature: signature }),
+            body: JSON.stringify({
+                fromWallet: wallet.publicKey.toString(),
+                toWallet: video.user.walletAddress,
+                amountSol: amount,
+                videoId: video.id,
+            }),
         });
 
-        toast({ title: 'Adoption Confirmed!', description: `You are now sponsoring ${video.user.username}` });
+        if (!res.ok) {
+            throw new Error(`Server error: ${await res.text()}`);
+        }
+        const { tipId, txBase64 } = await res.json();
+        const tx = Transaction.from(Buffer.from(txBase64, "base64"));
+        
+        const connection = new Connection("https://api.mainnet-beta.solana.com", "confirmed");
+        const signature = await wallet.sendTransaction(tx, connection);
 
-    } catch (error: any) {
-        console.error(error);
-        toast({ title: 'Adoption Failed', description: error.message || 'The transaction could not be completed.', variant: 'destructive' });
+        await fetch(`${FUNCTIONS_BASE_URL}/confirmTip`, {
+            method: "POST",
+            mode: 'cors',
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ tipId, txSignature: signature }),
+        });
+
+        toast({ title: 'Tip sent!', description: `You sent ${amount} SOL to ${video.user.username}` });
+    } catch (err: any) {
+        console.error("Tip failed:", err);
+        toast({ title: "Tip Failed", description: err.message || "Could not complete the tip transaction.", variant: "destructive" });
+    } finally {
+        setIsSubmitting(false);
+        setTipOpen(false);
+    }
+};
+
+const handleBook = async (payload: { date: string; time: string; budget: number; notes: string; }) => {
+    if (!wallet.publicKey || !wallet.signAndSendTransaction) {
+        toast({ title: "Please connect your wallet to book.", variant: "destructive" });
+        return;
+    }
+    setIsSubmitting(true);
+    const FUNCTIONS_BASE_URL = "https://us-central1-studio-8433025498-13bb2.cloudfunctions.net";
+    try {
+        const res = await fetch(`${FUNCTIONS_BASE_URL}/createBookingEscrowTransaction`, {
+            method: "POST",
+            mode: 'cors',
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                artistWallet: video.user.walletAddress,
+                businessWallet: wallet.publicKey.toString(),
+                videoId: video.id,
+                budgetSol: payload.budget,
+                date: payload.date,
+                time: payload.time,
+                details: payload.notes,
+            }),
+        });
+        if (!res.ok) throw new Error(await res.text());
+
+        const { bookingId, escrowId, txBase64 } = await res.json();
+        const tx = Transaction.from(Buffer.from(txBase64, "base64"));
+
+        const connection = new Connection("https://api.mainnet-beta.solana.com", "confirmed");
+        const signature = await wallet.sendTransaction(tx, connection);
+
+        await fetch(`${FUNCTIONS_BASE_URL}/confirmBookingEscrow`, {
+            method: "POST",
+            mode: 'cors',
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                bookingId,
+                escrowId,
+                txSignature: signature
+            }),
+        });
+        toast({ title: 'Booking Request Sent!', description: `Your request has been sent to ${video.user.username}` });
+    } catch (err: any) {
+        console.error("Booking failed:", err);
+        toast({ title: "Booking Failed", description: err.message || "Could not complete the booking transaction.", variant: "destructive" });
+    } finally {
+        setIsSubmitting(false);
+        setBookOpen(false);
+    }
+};
+
+const handleAdopt = async (payload: { tier: string; amount: number; recurring: boolean; message: string; }) => {
+    if (!wallet.publicKey || !wallet.signAndSendTransaction) {
+        toast({ title: "Please connect your wallet to adopt.", variant: "destructive" });
+        return;
+    }
+    setIsSubmitting(true);
+    const FUNCTIONS_BASE_URL = "https://us-central1-studio-8433025498-13bb2.cloudfunctions.net";
+    try {
+        const res = await fetch(`${FUNCTIONS_BASE_URL}/createAdoptionEscrowTransaction`, {
+            method: "POST",
+            mode: 'cors',
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                artistWallet: video.user.walletAddress,
+                businessWallet: wallet.publicKey.toString(),
+                videoId: video.id,
+                amountSol: payload.amount,
+                tier: payload.tier,
+                recurring: payload.recurring,
+                message: payload.message,
+            }),
+        });
+
+        if (!res.ok) throw new Error(await res.text());
+
+        const { adoptionId, escrowId, txBase64 } = await res.json();
+        const tx = Transaction.from(Buffer.from(txBase64, "base64"));
+        
+        const connection = new Connection("https://api.mainnet-beta.solana.com", "confirmed");
+        const signature = await wallet.sendTransaction(tx, connection);
+
+        await fetch(`${FUNCTIONS_BASE_URL}/confirmAdoptionEscrow`, {
+            method: "POST",
+            mode: 'cors',
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+                adoptionId,
+                escrowId,
+                txSignature: signature,
+            }),
+        });
+        toast({ title: 'Adoption Confirmed!', description: `You are now sponsoring ${video.user.username}` });
+    } catch (err: any) {
+        console.error("Adoption failed:", err);
+        toast({ title: "Adoption Failed", description: err.message || "Could not complete the adoption transaction.", variant: "destructive" });
     } finally {
         setIsSubmitting(false);
         setAdoptOpen(false);
     }
-  };
+};
 
   const handleFavoriteClick = () => {
     if (!userWallet) {
