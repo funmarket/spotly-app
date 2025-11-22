@@ -36,14 +36,25 @@ function ProfileVideos({ userId, canEdit }: { userId: string, canEdit: boolean }
 
   const videosQuery = useMemoFirebase(() => {
     if (!firestore) return null;
+    // Removed orderBy to prevent index error. Sorting will be done on the client.
     return query(
       collection(firestore, 'videos'),
-      where('artistId', '==', userId),
-      orderBy('createdAt', 'desc')
+      where('artistId', '==', userId)
     );
   }, [firestore, userId]);
 
-  const { data: videos, isLoading } = useCollection<Video>(videosQuery);
+  const { data: unsortedVideos, isLoading } = useCollection<Video>(videosQuery);
+
+  const videos = useMemo(() => {
+    if (!unsortedVideos) return null;
+    // Sort videos by creation date, newest first.
+    return [...unsortedVideos].sort((a, b) => {
+        const dateA = a.createdAt as any;
+        const dateB = b.createdAt as any;
+        return dateB.seconds - dateA.seconds;
+    });
+  }, [unsortedVideos]);
+
 
   const handleDeleteClick = (e: React.MouseEvent, video: Video) => {
     e.preventDefault();
