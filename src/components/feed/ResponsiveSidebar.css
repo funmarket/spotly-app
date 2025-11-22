@@ -1,112 +1,85 @@
-/* ============================================
-   RIZZUP — SIDEBAR STYLING
-   ============================================ */
-
-/* Main container for the sidebars */
-.sidebar-wrapper {
+/* === RIGHT SIDEBAR (RizzUp Style) === */
+.rzu-sidebar {
   position: absolute;
-  right: 12px;
-  top: 50%;
-  transform: translateY(-50%);
-  z-index: 20; /* Ensure it's above video but below modals */
+  top: 72px;               /* 5px under top menu bar */
+  right: 15px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  z-index: 999;
 }
 
-/* Individual button styling */
-.sidebar-button {
-  width: 54px;
-  height: 54px;
-  padding: 6px;
-  margin-bottom: 10px;
-  border-radius: 14px !important;
-  background: rgba(0, 0, 0, 0.65) !important;
+/* UNIVERSAL BUTTON STYLE */
+.rzu-btn {
+  padding: 6px 10px;
+  border-radius: 14px;
+  background: rgba(0, 0, 0, 0.65);
+  border: 1px solid #00ff80;
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
-  transition: all 0.15s ease;
+  min-width: fit-content;              /* IMPORTANT: shrink to label width */
   cursor: pointer;
-  color: white;
+  transition: 0.15s ease;
 }
 
-.sidebar-button:last-child {
-  margin-bottom: 0;
+.rzu-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 0 8px #00ff80;
 }
 
-.sidebar-button:hover {
-  transform: scale(1.05);
-}
-
-.sidebar-button:active {
-  transform: scale(0.97);
-}
-
-/* Base button from RizzUp */
-.rzu-btn {
-  border: 1px solid rgba(255, 255, 255, 0.4);
-}
-
-/* Up/Top Button */
-.rzu-up {
-  border: 1px solid #00ff66 !important;
-  box-shadow: 0 0 8px rgba(0, 255, 128, 0.25);
-}
-
-/* Flop Button */
-.rzu-flop {
-  border: 1px solid #ff4444 !important;
-  box-shadow: 0 0 8px rgba(255, 68, 68, 0.25);
-}
-
-/* General button styling for left/right nav */
-.slick-button {
-  border-radius: 14px !important;
-  background: rgba(0, 0, 0, 0.65) !important;
-  border: 1px solid #00ff66 !important;
-  box-shadow: 0 0 8px rgba(0, 255, 128, 0.25);
-  color: #00ff66;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-/* Icon inside the button */
+/* ICON BASE SIZE */
 .rzu-icon {
-  width: 22px;
-  height: 22px;
-  margin-bottom: 4px;
+  width: 20px;
+  height: 20px;
+  margin-bottom: 2px;
 }
 
-/* Label text below icon */
+/* LABEL */
 .rzu-label {
   font-size: 10px;
-  font-weight: 600;
   color: white;
-  text-shadow: 0 0 4px rgba(0, 0, 0, 0.7);
+  margin-top: 2px;
 }
 
-/* Mobile adjustments */
+/* === LEFT “UP” BUTTON (mirrors Down) === */
+.rzu-left-up {
+  position: absolute;
+  left: 15px;
+  top: 72px;        /* aligns with first sidebar button */
+  padding: 6px 10px;
+  border-radius: 14px;
+  background: rgba(0,0,0,0.65);
+  border: 1px solid #00ff80;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  cursor: pointer;
+}
+
+/* WHITE ARROW */
+.rzu-arrow {
+  width: 20px;
+  height: 20px;
+  stroke: white;
+}
+
+/* === MOBILE === */
 @media (max-width: 768px) {
-  .sidebar-wrapper {
-    top: 45%; /* Adjust vertical position to avoid bottom navbar */
-    right: 8px;
+  .rzu-sidebar {
+    right: 10px;
+    gap: 8px;
+    top: 60px;
   }
-  .sidebar-button {
-    width: 48px;
-    height: 48px;
-    margin-bottom: 8px;
+  .rzu-btn,
+  .rzu-left-up {
+    padding: 5px 8px;
   }
   .rzu-icon {
-    width: 20px;
-    height: 20px;
+    width: 18px;
+    height: 18px;
   }
   .rzu-label {
-    font-size: 9px;
-  }
-  .slick-button {
-    width: 48px;
-    height: 48px;
-  }
-  .absolute.left-4 {
-      left: 0.5rem; /* 8px */
+    font-size: 8px;
   }
 }
