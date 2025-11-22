@@ -24,7 +24,14 @@ export async function sendSol({
     throw new Error("Wallet does not support sendTransaction");
   }
 
-  const tx = new Transaction().add(
+  // Manually get the latest blockhash
+  const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash();
+
+  const tx = new Transaction({
+    recentBlockhash: blockhash,
+    lastValidBlockHeight: lastValidBlockHeight,
+    feePayer: from,
+  }).add(
     SystemProgram.transfer({
       fromPubkey: from,
       toPubkey: to,
@@ -34,7 +41,11 @@ export async function sendSol({
 
   const signature = await wallet.sendTransaction(tx, connection);
 
-  await connection.confirmTransaction(signature, "confirmed");
+  await connection.confirmTransaction({
+    signature,
+    blockhash,
+    lastValidBlockHeight
+  }, "confirmed");
 
   return signature;
 }
