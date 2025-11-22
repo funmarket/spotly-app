@@ -38,8 +38,8 @@ function TopCategoryMenu({ activeFeedTab, setActiveFeedTab }: { activeFeedTab: s
   };
 
   return (
-    <div className="fixed top-0 left-0 right-0 z-50 bg-black/80 backdrop-blur-md border-b border-white/10">
-      <div className="container mx-auto h-14 flex items-center justify-between gap-2 overflow-x-auto scrollbar-hide">
+    <div className="fixed top-0 left-0 right-0 z-50 bg-black/80 backdrop-blur-md border-b border-white/10 h-14">
+      <div className="container mx-auto h-full flex items-center justify-between gap-2 overflow-x-auto scrollbar-hide">
         <div className="text-xl font-bold text-white font-headline">SPOTLY</div>
          <div className="flex items-center gap-1 sm:gap-2 flex-shrink-0">
           {["music", "acting", "creator", "rising"].map(cat => (

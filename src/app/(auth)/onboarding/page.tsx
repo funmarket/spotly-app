@@ -63,6 +63,8 @@ function WalletConnectPrompt({ accountType, onBack }: { accountType: string, onB
         } catch (error) {
           console.error('Error checking profile:', error);
           router.push(`/onboarding/create/${accountType}`);
+        } finally {
+            setIsChecking(false);
         }
       }
     };
