@@ -76,7 +76,7 @@ export function VideoCard({ video, onVote, onFavorite, guestVoteCount, onGuestVo
     router.push(`/profile/${video.user.walletAddress}`);
   }
   
-  const handleTip = async (amount: number) => {
+const handleTip = async (amount: number) => {
     if (!wallet.publicKey || !wallet.sendTransaction) {
         toast({ title: "Please connect your wallet to tip.", variant: "destructive" });
         return;
@@ -130,39 +130,39 @@ const handleBook = async (payload: { date: string; time: string; budget: number;
     setIsSubmitting(true);
     const FUNCTIONS_BASE_URL = "https://us-central1-studio-8433025498-13bb2.cloudfunctions.net";
     try {
-        const res = await fetch(`${FUNCTIONS_BASE_URL}/createBookingEscrowTransaction`, {
-            method: "POST",
-            mode: 'cors',
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-                artistWallet: video.user.walletAddress,
-                businessWallet: wallet.publicKey.toString(),
-                videoId: video.id,
-                budgetSol: payload.budget,
-                date: payload.date,
-                time: payload.time,
-                details: payload.notes,
-            }),
-        });
-        if (!res.ok) throw new Error(await res.text());
+      const createResponse = await fetch(`${FUNCTIONS_BASE_URL}/createBookingEscrowTransaction`, {
+        method: "POST",
+        mode: 'cors',
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+            artistWallet: video.user.walletAddress,
+            businessWallet: wallet.publicKey.toString(),
+            videoId: video.id,
+            budgetSol: payload.budget,
+            date: payload.date,
+            time: payload.time,
+            details: payload.notes,
+        }),
+      });
+      if (!createResponse.ok) throw new Error(await createResponse.text());
 
-        const { bookingId, escrowId, txBase64 } = await res.json();
-        const tx = Transaction.from(Buffer.from(txBase64, "base64"));
+      const { bookingId, escrowId, txBase64 } = await createResponse.json();
+      const tx = Transaction.from(Buffer.from(txBase64, "base64"));
 
-        const connection = new Connection("https://api.mainnet-beta.solana.com", "confirmed");
-        const signature = await wallet.sendTransaction(tx, connection);
+      const connection = new Connection("https://api.mainnet-beta.solana.com", "confirmed");
+      const signature = await wallet.sendTransaction(tx, connection);
 
-        await fetch(`${FUNCTIONS_BASE_URL}/confirmBookingEscrow`, {
-            method: "POST",
-            mode: 'cors',
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-                bookingId,
-                escrowId,
-                txSignature: signature
-            }),
-        });
-        toast({ title: 'Booking Request Sent!', description: `Your request has been sent to ${video.user.username}` });
+      await fetch(`${FUNCTIONS_BASE_URL}/confirmBookingEscrow`, {
+          method: "POST",
+          mode: 'cors',
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+              bookingId,
+              escrowId,
+              txSignature: signature
+          }),
+      });
+      toast({ title: 'Booking Request Sent!', description: `Your request has been sent to ${video.user.username}` });
     } catch (err: any) {
         console.error("Booking failed:", err);
         toast({ title: "Booking Failed", description: err.message || "Could not complete the booking transaction.", variant: "destructive" });
