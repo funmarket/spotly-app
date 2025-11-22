@@ -1,65 +1,79 @@
 // supabase/functions/adopt/index.ts
-import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
-import { corsHeaders, sendFromVault } from "../_shared/solana.ts";
+import { sendSolFromVault } from "../_shared/solanaClient.ts";
+import { getServiceClient } from "../_shared/supabaseClient.ts";
 
-serve(async (req: Request): Promise<Response> => {
-  if (req.method === "OPTIONS") {
-    return new Response("ok", { headers: corsHeaders });
-  }
-
+Deno.serve(async (req) => {
   if (req.method !== "POST") {
-    return new Response("Method not allowed", { status: 405, headers: corsHeaders });
+    return new Response("Method not allowed", { status: 405 });
   }
 
   try {
-    const body = await req.json();
-    const {
-      artistWallet,
-      amountSol,
-      tier,             // "bronze" | "silver" | "gold"
-      recurring,        // boolean
-      message,
-      businessWallet,
-      videoId,
-      fromUserId,
-    } = body ?? {};
+    const supabase = getServiceClient(req);
 
-    if (!artistWallet || !amountSol) {
-      return new Response(
-        JSON.stringify({ error: "artistWallet and amountSol are required" }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
-      );
+    const { data: { user }, error: userError } = await supabase.auth.getUser();
+    if (userError || !user) {
+      return new Response("Unauthorized", { status: 401 });
     }
 
-    const result = await sendFromVault({
+    const body = await req.json().catch(() => null);
+    if (!body) {
+      return new Response("Invalid JSON body", { status: 400 });
+    }
+
+    const {
+      artistWallet,
+      videoId,
+      tier,
+      amountSol,
+      monthly,
+      message,
+    } = body;
+
+    if (!artistWallet || !amountSol) {
+      return new Response("artistWallet and amountSol are required", {
+        status: 400,
+      });
+    }
+
+    // 1) Send SOL from vault to artist
+    const signature = await sendSolFromVault({
       to: artistWallet,
       amountSol: Number(amountSol),
     });
 
-    // TODO: insert into `adoptions` + `payments` tables in Supabase.
-    // If `recurring === true`, also create a row your cron / scheduler can use.
+    // 2) Record adoption
+    const { data: adoption, error: insertError } = await supabase
+      .from("adoptions")
+      .insert({
+        user_id: user.id,
+        artist_wallet: artistWallet,
+        video_id: videoId ?? null,
+        tier: tier ?? null,
+        amount_sol: Number(amountSol),
+        monthly: Boolean(monthly),
+        message: message ?? null,
+        tx_signature: signature,
+        status: "active",
+      })
+      .select("*")
+      .single();
+
+    if (insertError) {
+      console.error("Failed to insert adoption:", insertError);
+      return new Response("Adoption paid on-chain but failed to save", {
+        status: 500,
+      });
+    }
 
     return new Response(
-      JSON.stringify({
-        ok: true,
-        type: "adopt",
-        txSignature: result.signature,
-        lamports: result.lamports,
-        artistWallet,
-        businessWallet,
-        tier,
-        recurring,
-        message,
-        videoId,
-        fromUserId,
-      }),
-      { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      JSON.stringify({ ok: true, adoption, txSignature: signature }),
+      {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      },
     );
-  } catch (err) {
-    console.error("adopt function error", err);
-    return new Response(
-      JSON.stringify({ error: String(err?.message ?? err) }),
-      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } },
-    );
+  } catch (e) {
+    console.error("adopt function error:", e);
+    return new Response("Internal Server Error", { status: 500 });
   }
 });

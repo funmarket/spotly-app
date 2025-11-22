@@ -1,32 +1,45 @@
 
 'use client';
 import { useState, useRef, useEffect, useCallback } from 'react';
-import type { EnrichedVideo, User } from '@/lib/types';
+import type { EnrichedVideo, User, Favorite } from '@/lib/types';
 import { VideoCard } from './video-card';
 import { Button } from '@/components/ui/button';
 import { Search, Bell, Home, Compass, Upload, MessageCircle, User as UserIcon, ArrowUp, ArrowDown } from 'lucide-react';
 import { useRouter, usePathname } from 'next/navigation';
 import Link from 'next/link';
 import { useDevapp } from '@/hooks/use-devapp';
-import { collection, doc, writeBatch, increment, serverTimestamp, query, where, getDocs, limit, deleteDoc, addDoc } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
-import { useCollection, useMemoFirebase, errorEmitter, FirestorePermissionError } from '@/firebase';
 
 function TopCategoryMenu({ activeFeedTab, setActiveFeedTab }: { activeFeedTab: string, setActiveFeedTab: (tab: string) => void }) {
-  const { userWallet, firestore } = useDevapp();
+  const { user: authUser, supabase } = useDevapp();
   const router = useRouter();
+  const [unreadCount, setUnreadCount] = useState(0);
 
-  const notificationsQuery = useMemoFirebase(() => {
-    if (!userWallet || !firestore) return null;
-    return query(
-      collection(firestore, 'notifications'),
-      where('recipientWallet', '==', userWallet),
-      where('read', '==', false)
-    );
-  }, [userWallet, firestore]);
+  useEffect(() => {
+    if (authUser) {
+      const fetchNotifications = async () => {
+        const { count } = await supabase
+          .from('notifications')
+          .select('*', { count: 'exact', head: true })
+          .eq('recipient_id', authUser.id)
+          .eq('read', false);
+        setUnreadCount(count || 0);
+      };
+      fetchNotifications();
 
-  const { data: notifications } = useCollection(notificationsQuery);
-  const unreadCount = notifications?.length || 0;
+      const channel = supabase.channel('public:notifications')
+        .on('postgres_changes', { event: '*', schema: 'public', table: 'notifications', filter: `recipient_id=eq.${authUser.id}` }, 
+        (payload) => {
+            fetchNotifications();
+        })
+        .subscribe();
+
+       return () => {
+           supabase.removeChannel(channel);
+       }
+    }
+  }, [authUser, supabase]);
+  
 
   const getTabLabel = (tab: string) => {
     switch (tab) {
@@ -116,25 +129,39 @@ const BottomNavBar = () => {
 
 export function VideoFeed({ videos, activeFeedTab, setActiveFeedTab, isLoading, currentUser }: { videos: EnrichedVideo[], activeFeedTab: string, setActiveFeedTab: (tab: string) => void, isLoading: boolean, currentUser: User | null }) {
   const router = useRouter();
-  const { firestore, userWallet } = useDevapp();
+  const { supabase, user: authUser } = useDevapp();
   const { toast } = useToast();
   const [guestVoteCount, setGuestVoteCount] = useState(0);
   const [voteLocked, setVoteLocked] = useState(false);
   const [currentVideos, setCurrentVideos] = useState(videos);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [touchStartY, setTouchStartY] = useState(0);
+  
+  const [favorites, setFavorites] = useState<string[]>([]);
 
   useEffect(() => {
     setCurrentVideos(videos);
     setCurrentIndex(0); // Reset index when videos change
   }, [videos]);
+  
+  // Fetch user's favorites
+  useEffect(() => {
+    if (authUser) {
+      supabase.from('favorites').select('item_id').eq('user_id', authUser.id).then(({ data }) => {
+        if (data) {
+          setFavorites(data.map(fav => fav.item_id));
+        }
+      });
+    }
+  }, [authUser, supabase]);
+
 
   useEffect(() => {
-    if (!userWallet) { // Only track for guests
+    if (!authUser) { // Only track for guests
         const storedCount = localStorage.getItem('guestVoteCount');
         setGuestVoteCount(storedCount ? parseInt(storedCount) : 0);
     }
-  }, [userWallet]);
+  }, [authUser]);
 
   const handleGuestVote = () => {
     const newCount = guestVoteCount + 1;
@@ -142,10 +169,10 @@ export function VideoFeed({ videos, activeFeedTab, setActiveFeedTab, isLoading, 
     setGuestVoteCount(newCount);
   }
 
-  const handleVoteInternal = (isTop: boolean) => {
-    if (!currentVideos[currentIndex] || !firestore) return;
+  const handleVoteInternal = async (isTop: boolean) => {
+    if (!currentVideos[currentIndex] || !supabase) return;
 
-    if (!userWallet) {
+    if (!authUser) {
         if (guestVoteCount >= 10) {
             router.push('/onboarding');
             return;
@@ -154,48 +181,36 @@ export function VideoFeed({ videos, activeFeedTab, setActiveFeedTab, isLoading, 
     }
 
     const video = currentVideos[currentIndex];
-    const field = isTop ? 'topCount' : 'flopCount';
+    const fieldToIncrement = isTop ? 'top_count' : 'flop_count';
     const scoreChange = isTop ? 1 : -1;
 
     // Optimistic UI Update
     setCurrentVideos(prev => prev.map((v, i) =>
-        i === currentIndex ? { ...v, [field]: (v[field] || 0) + 1, rankingScore: (v.rankingScore || 0) + scoreChange } : v
+        i === currentIndex ? { ...v, [fieldToIncrement]: (v[fieldToIncrement as keyof EnrichedVideo] as number || 0) + 1, ranking_score: (v.rankingScore || 0) + scoreChange } : v
     ));
+    
+    // DB update
+    const { error } = await supabase.rpc('update_video_vote', {
+        video_id: video.id,
+        field_to_increment: fieldToIncrement,
+        score_change: scoreChange
+    });
 
-    const batch = writeBatch(firestore);
-    const videoRef = doc(firestore, 'videos', video.id);
-
-    const videoUpdateData = {
-        [field]: increment(1),
-        rankingScore: increment(scoreChange)
-    };
-    batch.update(videoRef, videoUpdateData);
-
-    if (userWallet) {
-        const userVoteRef = doc(collection(firestore, 'user_votes'));
-        const userVoteData = {
-            userWallet,
-            videoId: video.id,
-            category: video.videoCategory,
-            isPositive: isTop,
-            createdAt: serverTimestamp()
-        };
-        batch.set(userVoteRef, userVoteData);
+    if (error) {
+        // Revert Optimistic Update
+        toast({title: 'Vote failed', description: 'Your vote could not be saved.', variant: 'destructive'});
+        setCurrentVideos(prev => prev.map((v, i) =>
+            i === currentIndex ? { ...v, [fieldToIncrement]: ((v[fieldToIncrement as keyof EnrichedVideo] as number) || 1) - 1, ranking_score: (v.rankingScore || 0) - scoreChange } : v
+        ));
     }
     
-    batch.commit().catch(error => {
-      // Revert Optimistic Update on failure
-      setCurrentVideos(prev => prev.map((v, i) =>
-          i === currentIndex ? { ...v, [field]: (v[field] || 1) - 1, rankingScore: (v.rankingScore || 0) - scoreChange } : v
-      ));
-
-      const permissionError = new FirestorePermissionError({
-        path: videoRef.path, // Assuming this is the primary operation
-        operation: 'write', // 'write' covers updates and sets
-        requestResourceData: { videoUpdate: videoUpdateData }
-      });
-      errorEmitter.emit('permission-error', permissionError);
-    });
+    if (authUser) {
+        await supabase.from('user_votes').insert({
+            user_id: authUser.id,
+            video_id: video.id,
+            is_positive: isTop,
+        });
+    }
 
     if (!isTop) {
         setTimeout(() => nextVideo(), 300);
@@ -266,46 +281,38 @@ const onVote = (isTop: boolean) => {
     }, [nextVideo, prevVideo, touchStartY]);
 
 
-   const handleFavorite = useCallback((videoId: string) => {
-    if (!userWallet || !firestore) {
+   const handleFavorite = useCallback(async (videoId: string) => {
+    if (!authUser || !supabase) {
       toast({ title: "Please log in to save favorites.", variant: "destructive" });
       return;
     }
     
-    const favQuery = query(collection(firestore, 'favorites'), where('userId', '==', userWallet), where('itemId', '==', videoId), limit(1));
-    
-    getDocs(favQuery).then(existing => {
-      if (existing.empty) {
-        const favoriteData = {
-          userId: userWallet,
-          itemId: videoId,
-          itemType: 'video',
-          createdAt: serverTimestamp()
-        };
-        addDoc(collection(firestore, 'favorites'), favoriteData)
-          .then(() => toast({ title: "Added to favorites!" }))
-          .catch(error => {
-              const permissionError = new FirestorePermissionError({
-                path: 'favorites',
-                operation: 'create',
-                requestResourceData: favoriteData
-              });
-              errorEmitter.emit('permission-error', permissionError);
-          });
+    const isFavorited = favorites.includes(videoId);
+
+    if (isFavorited) {
+      // Optimistic removal
+      setFavorites(current => current.filter(id => id !== videoId));
+      const { error } = await supabase.from('favorites').delete().match({ user_id: authUser.id, item_id: videoId });
+      if (error) {
+        toast({ title: "Failed to unfavorite", variant: 'destructive'});
+        // Revert
+        setFavorites(current => [...current, videoId]);
       } else {
-        const docRef = doc(firestore, 'favorites', existing.docs[0].id);
-        deleteDoc(docRef)
-          .then(() => toast({ title: "Removed from favorites." }))
-          .catch(error => {
-             const permissionError = new FirestorePermissionError({
-                path: docRef.path,
-                operation: 'delete',
-              });
-              errorEmitter.emit('permission-error', permissionError);
-          });
+        toast({ title: "Removed from favorites." });
       }
-    });
-  }, [firestore, userWallet, toast]);
+    } else {
+      // Optimistic add
+      setFavorites(current => [...current, videoId]);
+      const { error } = await supabase.from('favorites').insert({ user_id: authUser.id, item_id: videoId, item_type: 'video' });
+      if (error) {
+        toast({ title: "Failed to favorite", variant: 'destructive'});
+        // Revert
+        setFavorites(current => current.filter(id => id !== videoId));
+      } else {
+        toast({ title: "Added to favorites!" });
+      }
+    }
+  }, [supabase, authUser, toast, favorites]);
   
   const currentVideo = currentVideos[currentIndex];
 
@@ -342,6 +349,7 @@ const onVote = (isTop: boolean) => {
                     prevVideo={prevVideo}
                     voteLocked={voteLocked}
                     isPlaying={true}
+                    isFavorited={favorites.includes(currentVideo.id)}
                 />
             )}
         </div>
@@ -349,5 +357,3 @@ const onVote = (isTop: boolean) => {
     </div>
   );
 }
-
-    

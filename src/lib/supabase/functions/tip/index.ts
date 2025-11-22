@@ -1,39 +1,63 @@
-import { serve } from "https://deno.land/std@0.192.0/http/server.ts";
-import { Connection, Keypair, LAMPORTS_PER_SOL, PublicKey, SystemProgram, Transaction } from "npm:@solana/web3.js";
+// supabase/functions/tip/index.ts
+import { sendSolFromVault } from "../_shared/solanaClient.ts";
+import { getServiceClient } from "../_shared/supabaseClient.ts";
 
-serve(async (req) => {
+Deno.serve(async (req) => {
+  if (req.method !== "POST") {
+    return new Response("Method not allowed", { status: 405 });
+  }
+
   try {
-    const { toWallet, amount } = await req.json();
+    const supabase = getServiceClient(req);
 
-    const vaultSecretKey = Deno.env.get("SOLANA_VAULT_SECRET_KEY");
-    const rpc = Deno.env.get("SOLANA_RPC_URL");
-    if (!vaultSecretKey || !rpc)
-      throw new Error("Missing env vars");
+    const { data: { user }, error: userError } = await supabase.auth.getUser();
+    if (userError || !user) {
+      return new Response("Unauthorized", { status: 401 });
+    }
 
-    const secret = Uint8Array.from(JSON.parse(vaultSecretKey));
-    const vault = Keypair.fromSecretKey(secret);
+    const body = await req.json().catch(() => null);
+    if (!body) {
+      return new Response("Invalid JSON body", { status: 400 });
+    }
 
-    const conn = new Connection(rpc);
+    const { amountSol, recipientWallet, videoId, message } = body;
 
-    const tx = new Transaction().add(
-      SystemProgram.transfer({
-        fromPubkey: vault.publicKey,
-        toPubkey: new PublicKey(toWallet),
-        lamports: amount * LAMPORTS_PER_SOL,
-      })
+    if (!amountSol || !recipientWallet) {
+      return new Response("amountSol and recipientWallet are required", {
+        status: 400,
+      });
+    }
+
+    // 1) Send SOL from platform vault to artist
+    const signature = await sendSolFromVault({
+      to: recipientWallet,
+      amountSol: Number(amountSol),
+    });
+
+    // 2) Record tip in DB
+    const { error: insertError } = await supabase.from("tips").insert({
+      user_id: user.id,
+      to_wallet: recipientWallet,
+      amount_sol: Number(amountSol),
+      video_id: videoId ?? null,
+      message: message ?? null,
+      tx_signature: signature,
+    });
+
+    if (insertError) {
+      console.error("Failed to insert tip:", insertError);
+      // still return success because funds were sent on-chain
+    }
+
+    return new Response(
+      JSON.stringify({ ok: true, txSignature: signature }),
+      {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      },
     );
-
-    const block = await conn.getLatestBlockhash();
-    tx.recentBlockhash = block.blockhash;
-    tx.feePayer = vault.publicKey;
-
-    const signed = await vault.signTransaction(tx);
-    const sig = await conn.sendRawTransaction(signed.serialize());
-
-    return new Response(JSON.stringify({ success: true, sig }), { status: 200 });
-
   } catch (e) {
-    return new Response(JSON.stringify({ error: e.message }), { status: 400 });
+    console.error("tip function error:", e);
+    return new Response("Internal Server Error", { status: 500 });
   }
 });
-

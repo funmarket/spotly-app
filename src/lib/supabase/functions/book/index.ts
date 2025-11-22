@@ -1,66 +1,79 @@
 // supabase/functions/book/index.ts
-import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
-import { corsHeaders, sendFromVault } from "../_shared/solana.ts";
+import { sendSolFromVault } from "../_shared/solanaClient.ts";
+import { getServiceClient } from "../_shared/supabaseClient.ts";
 
-serve(async (req: Request): Promise<Response> => {
-  if (req.method === "OPTIONS") {
-    return new Response("ok", { headers: corsHeaders });
-  }
-
+Deno.serve(async (req) => {
   if (req.method !== "POST") {
-    return new Response("Method not allowed", { status: 405, headers: corsHeaders });
+    return new Response("Method not allowed", { status: 405 });
   }
 
   try {
-    const body = await req.json();
-    const {
-      artistWallet,
-      amountSol,
-      eventDate,
-      eventTime,
-      details,
-      businessWallet,
-      videoId,
-      fromUserId,
-    } = body ?? {};
+    const supabase = getServiceClient(req);
 
-    if (!artistWallet || !amountSol) {
-      return new Response(
-        JSON.stringify({ error: "artistWallet and amountSol are required" }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } },
-      );
+    const { data: { user }, error: userError } = await supabase.auth.getUser();
+    if (userError || !user) {
+      return new Response("Unauthorized", { status: 401 });
     }
 
-    // 💰 Simple escrow-style payment from vault to artist.
-    // (Later you can adjust to send to an escrow PDA instead of artist)
-    const result = await sendFromVault({
+    const body = await req.json().catch(() => null);
+    if (!body) {
+      return new Response("Invalid JSON body", { status: 400 });
+    }
+
+    const {
+      artistWallet,
+      videoId,
+      date,
+      time,
+      budgetSol,
+      details,
+    } = body;
+
+    if (!artistWallet || !budgetSol) {
+      return new Response("artistWallet and budgetSol are required", {
+        status: 400,
+      });
+    }
+
+    // 1) Send SOL from vault to artist (you can switch to escrow wallet here)
+    const signature = await sendSolFromVault({
       to: artistWallet,
-      amountSol: Number(amountSol),
+      amountSol: Number(budgetSol),
     });
 
-    // TODO: write "bookings" + "payments" rows into Supabase DB
+    // 2) Create booking record
+    const { data: booking, error: insertError } = await supabase
+      .from("bookings")
+      .insert({
+        user_id: user.id,
+        artist_wallet: artistWallet,
+        video_id: videoId ?? null,
+        date: date ?? null,
+        time: time ?? null,
+        budget_sol: Number(budgetSol),
+        details: details ?? null,
+        tx_signature: signature,
+        status: "paid", // or "escrow_released" etc
+      })
+      .select("*")
+      .single();
+
+    if (insertError) {
+      console.error("Failed to insert booking:", insertError);
+      return new Response("Booking created on-chain but failed to save", {
+        status: 500,
+      });
+    }
 
     return new Response(
-      JSON.stringify({
-        ok: true,
-        type: "book",
-        txSignature: result.signature,
-        lamports: result.lamports,
-        artistWallet,
-        businessWallet,
-        eventDate,
-        eventTime,
-        details,
-        videoId,
-        fromUserId,
-      }),
-      { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      JSON.stringify({ ok: true, booking, txSignature: signature }),
+      {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      },
     );
-  } catch (err) {
-    console.error("book function error", err);
-    return new Response(
-      JSON.stringify({ error: String(err?.message ?? err) }),
-      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } },
-    );
+  } catch (e) {
+    console.error("book function error:", e);
+    return new Response("Internal Server Error", { status: 500 });
   }
 });

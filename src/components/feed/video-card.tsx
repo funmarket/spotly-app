@@ -1,6 +1,6 @@
 
 'use client';
-import { useRef, useState } from 'react';
+import { useRef, useState, useEffect } from 'react';
 import type { EnrichedVideo, User, Favorite } from '@/lib/types';
 import VideoPlayer from './video-player';
 import Link from 'next/link';
@@ -10,22 +10,18 @@ import { useDevapp } from '@/hooks/use-devapp';
 import { useToast } from '@/hooks/use-toast';
 import { useRouter } from 'next/navigation';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '../ui/dialog';
-import { useCollection } from '@/firebase/firestore/use-collection';
-import { collection, query, where, addDoc, serverTimestamp } from 'firebase/firestore';
-import { useMemoFirebase } from '@/firebase';
 import ResponsiveSidebar from './ResponsiveSidebar';
 import LeftUpArrow from './LeftUpArrow';
 import './ResponsiveSidebar.css';
 import { TipModal } from '../modals/TipModal';
 import { BookModal } from '../modals/BookModal';
 import { AdoptModal } from '../modals/AdoptModal';
-import { Connection, PublicKey, Transaction } from '@solana/web3.js';
 import { useWallet } from '@solana/wallet-adapter-react';
 
 
-export function VideoCard({ video, onVote, onFavorite, guestVoteCount, onGuestVote, currentUser, nextVideo, prevVideo, voteLocked, isPlaying }: { video: EnrichedVideo, onVote: (isTop: boolean) => Promise<void>, onFavorite: (videoId:string) => Promise<void>, guestVoteCount: number, onGuestVote: () => void, currentUser: User | null, nextVideo: () => void, prevVideo: () => void, voteLocked: boolean, isPlaying: boolean }) {
+export function VideoCard({ video, onVote, onFavorite, guestVoteCount, onGuestVote, currentUser, nextVideo, prevVideo, voteLocked, isPlaying, isFavorited }: { video: EnrichedVideo, onVote: (isTop: boolean) => Promise<void>, onFavorite: (videoId:string) => Promise<void>, guestVoteCount: number, onGuestVote: () => void, currentUser: User | null, nextVideo: () => void, prevVideo: () => void, voteLocked: boolean, isPlaying: boolean, isFavorited: boolean }) {
   const cardRef = useRef<HTMLDivElement>(null);
-  const { firestore, userWallet } = useDevapp();
+  const { supabase, user: authUser, userWallet } = useDevapp();
   const { toast } = useToast();
   const router = useRouter();
   const wallet = useWallet();
@@ -36,14 +32,6 @@ export function VideoCard({ video, onVote, onFavorite, guestVoteCount, onGuestVo
   const [adoptOpen, setAdoptOpen] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   
-  const favoritesQuery = useMemoFirebase(() => {
-    if (!userWallet || !firestore) return null;
-    return query(collection(firestore, 'favorites'), where('userId', '==', userWallet), where('itemId', '==', video.id));
-  }, [firestore, userWallet, video.id]);
-
-  const { data: favorites } = useCollection<Favorite>(favoritesQuery);
-  const isFavorited = (favorites || []).length > 0;
-
   const getSubRole = (user: User) => {
     if (user.talentSubcategories && user.talentSubcategories.length > 0) {
         const subcategories = typeof user.talentSubcategories === 'string' ? JSON.parse(user.talentSubcategories) : user.talentSubcategories;
@@ -82,35 +70,21 @@ const handleTip = async (amount: number) => {
         return;
     }
     setIsSubmitting(true);
-    const FUNCTIONS_BASE_URL = "https://us-central1-studio-8433025498-13bb2.cloudfunctions.net";
+    
     try {
-        const res = await fetch(`${FUNCTIONS_BASE_URL}/createTipTransaction`, {
-            method: "POST",
-            mode: 'cors',
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-                fromWallet: wallet.publicKey.toString(),
-                toWallet: video.user.walletAddress,
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) throw new Error("Not authenticated");
+
+        const response = await supabase.functions.invoke('tip', {
+            body: {
+                recipientWallet: video.user.walletAddress,
                 amountSol: amount,
                 videoId: video.id,
-            }),
+            }
         });
 
-        if (!res.ok) {
-            throw new Error(`Server error: ${await res.text()}`);
-        }
-        const { tipId, txBase64 } = await res.json();
-        const tx = Transaction.from(Buffer.from(txBase64, "base64"));
-        
-        const connection = new Connection("https://api.mainnet-beta.solana.com", "confirmed");
-        const signature = await wallet.sendTransaction(tx, connection);
-
-        await fetch(`${FUNCTIONS_BASE_URL}/confirmTip`, {
-            method: "POST",
-            mode: 'cors',
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ tipId, txSignature: signature }),
-        });
+        if (response.error) throw new Error(response.error.message);
+        if (!response.data.ok) throw new Error("Function returned an error.");
 
         toast({ title: 'Tip sent!', description: `You sent ${amount} SOL to ${video.user.username}` });
     } catch (err: any) {
@@ -128,41 +102,26 @@ const handleBook = async (payload: { date: string; time: string; budget: number;
         return;
     }
     setIsSubmitting(true);
-    const FUNCTIONS_BASE_URL = "https://us-central1-studio-8433025498-13bb2.cloudfunctions.net";
+    
     try {
-      const createResponse = await fetch(`${FUNCTIONS_BASE_URL}/createBookingEscrowTransaction`, {
-        method: "POST",
-        mode: 'cors',
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-            artistWallet: video.user.walletAddress,
-            businessWallet: wallet.publicKey.toString(),
-            videoId: video.id,
-            budgetSol: payload.budget,
-            date: payload.date,
-            time: payload.time,
-            details: payload.notes,
-        }),
-      });
-      if (!createResponse.ok) throw new Error(await createResponse.text());
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) throw new Error("Not authenticated");
+        
+        const response = await supabase.functions.invoke('book', {
+            body: {
+                artistWallet: video.user.walletAddress,
+                videoId: video.id,
+                date: payload.date,
+                time: payload.time,
+                budgetSol: payload.budget,
+                details: payload.notes,
+            }
+        });
 
-      const { bookingId, escrowId, txBase64 } = await createResponse.json();
-      const tx = Transaction.from(Buffer.from(txBase64, "base64"));
+        if (response.error) throw new Error(response.error.message);
+        if (!response.data.ok) throw new Error("Function returned an error.");
 
-      const connection = new Connection("https://api.mainnet-beta.solana.com", "confirmed");
-      const signature = await wallet.sendTransaction(tx, connection);
-
-      await fetch(`${FUNCTIONS_BASE_URL}/confirmBookingEscrow`, {
-          method: "POST",
-          mode: 'cors',
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-              bookingId,
-              escrowId,
-              txSignature: signature
-          }),
-      });
-      toast({ title: 'Booking Request Sent!', description: `Your request has been sent to ${video.user.username}` });
+        toast({ title: 'Booking Request Sent!', description: `Your request has been sent to ${video.user.username}` });
     } catch (err: any) {
         console.error("Booking failed:", err);
         toast({ title: "Booking Failed", description: err.message || "Could not complete the booking transaction.", variant: "destructive" });
@@ -178,41 +137,25 @@ const handleAdopt = async (payload: { tier: string; amount: number; recurring: b
         return;
     }
     setIsSubmitting(true);
-    const FUNCTIONS_BASE_URL = "https://us-central1-studio-8433025498-13bb2.cloudfunctions.net";
+
     try {
-        const res = await fetch(`${FUNCTIONS_BASE_URL}/createAdoptionEscrowTransaction`, {
-            method: "POST",
-            mode: 'cors',
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
+        const { data: { session } } = await supabase.auth.getSession();
+        if (!session) throw new Error("Not authenticated");
+
+        const response = await supabase.functions.invoke('adopt', {
+            body: {
                 artistWallet: video.user.walletAddress,
-                businessWallet: wallet.publicKey.toString(),
                 videoId: video.id,
-                amountSol: payload.amount,
                 tier: payload.tier,
-                recurring: payload.recurring,
+                amountSol: payload.amount,
+                monthly: payload.recurring,
                 message: payload.message,
-            }),
+            }
         });
-
-        if (!res.ok) throw new Error(await res.text());
-
-        const { adoptionId, escrowId, txBase64 } = await res.json();
-        const tx = Transaction.from(Buffer.from(txBase64, "base64"));
         
-        const connection = new Connection("https://api.mainnet-beta.solana.com", "confirmed");
-        const signature = await wallet.sendTransaction(tx, connection);
+        if (response.error) throw new Error(response.error.message);
+        if (!response.data.ok) throw new Error("Function returned an error.");
 
-        await fetch(`${FUNCTIONS_BASE_URL}/confirmAdoptionEscrow`, {
-            method: "POST",
-            mode: 'cors',
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-                adoptionId,
-                escrowId,
-                txSignature: signature,
-            }),
-        });
         toast({ title: 'Adoption Confirmed!', description: `You are now sponsoring ${video.user.username}` });
     } catch (err: any) {
         console.error("Adoption failed:", err);
@@ -224,7 +167,7 @@ const handleAdopt = async (payload: { tier: string; amount: number; recurring: b
 };
 
   const handleFavoriteClick = () => {
-    if (!userWallet) {
+    if (!authUser) {
         toast({ title: 'Please log in to save videos.', variant: 'destructive' });
         return;
     }
@@ -303,7 +246,3 @@ const handleAdopt = async (payload: { tier: string; amount: number; recurring: b
     </div>
   );
 }
-
-    
-
-    
