@@ -71,6 +71,7 @@ export interface Tip {
 }
 
 export interface Booking {
+  bookingId: string;
   userWallet: string;
   artistWallet: string;
   escrowPDA: string;
@@ -78,8 +79,9 @@ export interface Booking {
   date: string;
   time: string;
   notes: string;
-  status: 'escrow_pending' | 'released' | 'refunded';
+  status: 'escrow_pending' | 'release_requested' | 'refund_requested' | 'released' | 'refunded';
   txSignature: string;
+  createdAt: Timestamp;
 }
 
 export interface Adoption {
@@ -89,6 +91,7 @@ export interface Adoption {
   tier: 'bronze' | 'silver' | 'gold';
   recurring: boolean;
   txSignature: string;
+  createdAt: Timestamp;
 }
 
 

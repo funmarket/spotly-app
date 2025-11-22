@@ -121,12 +121,13 @@ export function VideoCard({ video, onVote, onFavorite, guestVoteCount, onGuestVo
     try {
       const { budget, ...rest } = payload;
       // In a real app, you would have an escrow program ID
-      const ESCROW_PROGRAM_ID = new PublicKey("11111111111111111111111111111111"); 
+      const ESCROW_PROGRAM_ID = new PublicKey("RizZUpEscrow1111111111111111111111111111111"); 
       const bookingId = crypto.randomUUID();
       const [escrowPDA] = await PublicKey.findProgramAddress(
         [
           Buffer.from("rizzup-escrow"),
-          Buffer.from(bookingId),
+          wallet.publicKey.toBuffer(),
+          Buffer.from(bookingId.toString()),
         ],
         ESCROW_PROGRAM_ID
       );
