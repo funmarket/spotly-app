@@ -180,12 +180,10 @@ export function VideoCard({ video, onVote, onFavorite, guestVoteCount, onGuestVo
       
       {/* Right Action Bar */}
       <div className="absolute right-3 sm:right-4 top-1/2 -translate-y-1/2 flex flex-col gap-4 z-20">
-          <ActionButton icon={Bookmark} label={`${isFavorited ? 'Saved' : 'Save'}`} onClick={handleFavoriteClick} isActive={isFavorited} iconClassName={isFavorited ? 'fill-white' : ''} />
-          <ActionButton icon={ThumbsUp} label="Up" onClick={() => handleVote(true)} isDisabled={voteLocked} iconClassName={`text-green-400 ${userVote === 'top' ? 'fill-current' : ''}`} />
+          <ActionButton icon={Bookmark} label="Save" onClick={handleFavoriteClick} isActive={isFavorited} iconClassName={isFavorited ? 'fill-white' : ''} />
+          <ActionButton icon={ThumbsUp} label="Top" onClick={() => handleVote(true)} isDisabled={voteLocked} iconClassName={`text-green-400 ${userVote === 'top' ? 'fill-current' : ''}`} />
           <ActionButton icon={ThumbsDown} label="Flop" onClick={() => handleVote(false)} isDisabled={voteLocked} iconClassName={`text-red-400 ${userVote === 'flop' ? 'fill-current' : ''}`} />
-          <ActionButton icon={ArrowDown} label="Down" onClick={() => nextVideo()} iconClassName="text-white/70" />
           <ActionButton icon={DollarSign} label="Tip" onClick={handleTip} iconClassName="text-green-400" />
-          
           {currentUser?.role === 'business' && (
               <>
                   <ActionButton icon={Briefcase} label="Book" onClick={handleHireOrAdopt} iconClassName="text-cyan-400" />
