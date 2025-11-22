@@ -1,6 +1,20 @@
 
+'use client';
 import React, { useState } from 'react';
-import { BaseModal } from '../ui/BaseModal';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+import { Label } from '@/components/ui/label';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Loader2 } from 'lucide-react';
 
 interface AdoptModalProps {
   isOpen: boolean;
@@ -31,100 +45,77 @@ export const AdoptModal: React.FC<AdoptModalProps> = ({
 
   const handleConfirm = async () => {
     const numericAmount = Number(amount);
-
     if (!numericAmount || numericAmount <= 0) {
       alert('Please enter a valid sponsorship amount.');
       return;
     }
-
-    await onConfirmAdopt({
-      tier,
-      amount: numericAmount,
-      recurring,
-      message,
-    });
+    await onConfirmAdopt({ tier, amount: numericAmount, recurring, message });
   };
+  
+  const TIER_COLORS = {
+      bronze: 'bg-[#cd7f32] hover:bg-[#cd7f32]/90 border-[#cd7f32]',
+      silver: 'bg-[#c0c0c0] hover:bg-[#c0c0c0]/90 border-[#c0c0c0] text-black',
+      gold: 'bg-[#ffd700] hover:bg-[#ffd700]/90 border-[#ffd700] text-black',
+  }
+  const TIER_COLORS_INACTIVE = {
+      bronze: 'border-[#cd7f32] text-[#cd7f32]',
+      silver: 'border-[#c0c0c0] text-[#c0c0c0]',
+      gold: 'border-[#ffd700] text-[#ffd700]',
+  }
+
 
   return (
-    <BaseModal
-      isOpen={isOpen}
-      title="Adopt Artist"
-      onClose={isSubmitting ? () => {} : onClose}
-    >
-      <p className="modal-subtitle">
-        Become a sponsor for <strong>{artistName}</strong>
-      </p>
-
-      <div className="tier-row">
-        <button
-          className={`tier-btn ${tier === 'bronze' ? 'tier-btn--active' : ''}`}
-          onClick={() => setTier('bronze')}
-        >
-          Bronze
-        </button>
-        <button
-          className={`tier-btn ${tier === 'silver' ? 'tier-btn--active' : ''}`}
-          onClick={() => setTier('silver')}
-        >
-          Silver
-        </button>
-        <button
-          className={`tier-btn ${tier === 'gold' ? 'tier-btn--active' : ''}`}
-          onClick={() => setTier('gold')}
-        >
-          Gold
-        </button>
-      </div>
-
-      <div className="form-row">
-        <label>Amount ({currencyLabel})</label>
-        <input
-          type="number"
-          min="0"
-          step="0.01"
-          value={amount}
-          onChange={(e) => setAmount(e.target.value)}
-          placeholder={`Sponsorship amount in ${currencyLabel}`}
-        />
-      </div>
-
-      <div className="form-row checkbox-row">
-        <label>
-          <input
-            type="checkbox"
-            checked={recurring}
-            onChange={(e) => setRecurring(e.target.checked)}
-          />
-          Monthly recurring support
-        </label>
-      </div>
-
-      <div className="form-row">
-        <label>Message to artist (optional)</label>
-        <textarea
-          rows={3}
-          placeholder="Say hi, share why you want to support them..."
-          value={message}
-          onChange={(e) => setMessage(e.target.value)}
-        />
-      </div>
-
-      <div className="modal-actions">
-        <button
-          className="btn-primary adopt-btn"
-          onClick={handleConfirm}
-          disabled={isSubmitting}
-        >
-          {isSubmitting ? 'Processing...' : 'Confirm Adoption'}
-        </button>
-        <button
-          className="btn-secondary"
-          onClick={onClose}
-          disabled={isSubmitting}
-        >
-          Cancel
-        </button>
-      </div>
-    </BaseModal>
+    <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Adopt {artistName}</DialogTitle>
+          <DialogDescription>Become a sponsor for {artistName}!</DialogDescription>
+        </DialogHeader>
+        <div className="space-y-4 py-4">
+          <div className="grid grid-cols-3 gap-2">
+            <Button
+              variant={tier === 'bronze' ? 'default' : 'outline'}
+              className={tier === 'bronze' ? TIER_COLORS.bronze : TIER_COLORS_INACTIVE.bronze}
+              onClick={() => setTier('bronze')}
+            >
+              Bronze
+            </Button>
+            <Button
+              variant={tier === 'silver' ? 'default' : 'outline'}
+              className={tier === 'silver' ? TIER_COLORS.silver : TIERCOLORS_INACTIVE.silver}
+              onClick={() => setTier('silver')}
+            >
+              Silver
+            </Button>
+            <Button
+              variant={tier === 'gold' ? 'default' : 'outline'}
+              className={tier === 'gold' ? TIER_COLORS.gold : TIER_COLORS_INACTIVE.gold}
+              onClick={() => setTier('gold')}
+            >
+              Gold
+            </Button>
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="amount">Amount ({currencyLabel})</Label>
+            <Input id="amount" type="number" min="0" step="0.01" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder={`Sponsorship amount in ${currencyLabel}`} />
+          </div>
+          <div className="flex items-center space-x-2">
+            <Checkbox id="recurring" checked={recurring} onCheckedChange={(checked) => setRecurring(!!checked)} />
+            <Label htmlFor="recurring">Monthly recurring support</Label>
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="message">Message (Optional)</Label>
+            <Textarea id="message" placeholder="Say hi, share why you want to support them..." value={message} onChange={(e) => setMessage(e.target.value)} />
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="ghost" onClick={onClose} disabled={isSubmitting}>Cancel</Button>
+          <Button onClick={handleConfirm} disabled={isSubmitting}>
+            {isSubmitting && <Loader2 className="mr-2 animate-spin" />}
+            Confirm Adoption
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 };

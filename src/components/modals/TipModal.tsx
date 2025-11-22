@@ -1,12 +1,23 @@
 
+'use client';
 import React, { useState } from 'react';
-import { BaseModal } from '../ui/BaseModal';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Loader2 } from 'lucide-react';
 
 interface TipModalProps {
   isOpen: boolean;
   artistName: string;
-  presets?: number[]; // e.g. [0.001, 0.01, 0.1]
-  currencyLabel?: string; // "SOL", "USD", etc.
+  presets?: number[];
+  currencyLabel?: string;
   onClose: () => void;
   onConfirmTip: (amount: number) => Promise<void> | void;
   isSubmitting?: boolean;
@@ -25,73 +36,59 @@ export const TipModal: React.FC<TipModalProps> = ({
   const [customAmount, setCustomAmount] = useState('');
 
   const handleConfirm = async () => {
-    const amount =
-      selectedAmount ?? (customAmount ? Number(customAmount) : NaN);
-
+    const amount = selectedAmount ?? (customAmount ? Number(customAmount) : NaN);
     if (!amount || isNaN(amount) || amount <= 0) {
       alert('Please select or enter a valid amount.');
       return;
     }
-
     await onConfirmTip(amount);
   };
 
   return (
-    <BaseModal
-      isOpen={isOpen}
-      title={`Tip ${artistName}`}
-      onClose={isSubmitting ? () => {} : onClose}
-    >
-      <p className="modal-subtitle">Support {artistName} with a tip!</p>
-
-      <div className="tip-preset-row">
-        {presets.map((p) => (
-          <button
-            key={p}
-            className={`tip-preset ${
-              selectedAmount === p ? 'tip-preset--active' : ''
-            }`}
-            onClick={() => {
-              setSelectedAmount(p);
-              setCustomAmount('');
+    <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Tip {artistName}</DialogTitle>
+          <DialogDescription>Support {artistName} with a tip!</DialogDescription>
+        </DialogHeader>
+        <div className="space-y-4 py-4">
+          <div className="grid grid-cols-3 gap-2">
+            {presets.map((p) => (
+              <Button
+                key={p}
+                variant={selectedAmount === p ? 'default' : 'secondary'}
+                onClick={() => {
+                  setSelectedAmount(p);
+                  setCustomAmount('');
+                }}
+              >
+                {p} {currencyLabel}
+              </Button>
+            ))}
+          </div>
+          <Input
+            type="number"
+            min="0"
+            step="0.0001"
+            placeholder={`Or enter a custom amount in ${currencyLabel}`}
+            value={customAmount}
+            onChange={(e) => {
+              setCustomAmount(e.target.value);
+              setSelectedAmount(null);
             }}
-          >
-            {p} {currencyLabel}
-          </button>
-        ))}
-      </div>
-
-      <div className="tip-custom-input">
-        <input
-          type="number"
-          min="0"
-          step="0.0001"
-          placeholder={`Custom amount in ${currencyLabel}`}
-          value={customAmount}
-          onChange={(e) => {
-            setCustomAmount(e.target.value);
-            setSelectedAmount(null);
-          }}
-          className="w-full p-2 text-center border rounded"
-        />
-      </div>
-
-      <div className="modal-actions">
-        <button
-          className="btn-primary"
-          onClick={handleConfirm}
-          disabled={isSubmitting}
-        >
-          {isSubmitting ? 'Sending...' : 'Send Tip'}
-        </button>
-        <button
-          className="btn-secondary"
-          onClick={onClose}
-          disabled={isSubmitting}
-        >
-          Cancel
-        </button>
-      </div>
-    </BaseModal>
+            className="text-center"
+          />
+        </div>
+        <DialogFooter>
+          <Button variant="ghost" onClick={onClose} disabled={isSubmitting}>
+            Cancel
+          </Button>
+          <Button onClick={handleConfirm} disabled={isSubmitting}>
+            {isSubmitting && <Loader2 className="mr-2 animate-spin" />}
+            Send Tip
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 };

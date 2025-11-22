@@ -1,6 +1,19 @@
 
+'use client';
 import React, { useState } from 'react';
-import { BaseModal } from '../ui/BaseModal';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+import { Label } from '@/components/ui/label';
+import { Loader2 } from 'lucide-react';
 
 interface BookModalProps {
   isOpen: boolean;
@@ -31,86 +44,46 @@ export const BookModal: React.FC<BookModalProps> = ({
 
   const handleConfirm = async () => {
     const numericBudget = Number(budget);
-
     if (!date || !time || !numericBudget || numericBudget <= 0) {
       alert('Please fill in date, time, and a valid budget.');
       return;
     }
-
-    await onConfirmBooking({
-      date,
-      time,
-      budget: numericBudget,
-      notes,
-    });
+    await onConfirmBooking({ date, time, budget: numericBudget, notes });
   };
 
   return (
-    <BaseModal
-      isOpen={isOpen}
-      title="Book Artist"
-      onClose={isSubmitting ? () => {} : onClose}
-    >
-      <p className="modal-subtitle">
-        Send a booking request to <strong>{artistName}</strong>
-      </p>
-
-      <div className="form-row">
-        <label>Date</label>
-        <input
-          type="date"
-          value={date}
-          onChange={(e) => setDate(e.target.value)}
-        />
-      </div>
-
-      <div className="form-row">
-        <label>Time</label>
-        <input
-          type="time"
-          value={time}
-          onChange={(e) => setTime(e.target.value)}
-        />
-      </div>
-
-      <div className="form-row">
-        <label>Budget ({currencyLabel})</label>
-        <input
-          type="number"
-          min="0"
-          step="0.01"
-          value={budget}
-          onChange={(e) => setBudget(e.target.value)}
-          placeholder={`Your offer in ${currencyLabel}`}
-        />
-      </div>
-
-      <div className="form-row">
-        <label>Details / Notes</label>
-        <textarea
-          rows={3}
-          placeholder="Describe the event, location, duration, etc."
-          value={notes}
-          onChange={(e) => setNotes(e.target.value)}
-        />
-      </div>
-
-      <div className="modal-actions">
-        <button
-          className="btn-primary"
-          onClick={handleConfirm}
-          disabled={isSubmitting}
-        >
-          {isSubmitting ? 'Sending...' : 'Send Booking Request'}
-        </button>
-        <button
-          className="btn-secondary"
-          onClick={onClose}
-          disabled={isSubmitting}
-        >
-          Cancel
-        </button>
-      </div>
-    </BaseModal>
+    <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Book {artistName}</DialogTitle>
+          <DialogDescription>Send a booking request to {artistName}.</DialogDescription>
+        </DialogHeader>
+        <div className="grid gap-4 py-4">
+          <div className="grid grid-cols-4 items-center gap-4">
+            <Label htmlFor="date" className="text-right">Date</Label>
+            <Input id="date" type="date" value={date} onChange={(e) => setDate(e.target.value)} className="col-span-3" />
+          </div>
+          <div className="grid grid-cols-4 items-center gap-4">
+            <Label htmlFor="time" className="text-right">Time</Label>
+            <Input id="time" type="time" value={time} onChange={(e) => setTime(e.target.value)} className="col-span-3" />
+          </div>
+          <div className="grid grid-cols-4 items-center gap-4">
+            <Label htmlFor="budget" className="text-right">Budget ({currencyLabel})</Label>
+            <Input id="budget" type="number" min="0" step="0.01" value={budget} onChange={(e) => setBudget(e.target.value)} placeholder={`Your offer in ${currencyLabel}`} className="col-span-3" />
+          </div>
+          <div className="grid grid-cols-4 items-center gap-4">
+            <Label htmlFor="notes" className="text-right">Details</Label>
+            <Textarea id="notes" placeholder="Describe the event, location, etc." value={notes} onChange={(e) => setNotes(e.target.value)} className="col-span-3" />
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="ghost" onClick={onClose} disabled={isSubmitting}>Cancel</Button>
+          <Button onClick={handleConfirm} disabled={isSubmitting}>
+            {isSubmitting && <Loader2 className="mr-2 animate-spin" />}
+            Send Request
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 };
