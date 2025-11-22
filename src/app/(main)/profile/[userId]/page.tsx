@@ -46,6 +46,7 @@ function ProfileVideos({ userId, canEdit }: { userId: string, canEdit: boolean }
 
   const videos = useMemo(() => {
     if (!unsortedVideos) return null;
+    // Perform client-side sorting
     return [...unsortedVideos].sort((a, b) => {
         const dateA = a.createdAt as any;
         const dateB = b.createdAt as any;
