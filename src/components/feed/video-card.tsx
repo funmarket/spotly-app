@@ -1,3 +1,4 @@
+
 'use client';
 import { useRef, useState } from 'react';
 import type { EnrichedVideo, User, Favorite } from '@/lib/types';
@@ -15,6 +16,9 @@ import { useMemoFirebase } from '@/firebase';
 import ResponsiveSidebar from './ResponsiveSidebar';
 import LeftUpArrow from './LeftUpArrow';
 import './ResponsiveSidebar.css';
+import { TipModal } from '../modals/TipModal';
+import { BookModal } from '../modals/BookModal';
+import { AdoptModal } from '../modals/AdoptModal';
 
 
 export function VideoCard({ video, onVote, onFavorite, guestVoteCount, onGuestVote, currentUser, nextVideo, prevVideo, voteLocked, isPlaying }: { video: EnrichedVideo, onVote: (isTop: boolean) => Promise<void>, onFavorite: (videoId:string) => Promise<void>, guestVoteCount: number, onGuestVote: () => void, currentUser: User | null, nextVideo: () => void, prevVideo: () => void, voteLocked: boolean, isPlaying: boolean }) {
@@ -24,6 +28,10 @@ export function VideoCard({ video, onVote, onFavorite, guestVoteCount, onGuestVo
   const router = useRouter();
 
   const [showVoteLimitModal, setShowVoteLimitModal] = useState(false);
+  const [tipOpen, setTipOpen] = useState(false);
+  const [bookOpen, setBookOpen] = useState(false);
+  const [adoptOpen, setAdoptOpen] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   
   const favoritesQuery = useMemoFirebase(() => {
     if (!userWallet || !firestore) return null;
@@ -59,23 +67,45 @@ export function VideoCard({ video, onVote, onFavorite, guestVoteCount, onGuestVo
   
   const handleHireOrAdopt = () => {
     if (!currentUser || currentUser.role !== 'business') {
-        toast({
-            title: 'Business Feature',
-            description: 'Hiring and adopting talent is available for Business accounts.',
-            variant: 'destructive'
-        })
+        setBookOpen(true);
         return;
     }
     router.push(`/profile/${video.user.walletAddress}`);
   }
   
-  const handleTip = () => {
-      if(!userWallet) {
-          toast({ title: 'Please log in to tip artists.', variant: 'destructive' });
-          return;
-      }
-      toast({ title: 'Tipping not implemented yet.'});
-  }
+  const handleTip = async (amount: number) => {
+    if (!userWallet) {
+        toast({ title: 'Please log in to tip artists.', variant: 'destructive' });
+        return;
+    }
+    setIsSubmitting(true);
+    // TODO: Implement on-chain tipping logic
+    console.log(`Tipping ${amount} to ${video.user.username}`);
+    await new Promise(resolve => setTimeout(resolve, 1000)); // Simulate async operation
+    toast({ title: 'Tip sent!', description: `You sent ${amount} SOL to ${video.user.username}` });
+    setIsSubmitting(false);
+    setTipOpen(false);
+  };
+
+  const handleBook = async (payload: any) => {
+    setIsSubmitting(true);
+    // TODO: Create booking and escrow documents in Firebase
+    console.log('Booking payload', payload);
+    await new Promise(resolve => setTimeout(resolve, 1000));
+    toast({ title: 'Booking Request Sent!', description: `Your request has been sent to ${video.user.username}` });
+    setIsSubmitting(false);
+    setBookOpen(false);
+  };
+
+  const handleAdopt = async (payload: any) => {
+    setIsSubmitting(true);
+    // TODO: Create sponsorship record in Firebase
+    console.log('Adopt payload', payload);
+    await new Promise(resolve => setTimeout(resolve, 1000));
+    toast({ title: 'Adoption Confirmed!', description: `You are now sponsoring ${video.user.username}` });
+    setIsSubmitting(false);
+    setAdoptOpen(false);
+  };
 
   const handleFavoriteClick = () => {
     if (!userWallet) {
@@ -88,6 +118,28 @@ export function VideoCard({ video, onVote, onFavorite, guestVoteCount, onGuestVo
 
   return (
     <div ref={cardRef} className="h-full w-full relative flex items-center justify-center bg-black">
+      <TipModal
+        isOpen={tipOpen}
+        artistName={video.user.username}
+        onClose={() => setTipOpen(false)}
+        onConfirmTip={handleTip}
+        isSubmitting={isSubmitting}
+      />
+      <BookModal
+        isOpen={bookOpen}
+        artistName={video.user.username}
+        onClose={() => setBookOpen(false)}
+        onConfirmBooking={handleBook}
+        isSubmitting={isSubmitting}
+      />
+      <AdoptModal
+        isOpen={adoptOpen}
+        artistName={video.user.username}
+        onClose={() => setAdoptOpen(false)}
+        onConfirmAdopt={handleAdopt}
+        isSubmitting={isSubmitting}
+      />
+
         <Dialog open={showVoteLimitModal} onOpenChange={setShowVoteLimitModal}>
             <DialogContent>
                 <DialogHeader>
@@ -126,9 +178,9 @@ export function VideoCard({ video, onVote, onFavorite, guestVoteCount, onGuestVo
         onUp={() => handleVoteClick(true)}
         onFlop={() => handleVoteClick(false)}
         onDown={nextVideo}
-        onTip={handleTip}
-        onBook={handleHireOrAdopt}
-        onAdopt={handleHireOrAdopt}
+        onTip={() => setTipOpen(true)}
+        onBook={() => setBookOpen(true)}
+        onAdopt={() => setAdoptOpen(true)}
       />
 
     </div>
