@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useDevapp } from '@/hooks/use-devapp';
 import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
-import { getAuth, signInWithCustomToken, onAuthStateChanged } from 'firebase/auth';
+import { getAuth, onAuthStateChanged, signInAnonymously } from 'firebase/auth';
 import { Loader2 } from 'lucide-react';
 
 async function getCustomToken(walletAddress: string): Promise<string> {
@@ -78,7 +78,7 @@ export function AuthHandler({ children }: { children: React.ReactNode }) {
         // Since we cannot securely generate a custom token on the client,
         // we will use anonymous sign-in as a stand-in for this development environment.
         // In a real app, you'd call a backend function to get a custom token.
-        auth.signInAnonymously()
+        signInAnonymously(auth)
           .then((cred) => {
              // In a real custom auth flow, we would not need this. We'd get a token for userWallet.
              // But for anonymous, we can't control the UID.

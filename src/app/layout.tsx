@@ -1,9 +1,6 @@
 import type { Metadata } from 'next';
 import './globals.css';
 import { Toaster } from '@/components/ui/toaster';
-import { AuthHandler } from '@/components/AuthHandler';
-import { FirebaseClientProvider } from '@/firebase/client-provider';
-import { SolanaProvider } from '@/firebase/solana-provider';
 import '@solana/wallet-adapter-react-ui/styles.css';
 
 export const metadata: Metadata = {
@@ -31,14 +28,8 @@ export default function RootLayout({
         />
       </head>
       <body className="font-body antialiased">
-        <SolanaProvider>
-          <FirebaseClientProvider>
-            <AuthHandler>
-              {children}
-              <Toaster />
-            </AuthHandler>
-          </FirebaseClientProvider>
-        </SolanaProvider>
+        {children}
+        <Toaster />
       </body>
     </html>
   );
