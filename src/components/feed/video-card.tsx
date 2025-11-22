@@ -142,7 +142,7 @@ export function VideoCard({ video, onVote, onFavorite, guestVoteCount, onGuestVo
       <VideoPlayer src={video.videoUrl} isPlaying={isPlaying} />
       <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-black/30 pointer-events-none" />
 
-      <div className="absolute bottom-20 left-5 right-[100px] text-white">
+      <div className="absolute bottom-4 left-5 right-[100px] text-white">
         <Link href={`/profile/${video.user.walletAddress}`} className="flex items-center gap-3 mb-3 group">
           <Avatar className="h-12 w-12 border-2 border-primary">
             <AvatarImage src={video.user.profilePhotoUrl} alt={video.user.username} />
@@ -159,8 +159,8 @@ export function VideoCard({ video, onVote, onFavorite, guestVoteCount, onGuestVo
       {/* Right Action Bar */}
       <div className="absolute right-3 sm:right-4 top-1/2 -translate-y-1/2 flex flex-col gap-4 z-20">
           <ActionButton icon={Bookmark} label="Save" onClick={handleFavoriteClick} isActive={isFavorited} iconClassName={isFavorited ? 'fill-white' : ''} />
-          <ActionButton icon={ThumbsUp} label="Top" onClick={() => handleVoteClick(true)} isDisabled={voteLocked} iconClassName="text-green-400" />
-          <ActionButton icon={ThumbsDown} label="Flop" onClick={() => handleVoteClick(false)} isDisabled={voteLocked} iconClassName="text-red-400" />
+          <ActionButton icon={ThumbsUp} label={`${video.topCount || 0}`} onClick={() => handleVoteClick(true)} isDisabled={voteLocked} iconClassName="text-green-400" />
+          <ActionButton icon={ThumbsDown} label={`${video.flopCount || 0}`} onClick={() => handleVoteClick(false)} isDisabled={voteLocked} iconClassName="text-red-400" />
           <ActionButton icon={DollarSign} label="Tip" onClick={handleTip} iconClassName="text-green-400" />
           {currentUser?.role === 'business' && (
               <>
