@@ -4,16 +4,6 @@ import type { EnrichedVideo, User, Favorite } from '@/lib/types';
 import VideoPlayer from './video-player';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
-import {
-  ThumbsUp,
-  ThumbsDown,
-  Share2,
-  Bookmark,
-  DollarSign,
-  Briefcase,
-  UserPlus,
-  ArrowDown,
-} from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '../ui/avatar';
 import { useDevapp } from '@/hooks/use-devapp';
 import { useToast } from '@/hooks/use-toast';
@@ -22,73 +12,9 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { useCollection } from '@/firebase/firestore/use-collection';
 import { collection, query, where } from 'firebase/firestore';
 import { useMemoFirebase } from '@/firebase';
-
-type RightSidebarProps = {
-  onSave?: () => void;
-  onUp?: () => void;
-  onFlop?: () => void;
-  onDown?: () => void;
-  onTip?: () => void;
-  onBook?: () => void;
-  onAdopt?: () => void;
-  isVoteLocked?: boolean;
-  isBusiness?: boolean;
-};
-
-const RightSidebar: React.FC<RightSidebarProps> = ({
-  onSave,
-  onUp,
-  onFlop,
-  onDown,
-  onTip,
-  onBook,
-  onAdopt,
-  isVoteLocked,
-  isBusiness,
-}) => {
-  return (
-    <div className="rzu-sidebar">
-      <button className="rzu-sidebar-btn" onClick={onSave}>
-        <span className="rzu-icon">🔖</span>
-        <span className="rzu-label">Save</span>
-      </button>
-
-      <button className="rzu-sidebar-btn" onClick={onUp} disabled={isVoteLocked}>
-        <span className="rzu-icon">👍</span>
-        <span className="rzu-label">Up</span>
-      </button>
-
-      <button className="rzu-sidebar-btn" onClick={onFlop} disabled={isVoteLocked}>
-        <span className="rzu-icon">👎</span>
-        <span className="rzu-label">Flop</span>
-      </button>
-
-      <button className="rzu-sidebar-btn" onClick={onDown}>
-        <span className="rzu-icon">⬇</span>
-        <span className="rzu-label">Down</span>
-      </button>
-
-      <button className="rzu-sidebar-btn" onClick={onTip}>
-        <span className="rzu-icon">$</span>
-        <span className="rzu-label">Tip</span>
-      </button>
-
-      {isBusiness && (
-        <>
-          <button className="rzu-sidebar-btn" onClick={onBook}>
-            <span className="rzu-icon">🎁</span>
-            <span className="rzu-label">Book</span>
-          </button>
-
-          <button className="rzu-sidebar-btn" onClick={onAdopt}>
-            <span className="rzu-icon">👤＋</span>
-            <span className="rzu-label">Adopt</span>
-          </button>
-        </>
-      )}
-    </div>
-  );
-};
+import ResponsiveSidebar from './ResponsiveSidebar';
+import LeftUpArrow from './LeftUpArrow';
+import './ResponsiveSidebar.css';
 
 
 export function VideoCard({ video, onVote, onFavorite, guestVoteCount, onGuestVote, currentUser, nextVideo, prevVideo, voteLocked, isPlaying }: { video: EnrichedVideo, onVote: (isTop: boolean) => Promise<void>, onFavorite: (videoId:string) => Promise<void>, guestVoteCount: number, onGuestVote: () => void, currentUser: User | null, nextVideo: () => void, prevVideo: () => void, voteLocked: boolean, isPlaying: boolean }) {
@@ -194,7 +120,8 @@ export function VideoCard({ video, onVote, onFavorite, guestVoteCount, onGuestVo
         <p className="text-sm text-white drop-shadow-md line-clamp-2">{video.description}</p>
       </div>
       
-      <RightSidebar
+      <LeftUpArrow onClick={prevVideo} />
+      <ResponsiveSidebar
         onSave={handleFavoriteClick}
         onUp={() => handleVoteClick(true)}
         onFlop={() => handleVoteClick(false)}
@@ -202,8 +129,6 @@ export function VideoCard({ video, onVote, onFavorite, guestVoteCount, onGuestVo
         onTip={handleTip}
         onBook={handleHireOrAdopt}
         onAdopt={handleHireOrAdopt}
-        isVoteLocked={voteLocked}
-        isBusiness={currentUser?.role === 'business'}
       />
 
     </div>
