@@ -88,7 +88,7 @@ export function VideoCard({ video, onVote, onFavorite, guestVoteCount, onGuestVo
     try {
       const from = wallet.publicKey;
       const to = new PublicKey(video.user.walletAddress);
-      const connection = new Connection("https://api.mainnet-beta.solana.com");
+      const connection = new Connection("https://api.mainnet-beta.solana.com", "confirmed");
   
       const sig = await sendSol({ from, to, amountSol: amount, connection, wallet });
   
@@ -132,7 +132,7 @@ export function VideoCard({ video, onVote, onFavorite, guestVoteCount, onGuestVo
         ESCROW_PROGRAM_ID
       );
       
-      const connection = new Connection("https://api.mainnet-beta.solana.com");
+      const connection = new Connection("https://api.mainnet-beta.solana.com", "confirmed");
       const sig = await sendSol({
         from: wallet.publicKey,
         to: escrowPDA,
@@ -174,7 +174,7 @@ export function VideoCard({ video, onVote, onFavorite, guestVoteCount, onGuestVo
         const { amount, tier, recurring } = payload;
         const from = wallet.publicKey;
         const to = new PublicKey(video.user.walletAddress);
-        const connection = new Connection("https://api.mainnet-beta.solana.com");
+        const connection = new Connection("https://api.mainnet-beta.solana.com", "confirmed");
 
         const sig = await sendSol({
             from,

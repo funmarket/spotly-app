@@ -1,3 +1,4 @@
+
 'use client';
 
 import { ReactNode, useMemo } from 'react';
@@ -19,7 +20,7 @@ export function SolanaProvider({ children }: { children: ReactNode }) {
   const network = 'mainnet-beta';
 
   // You can also provide a custom RPC endpoint
-  const endpoint = useMemo(() => clusterApiUrl(network), [network]);
+  const endpoint = "https://api.mainnet-beta.solana.com";
 
   const wallets = useMemo(
     () => [
