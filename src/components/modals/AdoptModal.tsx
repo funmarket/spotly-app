@@ -82,7 +82,7 @@ export const AdoptModal: React.FC<AdoptModalProps> = ({
             </Button>
             <Button
               variant={tier === 'silver' ? 'default' : 'outline'}
-              className={tier === 'silver' ? TIER_COLORS.silver : TIERCOLORS_INACTIVE.silver}
+              className={tier === 'silver' ? TIER_COLORS.silver : TIER_COLORS_INACTIVE.silver}
               onClick={() => setTier('silver')}
             >
               Silver
