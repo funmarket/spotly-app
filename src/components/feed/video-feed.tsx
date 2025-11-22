@@ -1,10 +1,9 @@
-
 'use client';
 import { useState, useRef, useEffect, useCallback } from 'react';
-import type { EnrichedVideo, User, Favorite } from '@/lib/types';
+import type { EnrichedVideo, User } from '@/lib/types';
 import { VideoCard } from './video-card';
 import { Button } from '@/components/ui/button';
-import { Search, Bell, X, Home, Compass, Upload, MessageCircle, User as UserIcon } from 'lucide-react';
+import { Search, Bell, Home, Compass, Upload, MessageCircle, User as UserIcon } from 'lucide-react';
 import { useRouter, usePathname } from 'next/navigation';
 import Link from 'next/link';
 import { useDevapp } from '@/hooks/use-devapp';
@@ -12,7 +11,7 @@ import { collection, doc, writeBatch, increment, serverTimestamp, query, where, 
 import { useToast } from '@/hooks/use-toast';
 import { useCollection, useMemoFirebase } from '@/firebase';
 
-function TopCategoryMenu({ activeFeedTab, setActiveFeedTab, onSearchClick }: { activeFeedTab: string, setActiveFeedTab: (tab: string) => void, onSearchClick: () => void }) {
+function TopCategoryMenu({ activeFeedTab, setActiveFeedTab }: { activeFeedTab: string, setActiveFeedTab: (tab: string) => void }) {
   const { userWallet, firestore } = useDevapp();
   const router = useRouter();
 
@@ -75,7 +74,6 @@ function TopCategoryMenu({ activeFeedTab, setActiveFeedTab, onSearchClick }: { a
 
 const BottomNavBar = () => {
     const { userWallet } = useDevapp();
-    const router = useRouter();
     const pathname = usePathname();
 
     const navItems = [
@@ -127,6 +125,7 @@ export function VideoFeed({ videos, activeFeedTab, setActiveFeedTab, isLoading, 
 
   useEffect(() => {
     setCurrentVideos(videos);
+    setCurrentIndex(0); // Reset index when videos change
   }, [videos]);
 
   useEffect(() => {
@@ -159,7 +158,7 @@ export function VideoFeed({ videos, activeFeedTab, setActiveFeedTab, isLoading, 
 
     // Optimistic UI Update
     setCurrentVideos(prev => prev.map((v, i) =>
-        i === currentIndex ? { ...v, [field]: v[field] + 1, rankingScore: v.rankingScore + scoreChange } : v
+        i === currentIndex ? { ...v, [field]: (v[field] || 0) + 1, rankingScore: (v.rankingScore || 0) + scoreChange } : v
     ));
 
     try {
@@ -167,9 +166,8 @@ export function VideoFeed({ videos, activeFeedTab, setActiveFeedTab, isLoading, 
         const batch = writeBatch(firestore);
         const videoRef = doc(firestore, 'videos', video.id);
 
-        let existingVoteQuery;
         if (userWallet) {
-            existingVoteQuery = query(
+            const existingVoteQuery = query(
                 collection(firestore, 'user_votes'),
                 where('videoId', '==', video.id),
                 where('userWallet', '==', userWallet),
@@ -178,10 +176,7 @@ export function VideoFeed({ videos, activeFeedTab, setActiveFeedTab, isLoading, 
             const existingVoteSnap = await getDocs(existingVoteQuery);
 
             if (!existingVoteSnap.empty) {
-                // For simplicity, we are not handling vote changing. This would require more complex logic.
-                console.log("User has already voted.");
-                // We could revert the optimistic update here if we want to prevent multiple votes
-                // but for now we let it proceed as per spec "Currently, the frontend allows multiple votes"
+                console.log("User has already voted. In a real app, you might prevent this or handle vote changes.");
             }
         }
         
@@ -204,7 +199,7 @@ export function VideoFeed({ videos, activeFeedTab, setActiveFeedTab, isLoading, 
         await batch.commit();
 
         if (!isTop) {
-            nextVideo();
+            setTimeout(() => nextVideo(), 300);
         }
 
     } catch (error) {
@@ -212,17 +207,17 @@ export function VideoFeed({ videos, activeFeedTab, setActiveFeedTab, isLoading, 
         toast({ title: 'Failed to vote', variant: 'destructive' });
         // Revert Optimistic Update
         setCurrentVideos(prev => prev.map((v, i) =>
-            i === currentIndex ? { ...v, [field]: v[field] - 1, rankingScore: v.rankingScore - scoreChange } : v
+            i === currentIndex ? { ...v, [field]: (v[field] || 1) - 1, rankingScore: (v.rankingScore || 0) - scoreChange } : v
         ));
     }
 };
 
-const handleVote = async (isUpvote: boolean) => {
+const onVote = async (isTop: boolean) => {
     if (voteLocked) return;
     setVoteLocked(true);
 
     try {
-        await handleVoteInternal(isUpvote);
+        await handleVoteInternal(isTop);
     } finally {
         setTimeout(() => {
             setVoteLocked(false);
@@ -231,14 +226,25 @@ const handleVote = async (isUpvote: boolean) => {
 };
 
    const nextVideo = useCallback(() => {
-    feedRef.current?.scrollBy({ top: window.innerHeight, behavior: 'smooth' });
-    setCurrentIndex(i => (i + 1) % currentVideos.length);
-  }, [currentVideos.length]);
+    if (feedRef.current) {
+      feedRef.current.scrollBy({ top: feedRef.current.clientHeight, behavior: 'smooth' });
+    }
+  }, []);
   
    const prevVideo = useCallback(() => {
-    feedRef.current?.scrollBy({ top: -window.innerHeight, behavior: 'smooth' });
-    setCurrentIndex(i => (i - 1 + currentVideos.length) % currentVideos.length);
-  }, [currentVideos.length]);
+    if (feedRef.current) {
+        feedRef.current.scrollBy({ top: -feedRef.current.clientHeight, behavior: 'smooth' });
+    }
+   }, []);
+   
+   const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
+    const { scrollTop, clientHeight } = e.currentTarget;
+    const newIndex = Math.round(scrollTop / clientHeight);
+    if (newIndex !== currentIndex) {
+      setCurrentIndex(newIndex);
+    }
+  };
+
 
    const handleFavorite = useCallback(async (videoId: string) => {
     if (!userWallet || !firestore) {
@@ -266,7 +272,7 @@ const handleVote = async (isUpvote: boolean) => {
   if (currentVideos.length === 0 && !isLoading) {
     return (
       <div className="h-screen w-full flex flex-col bg-black">
-        <TopCategoryMenu activeFeedTab={activeFeedTab} setActiveFeedTab={setActiveFeedTab} onSearchClick={() => {}} />
+        <TopCategoryMenu activeFeedTab={activeFeedTab} setActiveFeedTab={setActiveFeedTab} />
         <div className="flex-1 flex items-center justify-center text-center px-4">
             <div>
                 <h2 className="text-2xl font-bold text-white mb-2">No Videos Found</h2>
@@ -281,13 +287,13 @@ const handleVote = async (isUpvote: boolean) => {
 
   return (
     <div className="h-screen w-full bg-black">
-        <TopCategoryMenu activeFeedTab={activeFeedTab} setActiveFeedTab={setActiveFeedTab} onSearchClick={() => {}} />
-        <div ref={feedRef} className="relative h-full w-full snap-y snap-mandatory overflow-y-scroll scrollbar-hide pt-14 pb-16">
-            {currentVideos.map((video) => (
+        <TopCategoryMenu activeFeedTab={activeFeedTab} setActiveFeedTab={setActiveFeedTab} />
+        <div ref={feedRef} onScroll={handleScroll} className="relative h-full w-full snap-y snap-mandatory overflow-y-scroll scrollbar-hide pt-14 pb-16">
+            {currentVideos.map((video, index) => (
                 <VideoCard 
                     key={video.id} 
                     video={video}
-                    onVote={handleVote}
+                    onVote={(isTop: boolean) => onVote(isTop)}
                     onFavorite={handleFavorite}
                     guestVoteCount={guestVoteCount}
                     onGuestVote={handleGuestVote}

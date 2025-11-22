@@ -1,7 +1,6 @@
-
 'use client';
 import { useRef, useState, useEffect, useCallback } from 'react';
-import type { EnrichedVideo, UserVote, Favorite, User } from '@/lib/types';
+import type { EnrichedVideo, User, Favorite } from '@/lib/types';
 import { useOnScreen } from '@/hooks/use-on-screen';
 import { VideoPlayer } from './video-player';
 import Link from 'next/link';
@@ -14,8 +13,6 @@ import {
   DollarSign,
   Briefcase,
   UserPlus,
-  ArrowUp,
-  ArrowDown,
 } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '../ui/avatar';
 import { useDevapp } from '@/hooks/use-devapp';
@@ -23,16 +20,9 @@ import { useToast } from '@/hooks/use-toast';
 import { useRouter } from 'next/navigation';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '../ui/dialog';
 import { useCollection } from '@/firebase/firestore/use-collection';
-import { collection, query, where, doc } from 'firebase/firestore';
+import { collection, query, where } from 'firebase/firestore';
 import { useMemoFirebase } from '@/firebase';
 
-
-const BookIcon = (props: React.SVGProps<SVGSVGElement>) => (
-    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"></path><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"></path></svg>
-);
-const AdoptIcon = (props: React.SVGProps<SVGSVGElement>) => (
-    <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}><path d="M12 20v-6M9 17H6M15 17h3M12 20a7 7 0 0 1-7-7V9a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v4a7 7 0 0 1-7 7Z"></path><path d="M12 8a2 2 0 0 0-2 2v0a2 2 0 0 0 4 0v0a2 2 0 0 0-2-2Z"></path></svg>
-);
 
 const ActionButton = ({
   icon: Icon,
@@ -64,16 +54,13 @@ const ActionButton = ({
 );
 
 
-export function VideoCard({ video, onVote, onFavorite, guestVoteCount, onGuestVote, currentUser, nextVideo, prevVideo, voteLocked }: { video: EnrichedVideo, onVote: (videoId: string, isTop: boolean) => Promise<void>, onFavorite: (videoId:string) => Promise<void>, guestVoteCount: number, onGuestVote: () => void, currentUser: User | null, nextVideo: () => void, prevVideo: () => void, voteLocked: boolean }) {
+export function VideoCard({ video, onVote, onFavorite, guestVoteCount, onGuestVote, currentUser, nextVideo, prevVideo, voteLocked }: { video: EnrichedVideo, onVote: (isTop: boolean) => Promise<void>, onFavorite: (videoId:string) => Promise<void>, guestVoteCount: number, onGuestVote: () => void, currentUser: User | null, nextVideo: () => void, prevVideo: () => void, voteLocked: boolean }) {
   const cardRef = useRef<HTMLDivElement>(null);
   const isVisible = useOnScreen(cardRef);
   const { firestore, userWallet } = useDevapp();
   const { toast } = useToast();
   const router = useRouter();
 
-  const [topCount, setTopCount] = useState(video.topCount || 0);
-  const [flopCount, setFlopCount] = useState(video.flopCount || 0);
-  const [userVote, setUserVote] = useState<'top' | 'flop' | null>(null);
   const [showVoteLimitModal, setShowVoteLimitModal] = useState(false);
   
   const favoritesQuery = useMemoFirebase(() => {
@@ -96,7 +83,7 @@ export function VideoCard({ video, onVote, onFavorite, guestVoteCount, onGuestVo
     return user.role.charAt(0).toUpperCase() + user.role.slice(1);
   }
 
-  const handleVote = (isTop: boolean) => {
+  const handleVoteClick = (isTop: boolean) => {
     if (voteLocked) return;
     if (!userWallet) { // Guest user
       if (guestVoteCount >= 10) {
@@ -105,14 +92,7 @@ export function VideoCard({ video, onVote, onFavorite, guestVoteCount, onGuestVo
       }
       onGuestVote();
     }
-    onVote(video.id, isTop);
-    
-    if (isTop) {
-      setUserVote(userVote === 'top' ? null : 'top');
-    } else {
-      setUserVote(userVote === 'flop' ? null : 'flop');
-      setTimeout(() => nextVideo(), 300);
-    }
+    onVote(isTop);
   };
   
   const handleHireOrAdopt = () => {
@@ -145,7 +125,7 @@ export function VideoCard({ video, onVote, onFavorite, guestVoteCount, onGuestVo
 
 
   return (
-    <div ref={cardRef} className="h-screen w-full snap-start relative flex items-center justify-center bg-black pt-14">
+    <div ref={cardRef} className="h-full w-full snap-start relative flex items-center justify-center bg-black">
         <Dialog open={showVoteLimitModal} onOpenChange={setShowVoteLimitModal}>
             <DialogContent>
                 <DialogHeader>
@@ -164,7 +144,7 @@ export function VideoCard({ video, onVote, onFavorite, guestVoteCount, onGuestVo
       <VideoPlayer src={video.videoUrl} isPlaying={isVisible} />
       <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-black/30 pointer-events-none" />
 
-      <div className="absolute bottom-20 sm:bottom-5 left-5 right-[100px] text-white">
+      <div className="absolute bottom-5 left-5 right-[100px] text-white">
         <Link href={`/profile/${video.user.walletAddress}`} className="flex items-center gap-3 mb-3 group">
           <Avatar className="h-12 w-12 border-2 border-primary">
             <AvatarImage src={video.user.profilePhotoUrl} alt={video.user.username} />
@@ -181,8 +161,8 @@ export function VideoCard({ video, onVote, onFavorite, guestVoteCount, onGuestVo
       {/* Right Action Bar */}
       <div className="absolute right-3 sm:right-4 top-1/2 -translate-y-1/2 flex flex-col gap-4 z-20">
           <ActionButton icon={Bookmark} label="Save" onClick={handleFavoriteClick} isActive={isFavorited} iconClassName={isFavorited ? 'fill-white' : ''} />
-          <ActionButton icon={ThumbsUp} label="Top" onClick={() => handleVote(true)} isDisabled={voteLocked} iconClassName={`text-green-400 ${userVote === 'top' ? 'fill-current' : ''}`} />
-          <ActionButton icon={ThumbsDown} label="Flop" onClick={() => handleVote(false)} isDisabled={voteLocked} iconClassName={`text-red-400 ${userVote === 'flop' ? 'fill-current' : ''}`} />
+          <ActionButton icon={ThumbsUp} label="Top" onClick={() => handleVoteClick(true)} isDisabled={voteLocked} iconClassName="text-green-400" />
+          <ActionButton icon={ThumbsDown} label="Flop" onClick={() => handleVoteClick(false)} isDisabled={voteLocked} iconClassName="text-red-400" />
           <ActionButton icon={DollarSign} label="Tip" onClick={handleTip} iconClassName="text-green-400" />
           {currentUser?.role === 'business' && (
               <>
