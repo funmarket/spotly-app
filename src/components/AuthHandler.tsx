@@ -10,60 +10,29 @@ import { Loader2 } from 'lucide-react';
 export function AuthHandler({ children }: { children: React.ReactNode }) {
   const { userWallet, firestore } = useDevapp();
   const [isLoading, setIsLoading] = useState(true);
+  const [authChecked, setAuthChecked] = useState(false); // New state to prevent re-running auth logic
 
   useEffect(() => {
     if (!firestore) return;
 
     const auth = getAuth();
+    
+    // This listener handles the auth state and ensures user docs exist.
     const unsubscribe = onAuthStateChanged(auth, async (user: User | null) => {
-      // If a wallet is connected but there's no Firebase user (or the UID doesn't match),
-      // we need to establish a session.
-      if (userWallet && (!user || user.uid !== userWallet)) {
-        
-        // This is a simplified custom auth flow for the dev environment.
-        // In a real app, you would securely verify the wallet on a backend
-        // and return a custom token to sign in with.
-        try {
-            // For now, we sign out any existing different user
-            if (user) await auth.signOut();
-
-            // Attempt to sign in anonymously. Note: In this simplified flow,
-            // the anonymous UID will NOT match the wallet address. The 'user'
-            // object in the next onAuthStateChanged event will be an anonymous user.
-            await signInAnonymously(auth);
-
-            // We don't set loading to false here; we let the auth state listener
-            // re-run with the new anonymous user.
-
-        } catch (error) {
-            console.error('Error during anonymous sign-in:', error);
-            setIsLoading(false); // Auth failed, stop loading.
-        }
-
-      } else if (userWallet && user && user.uid === userWallet) {
-        // This case is unlikely with the current logic but is good practice.
-        // Wallet and Firebase user are aligned.
-        setIsLoading(false);
-
-      } else if (user && !userWallet) {
-         // Logged in with Firebase but wallet disconnected, so sign out.
-         await auth.signOut();
-         // The listener will run again, but we can stop loading for now.
-         setIsLoading(false);
-
-      } else if (user) {
-        // This is the most common case for a logged-in user:
-        // An anonymous user from our flow exists. We ensure their profile doc is created.
+      if (user) {
+        // User is signed in. Ensure their doc exists.
         const userDocRef = doc(firestore, 'users', user.uid);
         const userDoc = await getDoc(userDocRef);
         if (!userDoc.exists()) {
            try {
-               await setDoc(userDocRef, {
-                   walletAddress: user.uid,
-                   username: `User_${user.uid.substring(0, 4)}...`,
+               // Use wallet address for new docs if available, otherwise fall back to UID
+               const wallet = userWallet || user.uid;
+               await setDoc(doc(firestore, 'users', wallet), {
+                   walletAddress: wallet,
+                   username: `User_${wallet.substring(0, 4)}...`,
                    role: 'regular',
-                   profilePhotoUrl: `https://picsum.photos/seed/${user.uid}/400`,
-                   bannerPhotoUrl: `https://picsum.photos/seed/banner-${user.uid}/1200/400`,
+                   profilePhotoUrl: `https://picsum.photos/seed/${wallet}/400`,
+                   bannerPhotoUrl: `https://picsum.photos/seed/banner-${wallet}/1200/400`,
                    createdAt: serverTimestamp(),
                    updatedAt: serverTimestamp(),
                });
@@ -71,17 +40,31 @@ export function AuthHandler({ children }: { children: React.ReactNode }) {
                console.error("Failed to create user doc:", e);
            }
         }
-        setIsLoading(false);
       }
-      else {
-        // No wallet, no user. We are done.
-        setIsLoading(false);
-      }
+      
+      // We've checked the auth state. Stop loading and mark as checked.
+      setIsLoading(false);
+      setAuthChecked(true);
     });
 
     return () => unsubscribe();
-  }, [userWallet, firestore]);
-  
+  }, [firestore, userWallet]); // userWallet is needed to create doc with correct ID
+
+  useEffect(() => {
+      // This effect runs separately to trigger anonymous sign-in ONCE.
+      if (authChecked && !isLoading) {
+          const auth = getAuth();
+          if (!auth.currentUser) {
+              signInAnonymously(auth).catch(error => {
+                  console.error('Error during anonymous sign-in:', error);
+                  // Even if sign-in fails, we should stop the loading spinner.
+                  setIsLoading(false);
+              });
+          }
+      }
+  }, [authChecked, isLoading]);
+
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center bg-black" style={{ height: '100vh', width: '100vw', position: 'fixed', top: 0, left: 0, zIndex: 9999 }}>
