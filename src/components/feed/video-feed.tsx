@@ -322,9 +322,9 @@ const onVote = async (isTop: boolean) => {
   }
 
   return (
-    <div className="h-screen w-full bg-black fixed inset-0 overflow-hidden">
+    <div className="fixed inset-0 bg-black overflow-hidden">
         <TopCategoryMenu activeFeedTab={activeFeedTab} setActiveFeedTab={setActiveFeedTab} />
-        <div className="h-full w-full pt-14 pb-16">
+        <div className="h-full pt-14 pb-16">
             {currentVideo && (
                 <VideoCard 
                     key={currentVideo.id} 

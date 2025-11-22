@@ -28,6 +28,11 @@ export function VideoPlayer({ src, isPlaying }: VideoPlayerProps) {
   };
 
   useEffect(() => {
+    // Reset state when src changes
+    setIsApiReady(false);
+    setError(null);
+    setIsMuted(true);
+    
     const handlePlayerStateChange = (event: MessageEvent) => {
       if (event.source !== iframeRef.current?.contentWindow) return;
       try {
@@ -58,7 +63,7 @@ export function VideoPlayer({ src, isPlaying }: VideoPlayerProps) {
       window.removeEventListener('message', handlePlayerStateChange);
     };
 
-  }, []);
+  }, [src]);
 
   useEffect(() => {
     if (!isApiReady) return;
