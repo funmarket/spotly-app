@@ -19,8 +19,7 @@ import './ResponsiveSidebar.css';
 import { TipModal } from '../modals/TipModal';
 import { BookModal } from '../modals/BookModal';
 import { AdoptModal } from '../modals/AdoptModal';
-import { sendSol } from '@/lib/solana';
-import { Connection, PublicKey } from '@solana/web3.js';
+import { Connection, PublicKey, Transaction } from '@solana/web3.js';
 import { useWallet } from '@solana/wallet-adapter-react';
 
 
@@ -78,33 +77,43 @@ export function VideoCard({ video, onVote, onFavorite, guestVoteCount, onGuestVo
   }
   
   const handleTip = async (amount: number) => {
-    if (!userWallet || !wallet.publicKey) {
+    if (!userWallet || !wallet.publicKey || !wallet.sendTransaction) {
       toast({ title: 'Please connect your wallet to tip artists.', variant: 'destructive' });
       return;
     }
-    if (!firestore) return;
-  
     setIsSubmitting(true);
     try {
-      const from = wallet.publicKey;
-      const to = new PublicKey(video.user.walletAddress);
+      // 1. Call backend to get unsigned transaction
+      const createResponse = await fetch("https://us-central1-studio-8433025498-13bb2.cloudfunctions.net/createTipTransaction", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          fromWallet: userWallet,
+          toWallet: video.user.walletAddress,
+          amountSol: amount,
+          videoId: video.id,
+        }),
+      });
+
+      if (!createResponse.ok) throw new Error('Failed to create tip transaction.');
+      const { tipId, txBase64 } = await createResponse.json();
+      
+      // 2. Deserialize, sign, and send transaction
+      const tx = Transaction.from(Buffer.from(txBase64, "base64"));
       const connection = new Connection("https://api.mainnet-beta.solana.com", "confirmed");
-  
-      const sig = await sendSol({ from, to, amountSol: amount, connection, wallet });
-  
-      await addDoc(collection(firestore, 'tips'), {
-        txSignature: sig,
-        amount: amount,
-        toWallet: to.toBase58(),
-        fromWallet: from.toBase58(),
-        videoId: video.id,
-        createdAt: serverTimestamp(),
+      const signature = await wallet.sendTransaction(tx, connection);
+
+      // 3. Confirm with backend
+      await fetch("https://us-central1-studio-8433025498-13bb2.cloudfunctions.net/confirmTip", {
+         method: "POST",
+         headers: { "Content-Type": "application/json" },
+         body: JSON.stringify({ tipId, txSignature: signature }),
       });
   
       toast({ title: 'Tip sent!', description: `You sent ${amount} SOL to ${video.user.username}` });
-    } catch (error) {
+    } catch (error: any) {
       console.error(error);
-      toast({ title: 'Tip Failed', description: 'The transaction could not be completed.', variant: 'destructive' });
+      toast({ title: 'Tip Failed', description: error.message || 'The transaction could not be completed.', variant: 'destructive' });
     } finally {
       setIsSubmitting(false);
       setTipOpen(false);
@@ -112,51 +121,47 @@ export function VideoCard({ video, onVote, onFavorite, guestVoteCount, onGuestVo
   };
   
   const handleBook = async (payload: { date: string; time: string; budget: number; notes: string; }) => {
-    if (!userWallet || !wallet.publicKey || !firestore) {
+    if (!userWallet || !wallet.publicKey || !wallet.sendTransaction) {
       toast({ title: 'Please connect your wallet to book artists.', variant: 'destructive' });
       return;
     }
     
     setIsSubmitting(true);
     try {
-      const { budget, ...rest } = payload;
-      // In a real app, you would have an escrow program ID
-      const ESCROW_PROGRAM_ID = new PublicKey("RizZUpEscrow1111111111111111111111111111111"); 
-      const bookingId = crypto.randomUUID();
-      const [escrowPDA] = await PublicKey.findProgramAddress(
-        [
-          Buffer.from("rizzup-escrow"),
-          wallet.publicKey.toBuffer(),
-          Buffer.from(bookingId.toString()),
-        ],
-        ESCROW_PROGRAM_ID
-      );
-      
+      // 1. Call backend to create records and get transaction
+      const createResponse = await fetch("https://us-central1-studio-8433025498-13bb2.cloudfunctions.net/createBookingEscrowTransaction", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          businessWallet: userWallet,
+          artistWallet: video.user.walletAddress,
+          videoId: video.id,
+          budgetSol: payload.budget,
+          date: payload.date,
+          time: payload.time,
+          details: payload.notes,
+        }),
+      });
+
+      if (!createResponse.ok) throw new Error('Failed to create booking transaction.');
+      const { bookingId, escrowId, txBase64 } = await createResponse.json();
+
+      // 2. Deserialize, sign, and send transaction to fund escrow
+      const tx = Transaction.from(Buffer.from(txBase64, "base64"));
       const connection = new Connection("https://api.mainnet-beta.solana.com", "confirmed");
-      const sig = await sendSol({
-        from: wallet.publicKey,
-        to: escrowPDA,
-        amountSol: budget,
-        connection,
-        wallet,
+      const signature = await wallet.sendTransaction(tx, connection);
+
+      // 3. Confirm with backend
+      await fetch("https://us-central1-studio-8433025498-13bb2.cloudfunctions.net/confirmBookingEscrow", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ bookingId, escrowId, txSignature: signature }),
       });
-  
-      await addDoc(collection(firestore, 'bookings'), {
-        bookingId,
-        artistWallet: video.user.walletAddress,
-        escrowPDA: escrowPDA.toBase58(),
-        userWallet: userWallet,
-        amount: budget,
-        ...rest,
-        txSignature: sig,
-        status: "escrow_pending",
-        createdAt: serverTimestamp(),
-      });
-      
+
       toast({ title: 'Booking Request Sent!', description: `Your request has been sent to ${video.user.username}` });
-    } catch (error) {
+    } catch (error: any) {
        console.error(error);
-      toast({ title: 'Booking Failed', description: 'The transaction could not be completed.', variant: 'destructive' });
+      toast({ title: 'Booking Failed', description: error.message || 'The transaction could not be completed.', variant: 'destructive' });
     } finally {
       setIsSubmitting(false);
       setBookOpen(false);
@@ -164,41 +169,48 @@ export function VideoCard({ video, onVote, onFavorite, guestVoteCount, onGuestVo
   };
   
   const handleAdopt = async (payload: { tier: string; amount: number; recurring: boolean; message: string; }) => {
-    if (!userWallet || !wallet.publicKey || !firestore) {
+    if (!userWallet || !wallet.publicKey || !wallet.sendTransaction) {
       toast({ title: 'Please connect your wallet to adopt artists.', variant: 'destructive' });
       return;
     }
     
     setIsSubmitting(true);
     try {
-        const { amount, tier, recurring } = payload;
-        const from = wallet.publicKey;
-        const to = new PublicKey(video.user.walletAddress);
-        const connection = new Connection("https://api.mainnet-beta.solana.com", "confirmed");
-
-        const sig = await sendSol({
-            from,
-            to,
-            amountSol: amount,
-            connection,
-            wallet,
+       // 1. Call backend to create records and get transaction
+        const createResponse = await fetch("https://us-central1-studio-8433025498-13bb2.cloudfunctions.net/createAdoptionEscrowTransaction", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            businessWallet: userWallet,
+            artistWallet: video.user.walletAddress,
+            videoId: video.id,
+            amountSol: payload.amount,
+            tier: payload.tier,
+            recurring: payload.recurring,
+            message: payload.message
+          }),
         });
 
-        await addDoc(collection(firestore, 'adoptions'), {
-            txSignature: sig,
-            artistWallet: video.user.walletAddress,
-            sponsorWallet: userWallet,
-            amount,
-            tier,
-            recurring,
-            createdAt: serverTimestamp(),
+        if (!createResponse.ok) throw new Error('Failed to create adoption transaction.');
+        const { adoptionId, escrowId, txBase64 } = await createResponse.json();
+        
+        // 2. Deserialize, sign, and send transaction
+        const tx = Transaction.from(Buffer.from(txBase64, "base64"));
+        const connection = new Connection("https://api.mainnet-beta.solana.com", "confirmed");
+        const signature = await wallet.sendTransaction(tx, connection);
+
+        // 3. Confirm with backend
+        await fetch("https://us-central1-studio-8433025498-13bb2.cloudfunctions.net/confirmAdoptionEscrow", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ adoptionId, escrowId, txSignature: signature }),
         });
 
         toast({ title: 'Adoption Confirmed!', description: `You are now sponsoring ${video.user.username}` });
 
-    } catch (error) {
+    } catch (error: any) {
         console.error(error);
-        toast({ title: 'Adoption Failed', description: 'The transaction could not be completed.', variant: 'destructive' });
+        toast({ title: 'Adoption Failed', description: error.message || 'The transaction could not be completed.', variant: 'destructive' });
     } finally {
         setIsSubmitting(false);
         setAdoptOpen(false);

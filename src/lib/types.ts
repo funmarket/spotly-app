@@ -79,7 +79,7 @@ export interface Booking {
   date: string;
   time: string;
   notes: string;
-  status: 'escrow_pending' | 'release_requested' | 'refund_requested' | 'released' | 'refunded';
+  status: 'escrow_pending' | 'escrow_funded' | 'release_requested' | 'refund_requested' | 'released' | 'refunded';
   txSignature: string;
   createdAt: Timestamp;
 }
