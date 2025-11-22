@@ -1,81 +1,137 @@
-/* === RIGHT SIDEBAR ALWAYS VISIBLE === */
+/* ============================================
+   RIZZUP — RIGHT SIDEBAR (PIXEL PERFECT)
+   ============================================ */
 .rzu-sidebar {
   position: absolute;
-  top: 70px;
-  right: 15px;
+  top: 50%;
+  right: 16px;
+  transform: translateY(-50%);
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 14px;
   z-index: 999;
 }
 
-/* BUTTON STYLE */
+/* ============================================
+   RIZZUP BUTTON BOX — FITS TEXT EXACTLY
+   ============================================ */
 .rzu-btn {
-  width: 64px;
-  padding: 8px 10px;
-  border-radius: 14px;
-  background: rgba(0, 0, 0, 0.65);
-  border: 1px solid #00ff66;
   display: flex;
   flex-direction: column;
   align-items: center;
-  cursor: pointer;
+  justify-content: center;
+
+  padding: 6px 12px;
+  width: fit-content;   /* <— VERY IMPORTANT FOR REAL RIZZUP FEEL */
+
+  border-radius: 14px;
+  background: rgba(0, 0, 0, 0.55);
+  backdrop-filter: blur(4px);
+
+  border: 1px solid rgba(255,255,255,0.15);
   transition: 0.15s ease;
+  cursor: pointer;
 }
 
 .rzu-btn:hover {
   transform: translateY(-2px);
-  box-shadow: 0 0 10px #00ff66;
+  box-shadow: 0 0 8px currentColor;
 }
 
-/* === ICON COLORS === */
+/* ============================================
+   ICON SIZE — EXACT MATCH TO RizzUp
+   ============================================ */
 .rzu-icon {
   width: 22px;
   height: 22px;
   margin-bottom: 3px;
-}
-
-.yellow { fill: #ffd600; }
-.green { fill: #00ff66; }
-.red { fill: #ff4444; }
-.blue { fill: #33bbff; }
-.purple { fill: #aa55ff; }
-
-/* LABEL */
-.rzu-label {
-  font-size: 11px;
   color: white;
 }
 
-/* === LEFT UP ARROW BUTTON === */
+/* ============================================
+   INDIVIDUAL BUTTON COLOR SETS — REAL RIZZUP
+   ============================================ */
+
+/* SAVE */
+.rzu-save { color: #ffd742; border-color: #ffd742; }
+.rzu-save .rzu-icon { color: #ffd742; }
+
+/* UP */
+.rzu-up { color: #3bff7a; border-color: #3bff7a; }
+.rzu-up .rzu-icon { color: #3bff7a; }
+
+/* FLOP */
+.rzu-flop { color: #ff5050; border-color: #ff5050; }
+.rzu-flop .rzu-icon { color: #ff5050; }
+
+/* DOWN */
+.rzu-down { color: #3bff7a; border-color: #3bff7a; }
+.rzu-down .rzu-icon { color: #3bff7a; }
+
+/* TIP */
+.rzu-tip { color: #ffdf4e; border-color: #ffdf4e; }
+.rzu-tip .rzu-icon { color: #ffdf4e; }
+
+/* BOOK */
+.rzu-book { color: #55c9ff; border-color: #55c9ff; }
+.rzu-book .rzu-icon { color: #55c9ff; }
+
+/* ADOPT */
+.rzu-adopt { color: #b56dff; border-color: #b56dff; }
+.rzu-adopt .rzu-icon { color: #b56dff; }
+
+/* ============================================
+   LABEL
+   ============================================ */
+.rzu-label {
+  font-size: 11px;
+  font-weight: 400;
+  color: white;
+  text-shadow: 0 0 4px rgba(0,0,0,0.7);
+}
+
+/* ============================================
+   LEFT UP BUTTON — PERFECT ALIGNMENT
+   ============================================ */
 .rzu-left-btn {
   position: absolute;
-  left: 15px;
-  top: 260px;  /* aligned to Down button */
-  width: 64px;
-  padding: 8px;
+  top: 50%;
+  left: 16px;
+  transform: translateY(-50%);
+
+  padding: 6px 12px;
+  width: fit-content;
+
   border-radius: 14px;
-  border: 1px solid #00ff66;
-  background: rgba(0, 0, 0, 0.65);
+  background: rgba(0,0,0,0.55);
+  border: 1px solid #3bff7a;
+  backdrop-filter: blur(4px);
+
   cursor: pointer;
+  transition: 0.15s ease;
+  color: #3bff7a;
 }
 
 .rzu-left-btn:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 0 10px #00ff66;
+  transform: translateY(calc(-50% - 2px));
+  box-shadow: 0 0 8px #3bff7a;
+}
+.rzu-left-btn .rzu-icon {
+  color: #3bff7a;
 }
 
-/* === MOBILE RESPONSIVENESS === */
+
+/* ============================================
+   MOBILE — RESPONSIVE RIZZUP VERSION
+   ============================================ */
 @media (max-width: 768px) {
   .rzu-sidebar {
     right: 8px;
-    top: 60px;
-    gap: 8px;
+    gap: 10px;
   }
 
   .rzu-btn {
-    width: 52px;
-    padding: 6px;
+    padding: 6px 10px;
   }
 
   .rzu-icon {
@@ -88,8 +144,7 @@
   }
 
   .rzu-left-btn {
-    width: 52px;
-    padding: 6px;
+    padding: 6px 10px;
     left: 8px;
   }
 }
