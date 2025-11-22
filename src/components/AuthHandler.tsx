@@ -1,68 +1,45 @@
-
 'use client';
 
 import { useEffect, useState } from 'react';
 import { useDevapp } from '@/hooks/use-devapp';
-import { doc, getDoc, setDoc, serverTimestamp } from 'firebase/firestore';
-import { getAuth, onAuthStateChanged, signInAnonymously, User } from 'firebase/auth';
 import { Loader2 } from 'lucide-react';
+import { supabase } from '@/lib/supabaseClient';
 
 export function AuthHandler({ children }: { children: React.ReactNode }) {
-  const { userWallet, firestore } = useDevapp();
+  const { user, userWallet } = useDevapp();
   const [isLoading, setIsLoading] = useState(true);
-  const [authChecked, setAuthChecked] = useState(false); // New state to prevent re-running auth logic
 
   useEffect(() => {
-    if (!firestore) return;
-
-    const auth = getAuth();
-    
-    // This listener handles the auth state and ensures user docs exist.
-    const unsubscribe = onAuthStateChanged(auth, async (user: User | null) => {
-      if (user) {
-        // User is signed in. Ensure their doc exists.
-        const userDocRef = doc(firestore, 'users', user.uid);
-        const userDoc = await getDoc(userDocRef);
-        if (!userDoc.exists()) {
-           try {
-               // Use wallet address for new docs if available, otherwise fall back to UID
-               const wallet = userWallet || user.uid;
-               await setDoc(doc(firestore, 'users', wallet), {
-                   walletAddress: wallet,
-                   username: `User_${wallet.substring(0, 4)}...`,
-                   role: 'regular',
-                   profilePhotoUrl: `https://picsum.photos/seed/${wallet}/400`,
-                   bannerPhotoUrl: `https://picsum.photos/seed/banner-${wallet}/1200/400`,
-                   createdAt: serverTimestamp(),
-                   updatedAt: serverTimestamp(),
-               });
-           } catch (e) {
-               console.error("Failed to create user doc:", e);
-           }
+    const handleAuth = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      // If there's a session and a connected wallet, ensure they match.
+      // This is a simplified example. A real app might involve signing a message
+      // to prove wallet ownership and linking it to the Supabase user.
+      if (session && userWallet) {
+        const userMetadata = session.user.user_metadata;
+        if (!userMetadata.walletAddress) {
+          // Link wallet if not already linked
+          await supabase.auth.updateUser({
+            data: { walletAddress: userWallet }
+          });
         }
       }
-      
-      // We've checked the auth state. Stop loading and mark as checked.
       setIsLoading(false);
-      setAuthChecked(true);
+    };
+
+    handleAuth();
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === 'INITIAL_SESSION') {
+        setIsLoading(false);
+      }
     });
 
-    return () => unsubscribe();
-  }, [firestore, userWallet]); // userWallet is needed to create doc with correct ID
-
-  useEffect(() => {
-      // This effect runs separately to trigger anonymous sign-in ONCE.
-      if (authChecked && !isLoading) {
-          const auth = getAuth();
-          if (!auth.currentUser) {
-              signInAnonymously(auth).catch(error => {
-                  console.error('Error during anonymous sign-in:', error);
-                  // Even if sign-in fails, we should stop the loading spinner.
-                  setIsLoading(false);
-              });
-          }
-      }
-  }, [authChecked, isLoading]);
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, [userWallet]);
 
 
   if (isLoading) {
