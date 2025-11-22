@@ -102,6 +102,11 @@ export default function CreateProfilePage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showExtraLinks, setShowExtraLinks] = useState(false);
   const [existingProfile, setExistingProfile] = useState<User | null>(null);
+  const [isClient, setIsClient] = useState(false);
+
+  useEffect(() => {
+    setIsClient(true);
+  }, []);
 
   const form = useForm<ProfileFormValues>({
     resolver: zodResolver(profileSchema),
@@ -270,7 +275,7 @@ export default function CreateProfilePage() {
             <CardDescription>A Solana wallet is required to create an {accountType} profile.</CardDescription>
           </CardHeader>
           <CardContent className="flex justify-center">
-            <WalletMultiButton />
+            {isClient && <WalletMultiButton />}
           </CardContent>
            <CardFooter className="justify-center">
                 <Button variant="link" onClick={() => router.push('/onboarding')}>

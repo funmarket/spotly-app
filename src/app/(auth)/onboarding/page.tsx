@@ -1,3 +1,4 @@
+
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -41,6 +42,11 @@ function WalletConnectPrompt({ accountType, onBack }: { accountType: string, onB
   const { userWallet, firestore } = useDevapp();
   const router = useRouter();
   const [isChecking, setIsChecking] = useState(false);
+  const [isClient, setIsClient] = useState(false);
+
+  useEffect(() => {
+    setIsClient(true);
+  }, []);
 
   useEffect(() => {
     const checkAndRedirect = async () => {
@@ -94,7 +100,7 @@ function WalletConnectPrompt({ accountType, onBack }: { accountType: string, onB
           <div className="flex flex-col items-center gap-6">
             <div className="w-full flex justify-center">
               <div className="scale-110">
-                <WalletMultiButton style={{ backgroundColor: '#ec4899', borderRadius: '24px', height: '48px' }} />
+                {isClient && <WalletMultiButton style={{ backgroundColor: '#ec4899', borderRadius: '24px', height: '48px' }} />}
               </div>
             </div>
             <p className="text-white/60 text-center text-sm">
