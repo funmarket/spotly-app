@@ -1,7 +1,6 @@
 'use client';
 import { useRef, useState, useEffect, useCallback } from 'react';
 import type { EnrichedVideo, User, Favorite } from '@/lib/types';
-import { useOnScreen } from '@/hooks/use-on-screen';
 import { VideoPlayer } from './video-player';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
@@ -54,9 +53,8 @@ const ActionButton = ({
 );
 
 
-export function VideoCard({ video, onVote, onFavorite, guestVoteCount, onGuestVote, currentUser, nextVideo, prevVideo, voteLocked }: { video: EnrichedVideo, onVote: (isTop: boolean) => Promise<void>, onFavorite: (videoId:string) => Promise<void>, guestVoteCount: number, onGuestVote: () => void, currentUser: User | null, nextVideo: () => void, prevVideo: () => void, voteLocked: boolean }) {
+export function VideoCard({ video, onVote, onFavorite, guestVoteCount, onGuestVote, currentUser, nextVideo, prevVideo, voteLocked, isPlaying }: { video: EnrichedVideo, onVote: (isTop: boolean) => Promise<void>, onFavorite: (videoId:string) => Promise<void>, guestVoteCount: number, onGuestVote: () => void, currentUser: User | null, nextVideo: () => void, prevVideo: () => void, voteLocked: boolean, isPlaying: boolean }) {
   const cardRef = useRef<HTMLDivElement>(null);
-  const isVisible = useOnScreen(cardRef);
   const { firestore, userWallet } = useDevapp();
   const { toast } = useToast();
   const router = useRouter();
@@ -125,7 +123,7 @@ export function VideoCard({ video, onVote, onFavorite, guestVoteCount, onGuestVo
 
 
   return (
-    <div ref={cardRef} className="h-full w-full snap-start relative flex items-center justify-center bg-black">
+    <div ref={cardRef} className="h-full w-full relative flex items-center justify-center bg-black">
         <Dialog open={showVoteLimitModal} onOpenChange={setShowVoteLimitModal}>
             <DialogContent>
                 <DialogHeader>
@@ -141,10 +139,10 @@ export function VideoCard({ video, onVote, onFavorite, guestVoteCount, onGuestVo
             </DialogContent>
         </Dialog>
 
-      <VideoPlayer src={video.videoUrl} isPlaying={isVisible} />
+      <VideoPlayer src={video.videoUrl} isPlaying={isPlaying} />
       <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-black/30 pointer-events-none" />
 
-      <div className="absolute bottom-5 left-5 right-[100px] text-white">
+      <div className="absolute bottom-20 left-5 right-[100px] text-white">
         <Link href={`/profile/${video.user.walletAddress}`} className="flex items-center gap-3 mb-3 group">
           <Avatar className="h-12 w-12 border-2 border-primary">
             <AvatarImage src={video.user.profilePhotoUrl} alt={video.user.username} />

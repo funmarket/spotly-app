@@ -3,7 +3,7 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import type { EnrichedVideo, User } from '@/lib/types';
 import { VideoCard } from './video-card';
 import { Button } from '@/components/ui/button';
-import { Search, Bell, Home, Compass, Upload, MessageCircle, User as UserIcon } from 'lucide-react';
+import { Search, Bell, Home, Compass, Upload, MessageCircle, User as UserIcon, ArrowUp, ArrowDown } from 'lucide-react';
 import { useRouter, usePathname } from 'next/navigation';
 import Link from 'next/link';
 import { useDevapp } from '@/hooks/use-devapp';
@@ -115,13 +115,13 @@ const BottomNavBar = () => {
 
 export function VideoFeed({ videos, activeFeedTab, setActiveFeedTab, isLoading, currentUser }: { videos: EnrichedVideo[], activeFeedTab: string, setActiveFeedTab: (tab: string) => void, isLoading: boolean, currentUser: User | null }) {
   const router = useRouter();
-  const feedRef = useRef<HTMLDivElement>(null);
   const { firestore, userWallet } = useDevapp();
   const { toast } = useToast();
   const [guestVoteCount, setGuestVoteCount] = useState(0);
   const [voteLocked, setVoteLocked] = useState(false);
   const [currentVideos, setCurrentVideos] = useState(videos);
   const [currentIndex, setCurrentIndex] = useState(0);
+  const [touchStartY, setTouchStartY] = useState(0);
 
   useEffect(() => {
     setCurrentVideos(videos);
@@ -200,6 +200,8 @@ export function VideoFeed({ videos, activeFeedTab, setActiveFeedTab, isLoading, 
 
         if (!isTop) {
             setTimeout(() => nextVideo(), 300);
+        } else {
+             setTimeout(() => nextVideo(), 300);
         }
 
     } catch (error) {
@@ -226,24 +228,56 @@ const onVote = async (isTop: boolean) => {
 };
 
    const nextVideo = useCallback(() => {
-    if (feedRef.current) {
-      feedRef.current.scrollBy({ top: feedRef.current.clientHeight, behavior: 'smooth' });
-    }
-  }, []);
+    setCurrentIndex(prev => (prev < currentVideos.length - 1 ? prev + 1 : prev));
+  }, [currentVideos.length]);
   
    const prevVideo = useCallback(() => {
-    if (feedRef.current) {
-        feedRef.current.scrollBy({ top: -feedRef.current.clientHeight, behavior: 'smooth' });
-    }
+    setCurrentIndex(prev => (prev > 0 ? prev - 1 : prev));
    }, []);
    
-   const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
-    const { scrollTop, clientHeight } = e.currentTarget;
-    const newIndex = Math.round(scrollTop / clientHeight);
-    if (newIndex !== currentIndex) {
-      setCurrentIndex(newIndex);
-    }
-  };
+   useEffect(() => {
+      const handleKeyDown = (e: KeyboardEvent) => {
+        if (e.key === 'ArrowDown') {
+          nextVideo();
+        } else if (e.key === 'ArrowUp') {
+          prevVideo();
+        }
+      };
+
+      const handleWheel = (e: WheelEvent) => {
+        if (e.deltaY > 50) {
+          nextVideo();
+        } else if (e.deltaY < -50) {
+          prevVideo();
+        }
+      };
+
+      const handleTouchStart = (e: TouchEvent) => {
+        setTouchStartY(e.touches[0].clientY);
+      };
+
+      const handleTouchEnd = (e: TouchEvent) => {
+        const touchEndY = e.changedTouches[0].clientY;
+        const diff = touchStartY - touchEndY;
+        if (diff > 50) {
+          nextVideo();
+        } else if (diff < -50) {
+          prevVideo();
+        }
+      };
+
+      window.addEventListener('keydown', handleKeyDown);
+      window.addEventListener('wheel', handleWheel);
+      window.addEventListener('touchstart', handleTouchStart);
+      window.addEventListener('touchend', handleTouchEnd);
+
+      return () => {
+        window.removeEventListener('keydown', handleKeyDown);
+        window.removeEventListener('wheel', handleWheel);
+        window.removeEventListener('touchstart', handleTouchStart);
+        window.removeEventListener('touchend', handleTouchEnd);
+      };
+    }, [nextVideo, prevVideo, touchStartY]);
 
 
    const handleFavorite = useCallback(async (videoId: string) => {
@@ -268,6 +302,8 @@ const onVote = async (isTop: boolean) => {
       toast({ title: "Removed from favorites." });
     }
   }, [firestore, userWallet, toast]);
+  
+  const currentVideo = currentVideos[currentIndex];
 
   if (currentVideos.length === 0 && !isLoading) {
     return (
@@ -286,13 +322,13 @@ const onVote = async (isTop: boolean) => {
   }
 
   return (
-    <div className="h-screen w-full bg-black">
+    <div className="h-screen w-full bg-black fixed inset-0 overflow-hidden">
         <TopCategoryMenu activeFeedTab={activeFeedTab} setActiveFeedTab={setActiveFeedTab} />
-        <div ref={feedRef} onScroll={handleScroll} className="relative h-full w-full snap-y snap-mandatory overflow-y-scroll scrollbar-hide pt-14 pb-16">
-            {currentVideos.map((video, index) => (
+        <div className="h-full w-full pt-14 pb-16">
+            {currentVideo && (
                 <VideoCard 
-                    key={video.id} 
-                    video={video}
+                    key={currentVideo.id} 
+                    video={currentVideo}
                     onVote={(isTop: boolean) => onVote(isTop)}
                     onFavorite={handleFavorite}
                     guestVoteCount={guestVoteCount}
@@ -301,8 +337,9 @@ const onVote = async (isTop: boolean) => {
                     nextVideo={nextVideo}
                     prevVideo={prevVideo}
                     voteLocked={voteLocked}
+                    isPlaying={true}
                 />
-            ))}
+            )}
         </div>
         <BottomNavBar />
     </div>
