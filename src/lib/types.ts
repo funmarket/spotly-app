@@ -1,3 +1,4 @@
+
 import type { Timestamp } from 'firebase/firestore';
 
 export interface User {
@@ -7,7 +8,7 @@ export interface User {
   profilePhotoUrl: string;
   bannerPhotoUrl: string;
   bio: string;
-  role: 'artist' | 'business' | 'fan';
+  role: 'artist' | 'business' | 'fan' | 'regular';
   subRole?: string;
   talentCategory?: 'music' | 'acting' | 'creator';
   talentSubcategories?: string[];
@@ -23,6 +24,8 @@ export interface User {
   warnings?: number;
   adminNotes?: string;
   isDeleted?: boolean;
+  followers?: string[];
+  following?: string[];
   createdAt?: Timestamp;
   updatedAt?: Timestamp;
 }

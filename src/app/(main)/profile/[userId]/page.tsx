@@ -3,8 +3,7 @@
 import { useMemo, useState, useEffect } from 'react';
 import { notFound, useRouter, useParams } from 'next/navigation';
 import { ProfileHeader } from '@/components/profile/profile-header';
-import { AdminAiInsights } from '@/components/profile/admin-ai-insights';
-import { Card, CardContent, CardFooter } from '@/components/ui/card';
+import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import Image from 'next/image';
 import Link from 'next/link';
@@ -39,21 +38,12 @@ function ProfileVideos({ userId, canEdit }: { userId: string, canEdit: boolean }
     if (!firestore) return null;
     return query(
       collection(firestore, 'videos'),
-      where('artistId', '==', userId)
+      where('artistId', '==', userId),
+      orderBy('createdAt', 'desc')
     );
   }, [firestore, userId]);
 
-  const { data: rawVideos, isLoading } = useCollection<Video>(videosQuery);
-  
-  const videos = useMemo(() => {
-    if (!rawVideos) return [];
-    return rawVideos.sort((a, b) => {
-      const aTime = a.createdAt ? (a.createdAt as any).seconds : 0;
-      const bTime = b.createdAt ? (b.createdAt as any).seconds : 0;
-      return bTime - aTime;
-    });
-  }, [rawVideos]);
-
+  const { data: videos, isLoading } = useCollection<Video>(videosQuery);
 
   const handleDeleteClick = (e: React.MouseEvent, video: Video) => {
     e.preventDefault();
@@ -116,7 +106,7 @@ function ProfileVideos({ userId, canEdit }: { userId: string, canEdit: boolean }
       </Dialog>
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
         {videos?.map(video => (
-          <Link href="#" key={video.id} className="group">
+          <Link href={`/`} key={video.id} className="group">
             <Card className="overflow-hidden">
               <div className="aspect-w-9 aspect-h-16 relative">
                 <Image src={`https://picsum.photos/seed/${video.id}/300/500`} alt={video.description} fill className="object-cover group-hover:scale-105 transition-transform duration-300" />
@@ -148,7 +138,6 @@ export default function ProfilePage() {
   const userId = params.userId as string;
   const { userWallet } = useDevapp();
   const firestore = useFirestore();
-  const router = useRouter();
 
   const userDocRef = useMemoFirebase(() => {
       if (!firestore || !userId) return null;
@@ -167,18 +156,18 @@ export default function ProfilePage() {
   const { data: videos, isLoading: videosLoading } = useCollection<Video>(videosQuery);
 
   const stats = useMemo(() => {
-    if (!videos) return { totalViews: 0, totalTops: 0, totalVideos: 0 };
+    if (!videos) return { totalViews: 0, totalTops: 0, totalVideos: 0, points: 0 };
     return videos.reduce((acc, video) => {
-      acc.totalViews += (video.topCount || 0) + (video.flopCount || 0);
-      acc.totalTops += video.topCount || 0;
+      const topCount = video.topCount || 0;
+      const flopCount = video.flopCount || 0;
+      acc.totalViews += topCount + flopCount;
+      acc.totalTops += topCount;
+      acc.points += topCount - flopCount;
       acc.totalVideos += 1;
       return acc;
-    }, { totalViews: 0, totalTops: 0, totalVideos: 0 });
+    }, { totalViews: 0, totalTops: 0, totalVideos: 0, points: 0 });
   }, [videos]);
   
-  // NOTE: Admin role check is hardcoded as per original structure.
-  // In a real app, this would use custom claims or a database role.
-  const isAdmin = userWallet === 'HZ2GQg1Qdh4kmGSTjRBAHVwTw88JVqkL1Hda2Y1Tqxgs';
   const isOwnProfile = userWallet === viewingUser?.walletAddress;
 
   if (isProfileLoading) {
@@ -188,14 +177,16 @@ export default function ProfilePage() {
   if (!viewingUser) {
     notFound();
   }
-
-  const handleMessage = () => {
-    router.push(`/gossip?openConversationWith=${userId}`);
+  
+  const profileStats = {
+      points: stats.points,
+      videos: stats.totalVideos,
+      views: stats.totalViews
   };
 
   return (
     <div className="min-h-screen">
-      <ProfileHeader user={viewingUser} isOwnProfile={isOwnProfile} onMessage={handleMessage} />
+      <ProfileHeader user={viewingUser} isOwnProfile={isOwnProfile} stats={profileStats} />
       <div className="container mx-auto p-4 sm:p-6 lg:p-8 mt-6">
         <Tabs defaultValue="videos" className="w-full">
             <TabsList className="grid w-full grid-cols-3">
@@ -215,14 +206,13 @@ export default function ProfilePage() {
                 </div>
             </TabsContent>
             <TabsContent value="insights" className="mt-6">
-              {isAdmin && <AdminAiInsights />}
-              {(isOwnProfile && viewingUser.role === 'artist') && <AiInsights artistId={userId} />}
-              {!isOwnProfile && !isAdmin && (
+              {isOwnProfile && viewingUser.role === 'artist' && <AiInsights artistId={userId} />}
+              {!isOwnProfile && (
                   <Card className="col-span-full py-12 text-center">
                     <CardContent>
                       <h3 className="text-lg font-semibold">Private Insights</h3>
                       <p className="mt-1 text-sm text-muted-foreground">
-                        AI-generated insights are only visible to the artist and administrators.
+                        AI-generated insights are only visible to the artist.
                       </p>
                     </CardContent>
                   </Card>

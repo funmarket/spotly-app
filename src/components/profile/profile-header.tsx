@@ -1,10 +1,15 @@
+
 import type { User } from '@/lib/types';
 import Image from 'next/image';
 import { Button } from '@/components/ui/button';
-import { Mail, UserPlus, Twitter, Instagram, Youtube, Globe, Facebook, Music } from 'lucide-react';
+import { Mail, UserPlus, Twitter, Instagram, Youtube, Globe, Facebook, Music, LogOut, Check, Star, VideoIcon, Eye } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '../ui/avatar';
 import { Badge } from '../ui/badge';
 import Link from 'next/link';
+import { useDevapp } from '@/hooks/use-devapp';
+import { doc, updateDoc, arrayUnion, arrayRemove } from 'firebase/firestore';
+import { useFirestore } from '@/firebase';
+import { getAuth, signOut } from 'firebase/auth';
 
 const socialIcons: { [key: string]: React.ReactNode } = {
   twitter: <Twitter className="h-4 w-4" />,
@@ -15,77 +20,118 @@ const socialIcons: { [key: string]: React.ReactNode } = {
   website: <Globe className="h-4 w-4" />,
 };
 
-export function ProfileHeader({ user, isOwnProfile, onMessage }: { user: User, isOwnProfile: boolean, onMessage: () => void }) {
-  const socialLinks = typeof user.socialLinks === 'string' && user.socialLinks ? JSON.parse(user.socialLinks) : user.socialLinks;
-  const extraLinks = typeof user.extraLinks === 'string' && user.extraLinks ? JSON.parse(user.extraLinks) : user.extraLinks;
+const StatItem = ({ icon: Icon, value, label }: { icon: React.ElementType, value: number, label: string }) => (
+    <div className="flex items-center gap-2">
+        <Icon className="h-5 w-5 text-primary" />
+        <div>
+            <p className="font-bold text-sm">{value.toLocaleString()}</p>
+            <p className="text-xs text-muted-foreground">{label}</p>
+        </div>
+    </div>
+);
+
+export function ProfileHeader({ user, isOwnProfile, stats }: { user: User, isOwnProfile: boolean, stats: { points: number, videos: number, views: number }}) {
+  const { userWallet } = useDevapp();
+  const firestore = useFirestore();
+  const socialLinks = typeof user.socialLinks === 'string' && user.socialLinks ? JSON.parse(user.socialLinks) : {};
+  const tags = user.talentSubcategories && typeof user.talentSubcategories === 'string' ? JSON.parse(user.talentSubcategories) : (user.talentSubcategories || []);
+
+  const isFollowing = user.followers?.includes(userWallet || '');
+
+  const handleFollowToggle = async () => {
+      if (!userWallet || !firestore || isOwnProfile) return;
+      
+      const currentUserRef = doc(firestore, 'users', userWallet);
+      const targetUserRef = doc(firestore, 'users', user.walletAddress);
+
+      if (isFollowing) {
+          await updateDoc(currentUserRef, { following: arrayRemove(user.walletAddress) });
+          await updateDoc(targetUserRef, { followers: arrayRemove(userWallet) });
+      } else {
+          await updateDoc(currentUserRef, { following: arrayUnion(user.walletAddress) });
+          await updateDoc(targetUserRef, { followers: arrayUnion(userWallet) });
+      }
+  }
+
+  const handleLogout = async () => {
+    const auth = getAuth();
+    await signOut(auth);
+    window.location.href = '/';
+  }
 
   return (
     <div className="relative">
-      <div className="h-48 md:h-64 w-full overflow-hidden">
-        {user.bannerPhotoUrl ? (
+      <div className="h-48 md:h-64 w-full overflow-hidden bg-muted">
+        {user.bannerPhotoUrl && (
           <Image
             src={user.bannerPhotoUrl}
             alt={`${user.username}'s banner`}
             fill
             className="object-cover"
+            priority
             data-ai-hint="banner image"
           />
-        ) : (
-          <div className="bg-gradient-to-br from-muted to-secondary h-full w-full" />
         )}
+         <div className="absolute inset-0 bg-black/20" />
       </div>
       <div className="container mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="relative -mt-16 sm:-mt-20 md:-mt-24 flex flex-col md:flex-row items-center md:items-end md:space-x-5">
-          <Avatar className="h-32 w-32 md:h-40 md:w-40 ring-4 ring-background">
-            <AvatarImage src={user.profilePhotoUrl} alt={user.username} data-ai-hint="profile picture" />
-            <AvatarFallback className="text-4xl">
-              {user.username?.slice(0, 2) || '??'}
-            </AvatarFallback>
-          </Avatar>
-          <div className="mt-4 md:mt-0 md:pb-4 flex-1 flex flex-col md:flex-row items-center justify-between w-full">
-            <div className="text-center md:text-left">
-              <h1 className="text-3xl md:text-4xl font-headline font-bold text-foreground">
-                {user.username}
-              </h1>
-              <p className="text-muted-foreground mt-1 max-w-xl">{user.bio}</p>
-              <div className="mt-3 flex justify-center md:justify-start items-center gap-2 flex-wrap">
-                <Badge variant="secondary" className="capitalize">{user.role}</Badge>
-                {user.talentCategory && <Badge variant="outline" className="capitalize">{user.talentCategory}</Badge>}
-                 {extraLinks?.map((link: {label: string, url: string}, index: number) => (
-                   <Button key={index} variant="outline" size="sm" asChild>
-                      <a href={link.url} target="_blank" rel="noopener noreferrer">
-                        {link.label}
-                      </a>
-                    </Button>
-                 ))}
+        <div className="relative -mt-16 sm:-mt-20 md:-mt-24">
+          <div className="flex flex-col md:flex-row items-center md:items-end md:space-x-5">
+              <Avatar className="h-32 w-32 md:h-40 md:w-40 ring-4 ring-background">
+                <AvatarImage src={user.profilePhotoUrl} alt={user.username} data-ai-hint="profile picture" />
+                <AvatarFallback className="text-4xl">
+                  {user.username?.slice(0, 2) || '??'}
+                </AvatarFallback>
+              </Avatar>
+              <div className="mt-4 md:mt-0 md:pb-4 flex-1 flex flex-col md:flex-row items-center justify-between w-full">
+                <div className="text-center md:text-left">
+                  <h1 className="text-3xl md:text-4xl font-headline font-bold text-foreground">
+                    {user.username}
+                  </h1>
+                   <div className="mt-3 flex justify-center md:justify-start items-center gap-2 flex-wrap">
+                    <Badge variant="secondary" className="capitalize">{user.role}</Badge>
+                    {user.talentCategory && <Badge variant="outline" className="capitalize">{user.talentCategory}</Badge>}
+                    {tags.slice(0, 3).map((tag: string) => <Badge key={tag} variant="outline" className="capitalize">{tag}</Badge>)}
+                  </div>
+                </div>
               </div>
-            </div>
-            <div className="mt-4 md:mt-0 flex items-center space-x-3">
-              {socialLinks && Object.entries(socialLinks).map(([platform, url]) => (
-                 url && socialIcons[platform] && (
-                    <Button key={platform} variant="outline" size="icon" asChild>
-                      <a href={url as string} target="_blank" rel="noopener noreferrer">
-                        {socialIcons[platform]}
-                      </a>
-                    </Button>
-                 )
-              ))}
-              {!isOwnProfile && (
-                <>
-                  <Button variant="outline">
-                    <UserPlus className="mr-2 h-4 w-4" /> Follow
-                  </Button>
-                  <Button onClick={onMessage}>
-                    <Mail className="mr-2 h-4 w-4" /> Message
-                  </Button>
-                </>
-              )}
-               {isOwnProfile && (
-                  <Button variant="outline" asChild>
-                     <Link href={`/onboarding/create/${user.role}`}>Edit Profile</Link>
-                  </Button>
-               )}
-            </div>
+          </div>
+          
+          <div className="mt-4 space-y-4">
+              <p className="text-muted-foreground text-center md:text-left text-sm max-w-2xl">{user.bio}</p>
+          
+              <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+                 <div className="flex items-center gap-4 sm:gap-6 p-3 rounded-lg bg-muted/50 w-full sm:w-auto justify-center">
+                    <StatItem icon={Star} value={stats.points} label="Points" />
+                    <StatItem icon={VideoIcon} value={stats.videos} label="Videos" />
+                    <StatItem icon={Eye} value={stats.views} label="Views" />
+                 </div>
+
+                 <div className="flex items-center space-x-2 w-full sm:w-auto">
+                    {isOwnProfile ? (
+                        <>
+                           <Button variant="outline" asChild className="flex-1 sm:flex-initial">
+                             <Link href={`/onboarding/create/${user.role}`}>Edit Profile</Link>
+                           </Button>
+                           <Button variant="ghost" onClick={handleLogout} className="flex-1 sm:flex-initial">
+                                <LogOut className="mr-2 h-4 w-4" /> Logout
+                           </Button>
+                        </>
+                    ) : (
+                        <>
+                           <Button onClick={handleFollowToggle} className="flex-1">
+                               {isFollowing ? <Check className="mr-2 h-4 w-4"/> : <UserPlus className="mr-2 h-4 w-4" />}
+                               {isFollowing ? 'Following' : 'Follow'}
+                           </Button>
+                           <Button variant="outline" asChild className="flex-1">
+                                <Link href={`/gossip?openConversationWith=${user.walletAddress}`}>
+                                    <Mail className="mr-2 h-4 w-4" /> Message
+                                </Link>
+                           </Button>
+                        </>
+                    )}
+                 </div>
+              </div>
           </div>
         </div>
       </div>
