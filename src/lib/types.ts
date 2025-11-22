@@ -61,6 +61,37 @@ export type EnrichedVideo = Omit<Video, 'videoId'> & {
   user: User;
 };
 
+export interface Tip {
+  fromWallet: string;
+  toWallet: string;
+  amount: number;
+  txSignature: string;
+  videoId: string;
+  createdAt: Timestamp;
+}
+
+export interface Booking {
+  userWallet: string;
+  artistWallet: string;
+  escrowPDA: string;
+  amount: number;
+  date: string;
+  time: string;
+  notes: string;
+  status: 'escrow_pending' | 'released' | 'refunded';
+  txSignature: string;
+}
+
+export interface Adoption {
+  sponsorWallet: string;
+  artistWallet: string;
+  amount: number;
+  tier: 'bronze' | 'silver' | 'gold';
+  recurring: boolean;
+  txSignature: string;
+}
+
+
 export interface GossipPost {
   id: string;
   authorId: string;

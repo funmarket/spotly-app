@@ -158,6 +158,51 @@
         "updatedAt"
       ]
     },
+     "Tip": {
+      "title": "Tip",
+      "description": "Represents a tip from one user to another.",
+      "type": "object",
+      "properties": {
+        "fromWallet": { "type": "string", "description": "The wallet address of the user giving the tip." },
+        "toWallet": { "type": "string", "description": "The wallet address of the artist receiving the tip." },
+        "amount": { "type": "number", "description": "The amount of the tip in SOL." },
+        "txSignature": { "type": "string", "description": "The Solana transaction signature." },
+        "videoId": { "type": "string", "description": "The ID of the video being tipped for." },
+        "createdAt": { "type": "string", "format": "date-time", "description": "Timestamp of when the tip was created." }
+      },
+      "required": ["fromWallet", "toWallet", "amount", "txSignature", "videoId", "createdAt"]
+    },
+    "Booking": {
+      "title": "Booking",
+      "description": "Represents a booking request and escrow transaction.",
+      "type": "object",
+      "properties": {
+        "userWallet": { "type": "string", "description": "The wallet address of the user making the booking." },
+        "artistWallet": { "type": "string", "description": "The wallet address of the artist being booked." },
+        "escrowPDA": { "type": "string", "description": "The address of the Program Derived Address (PDA) for the escrow." },
+        "amount": { "type": "number", "description": "The budget for the booking in SOL." },
+        "date": { "type": "string", "format": "date" },
+        "time": { "type": "string", "format": "time" },
+        "notes": { "type": "string" },
+        "status": { "type": "string", "enum": ["escrow_pending", "released", "refunded"] },
+        "txSignature": { "type": "string", "description": "The Solana transaction signature for the escrow deposit." }
+      },
+      "required": ["userWallet", "artistWallet", "escrowPDA", "amount", "date", "time", "status", "txSignature"]
+    },
+    "Adoption": {
+      "title": "Adoption",
+      "description": "Represents a sponsorship/adoption of an artist by a user.",
+      "type": "object",
+      "properties": {
+        "sponsorWallet": { "type": "string", "description": "The wallet address of the user sponsoring the artist." },
+        "artistWallet": { "type": "string", "description": "The wallet address of the artist being sponsored." },
+        "amount": { "type": "number" },
+        "tier": { "type": "string", "enum": ["bronze", "silver", "gold"] },
+        "recurring": { "type": "boolean" },
+        "txSignature": { "type": "string" }
+      },
+      "required": ["sponsorWallet", "artistWallet", "amount", "tier", "recurring", "txSignature"]
+    },
     "GossipPost": {
       "title": "Gossip Post",
       "description": "A post in the gossip feed.",
@@ -287,19 +332,6 @@
       },
       "required": ["recipientWallet", "message", "type", "read", "createdAt"]
     },
-    "Tip": {
-      "title": "Tip",
-      "description": "Represents a tip from one user to another.",
-      "type": "object",
-      "properties": {
-        "amount": { "type": "number", "description": "The amount of the tip." },
-        "videoId": { "type": "string", "description": "The ID of the video being tipped for." },
-        "toWallet": { "type": "string", "description": "The wallet address of the artist receiving the tip." },
-        "fromWallet": { "type": "string", "description": "The wallet address of the user giving the tip." },
-        "createdAt": { "type": "string", "format": "date-time", "description": "Timestamp of when the tip was created." }
-      },
-      "required": ["amount", "videoId", "toWallet", "fromWallet", "createdAt"]
-    },
     "UserVote": {
       "title": "User Vote",
       "description": "Represents a Top or Flop vote on a video by a user.",
@@ -405,6 +437,30 @@
         }
       },
       {
+        "path": "/tips/{tipId}",
+        "definition": {
+          "entityName": "Tip",
+          "schema": { "$ref": "#/backend/entities/Tip" },
+          "description": "Stores tips from users to artists, linking wallets and the transaction signature."
+        }
+      },
+      {
+        "path": "/bookings/{bookingId}",
+        "definition": {
+          "entityName": "Booking",
+          "schema": { "$ref": "#/backend/entities/Booking" },
+          "description": "Stores booking and escrow information, tracking the status from pending to completion."
+        }
+      },
+      {
+        "path": "/adoptions/{adoptionId}",
+        "definition": {
+          "entityName": "Adoption",
+          "schema": { "$ref": "#/backend/entities/Adoption" },
+          "description": "Stores sponsorship records for artists."
+        }
+      },
+      {
           "path": "/gossip_posts/{postId}",
           "definition": {
               "entityName": "GossipPost",
@@ -482,14 +538,6 @@
           "entityName": "Notification",
           "schema": { "$ref": "#/backend/entities/Notification" },
           "description": "Stores user notifications for various events."
-        }
-      },
-       {
-        "path": "/tips/{tipId}",
-        "definition": {
-          "entityName": "Tip",
-          "schema": { "$ref": "#/backend/entities/Tip" },
-          "description": "Stores tips from users to artists."
         }
       },
       {

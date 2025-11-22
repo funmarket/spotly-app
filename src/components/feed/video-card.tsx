@@ -11,7 +11,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useRouter } from 'next/navigation';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '../ui/dialog';
 import { useCollection } from '@/firebase/firestore/use-collection';
-import { collection, query, where } from 'firebase/firestore';
+import { collection, query, where, addDoc, serverTimestamp } from 'firebase/firestore';
 import { useMemoFirebase } from '@/firebase';
 import ResponsiveSidebar from './ResponsiveSidebar';
 import LeftUpArrow from './LeftUpArrow';
@@ -19,6 +19,9 @@ import './ResponsiveSidebar.css';
 import { TipModal } from '../modals/TipModal';
 import { BookModal } from '../modals/BookModal';
 import { AdoptModal } from '../modals/AdoptModal';
+import { sendSol } from '@/lib/solana';
+import { Connection, PublicKey } from '@solana/web3.js';
+import { useWallet } from '@solana/wallet-adapter-react';
 
 
 export function VideoCard({ video, onVote, onFavorite, guestVoteCount, onGuestVote, currentUser, nextVideo, prevVideo, voteLocked, isPlaying }: { video: EnrichedVideo, onVote: (isTop: boolean) => Promise<void>, onFavorite: (videoId:string) => Promise<void>, guestVoteCount: number, onGuestVote: () => void, currentUser: User | null, nextVideo: () => void, prevVideo: () => void, voteLocked: boolean, isPlaying: boolean }) {
@@ -26,6 +29,7 @@ export function VideoCard({ video, onVote, onFavorite, guestVoteCount, onGuestVo
   const { firestore, userWallet } = useDevapp();
   const { toast } = useToast();
   const router = useRouter();
+  const wallet = useWallet();
 
   const [showVoteLimitModal, setShowVoteLimitModal] = useState(false);
   const [tipOpen, setTipOpen] = useState(false);
@@ -74,37 +78,130 @@ export function VideoCard({ video, onVote, onFavorite, guestVoteCount, onGuestVo
   }
   
   const handleTip = async (amount: number) => {
-    if (!userWallet) {
-        toast({ title: 'Please log in to tip artists.', variant: 'destructive' });
-        return;
+    if (!userWallet || !wallet.publicKey) {
+      toast({ title: 'Please connect your wallet to tip artists.', variant: 'destructive' });
+      return;
     }
+    if (!firestore) return;
+  
     setIsSubmitting(true);
-    // TODO: Implement on-chain tipping logic
-    console.log(`Tipping ${amount} to ${video.user.username}`);
-    await new Promise(resolve => setTimeout(resolve, 1000)); // Simulate async operation
-    toast({ title: 'Tip sent!', description: `You sent ${amount} SOL to ${video.user.username}` });
-    setIsSubmitting(false);
-    setTipOpen(false);
+    try {
+      const from = wallet.publicKey;
+      const to = new PublicKey(video.user.walletAddress);
+      const connection = new Connection("https://api.mainnet-beta.solana.com");
+  
+      const sig = await sendSol({ from, to, amountSol: amount, connection, wallet });
+  
+      await addDoc(collection(firestore, 'tips'), {
+        txSignature: sig,
+        amount: amount,
+        toWallet: to.toBase58(),
+        fromWallet: from.toBase58(),
+        videoId: video.id,
+        createdAt: serverTimestamp(),
+      });
+  
+      toast({ title: 'Tip sent!', description: `You sent ${amount} SOL to ${video.user.username}` });
+    } catch (error) {
+      console.error(error);
+      toast({ title: 'Tip Failed', description: 'The transaction could not be completed.', variant: 'destructive' });
+    } finally {
+      setIsSubmitting(false);
+      setTipOpen(false);
+    }
   };
-
-  const handleBook = async (payload: any) => {
+  
+  const handleBook = async (payload: { date: string; time: string; budget: number; notes: string; }) => {
+    if (!userWallet || !wallet.publicKey || !firestore) {
+      toast({ title: 'Please connect your wallet to book artists.', variant: 'destructive' });
+      return;
+    }
+    
     setIsSubmitting(true);
-    // TODO: Create booking and escrow documents in Firebase
-    console.log('Booking payload', payload);
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    toast({ title: 'Booking Request Sent!', description: `Your request has been sent to ${video.user.username}` });
-    setIsSubmitting(false);
-    setBookOpen(false);
+    try {
+      const { budget, ...rest } = payload;
+      // In a real app, you would have an escrow program ID
+      const ESCROW_PROGRAM_ID = new PublicKey("11111111111111111111111111111111"); 
+      const bookingId = crypto.randomUUID();
+      const [escrowPDA] = await PublicKey.findProgramAddress(
+        [
+          Buffer.from("rizzup-escrow"),
+          Buffer.from(bookingId),
+        ],
+        ESCROW_PROGRAM_ID
+      );
+      
+      const connection = new Connection("https://api.mainnet-beta.solana.com");
+      const sig = await sendSol({
+        from: wallet.publicKey,
+        to: escrowPDA,
+        amountSol: budget,
+        connection,
+        wallet,
+      });
+  
+      await addDoc(collection(firestore, 'bookings'), {
+        bookingId,
+        artistWallet: video.user.walletAddress,
+        escrowPDA: escrowPDA.toBase58(),
+        userWallet: userWallet,
+        amount: budget,
+        ...rest,
+        txSignature: sig,
+        status: "escrow_pending",
+        createdAt: serverTimestamp(),
+      });
+      
+      toast({ title: 'Booking Request Sent!', description: `Your request has been sent to ${video.user.username}` });
+    } catch (error) {
+       console.error(error);
+      toast({ title: 'Booking Failed', description: 'The transaction could not be completed.', variant: 'destructive' });
+    } finally {
+      setIsSubmitting(false);
+      setBookOpen(false);
+    }
   };
-
-  const handleAdopt = async (payload: any) => {
+  
+  const handleAdopt = async (payload: { tier: string; amount: number; recurring: boolean; message: string; }) => {
+    if (!userWallet || !wallet.publicKey || !firestore) {
+      toast({ title: 'Please connect your wallet to adopt artists.', variant: 'destructive' });
+      return;
+    }
+    
     setIsSubmitting(true);
-    // TODO: Create sponsorship record in Firebase
-    console.log('Adopt payload', payload);
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    toast({ title: 'Adoption Confirmed!', description: `You are now sponsoring ${video.user.username}` });
-    setIsSubmitting(false);
-    setAdoptOpen(false);
+    try {
+        const { amount, tier, recurring } = payload;
+        const from = wallet.publicKey;
+        const to = new PublicKey(video.user.walletAddress);
+        const connection = new Connection("https://api.mainnet-beta.solana.com");
+
+        const sig = await sendSol({
+            from,
+            to,
+            amountSol: amount,
+            connection,
+            wallet,
+        });
+
+        await addDoc(collection(firestore, 'adoptions'), {
+            txSignature: sig,
+            artistWallet: video.user.walletAddress,
+            sponsorWallet: userWallet,
+            amount,
+            tier,
+            recurring,
+            createdAt: serverTimestamp(),
+        });
+
+        toast({ title: 'Adoption Confirmed!', description: `You are now sponsoring ${video.user.username}` });
+
+    } catch (error) {
+        console.error(error);
+        toast({ title: 'Adoption Failed', description: 'The transaction could not be completed.', variant: 'destructive' });
+    } finally {
+        setIsSubmitting(false);
+        setAdoptOpen(false);
+    }
   };
 
   const handleFavoriteClick = () => {
