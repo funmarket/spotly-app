@@ -278,6 +278,7 @@ export function VideoCard({ video, onVote, onFavorite, guestVoteCount, onGuestVo
         onTip={() => setTipOpen(true)}
         onBook={() => setBookOpen(true)}
         onAdopt={() => setAdoptOpen(true)}
+        isFavorited={isFavorited}
       />
 
     </div>
