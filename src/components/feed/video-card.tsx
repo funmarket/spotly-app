@@ -86,6 +86,7 @@ export function VideoCard({ video, onVote, onFavorite, guestVoteCount, onGuestVo
       // 1. Call backend to get unsigned transaction
       const createResponse = await fetch("https://us-central1-studio-8433025498-13bb2.cloudfunctions.net/createTipTransaction", {
         method: "POST",
+        mode: 'cors',
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           fromWallet: userWallet,
@@ -106,6 +107,7 @@ export function VideoCard({ video, onVote, onFavorite, guestVoteCount, onGuestVo
       // 3. Confirm with backend
       await fetch("https://us-central1-studio-8433025498-13bb2.cloudfunctions.net/confirmTip", {
          method: "POST",
+         mode: 'cors',
          headers: { "Content-Type": "application/json" },
          body: JSON.stringify({ tipId, txSignature: signature }),
       });
@@ -131,6 +133,7 @@ export function VideoCard({ video, onVote, onFavorite, guestVoteCount, onGuestVo
       // 1. Call backend to create records and get transaction
       const createResponse = await fetch("https://us-central1-studio-8433025498-13bb2.cloudfunctions.net/createBookingEscrowTransaction", {
         method: "POST",
+        mode: 'cors',
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           businessWallet: userWallet,
@@ -154,6 +157,7 @@ export function VideoCard({ video, onVote, onFavorite, guestVoteCount, onGuestVo
       // 3. Confirm with backend
       await fetch("https://us-central1-studio-8433025498-13bb2.cloudfunctions.net/confirmBookingEscrow", {
         method: "POST",
+        mode: 'cors',
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ bookingId, escrowId, txSignature: signature }),
       });
@@ -179,6 +183,7 @@ export function VideoCard({ video, onVote, onFavorite, guestVoteCount, onGuestVo
        // 1. Call backend to create records and get transaction
         const createResponse = await fetch("https://us-central1-studio-8433025498-13bb2.cloudfunctions.net/createAdoptionEscrowTransaction", {
           method: "POST",
+          mode: 'cors',
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             businessWallet: userWallet,
@@ -202,6 +207,7 @@ export function VideoCard({ video, onVote, onFavorite, guestVoteCount, onGuestVo
         // 3. Confirm with backend
         await fetch("https://us-central1-studio-8433025498-13bb2.cloudfunctions.net/confirmAdoptionEscrow", {
             method: "POST",
+            mode: 'cors',
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ adoptionId, escrowId, txSignature: signature }),
         });
@@ -297,3 +303,5 @@ export function VideoCard({ video, onVote, onFavorite, guestVoteCount, onGuestVo
     </div>
   );
 }
+
+    
