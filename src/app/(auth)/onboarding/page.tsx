@@ -4,7 +4,6 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useDevapp } from '@/hooks/use-devapp';
-import { doc, getDoc } from 'firebase/firestore';
 import { Loader2 } from 'lucide-react';
 import { WalletMultiButton } from '@solana/wallet-adapter-react-ui';
 
@@ -40,7 +39,7 @@ function RoleChoiceButton({
 
 
 export default function OnboardingRoleSelectionPage() {
-  const { userWallet, firestore } = useDevapp();
+  const { userWallet, supabase } = useDevapp();
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(true);
   const [isClient, setIsClient] = useState(false);
@@ -51,16 +50,20 @@ export default function OnboardingRoleSelectionPage() {
 
   useEffect(() => {
     const checkProfileAndRedirect = async () => {
-      // Wait for wallet and firestore to be ready
-      if (userWallet === undefined || !firestore) {
+      // Wait for wallet to be ready
+      if (userWallet === undefined) {
         return; 
       }
 
       // If wallet is connected, check for profile
       if (userWallet) {
-        const userDocRef = doc(firestore, 'users', userWallet);
-        const userDoc = await getDoc(userDocRef);
-        if (userDoc.exists()) {
+        const { data: user, error } = await supabase
+          .from('users')
+          .select('wallet_address')
+          .eq('wallet_address', userWallet)
+          .single();
+        
+        if (user) {
           // Profile exists, go to their profile page
           router.push(`/profile/${userWallet}`);
         } else {
@@ -74,7 +77,7 @@ export default function OnboardingRoleSelectionPage() {
     };
 
     checkProfileAndRedirect();
-  }, [userWallet, firestore, router]);
+  }, [userWallet, supabase, router]);
 
 
   const handleRoleClick = (role: string) => {

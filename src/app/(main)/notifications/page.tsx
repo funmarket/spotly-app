@@ -1,47 +1,26 @@
+
 'use client';
 import { useDevapp } from '@/hooks/use-devapp';
-import { useMemoFirebase } from '@/firebase';
-import { collection, query, where, orderBy, updateDoc, doc } from 'firebase/firestore';
-import { useCollection } from '@/firebase/firestore/use-collection';
 import { Bell, Loader2 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { formatDistanceToNow } from 'date-fns';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import Link from 'next/link';
-import { useDoc } from '@/firebase/firestore/use-doc';
-import type { User } from '@/lib/types';
+import type { User, Notification } from '@/lib/types';
+import { useEffect, useState } from 'react';
 
 
-interface Notification {
-  id: string;
-  recipientWallet: string;
-  senderWallet?: string;
-  message: string;
-  type: string;
-  read: boolean;
-  relatedId?: string;
-  createdAt: { seconds: number; nanoseconds: number };
-}
-
-function NotificationItem({ notification }: { notification: Notification }) {
-  const { firestore } = useDevapp();
-  
-  const senderDocRef = useMemoFirebase(() => {
-      if (!firestore || !notification.senderWallet) return null;
-      return doc(firestore, 'users', notification.senderWallet);
-  }, [firestore, notification.senderWallet]);
-
-  const { data: sender } = useDoc<User>(senderDocRef);
+function NotificationItem({ notification, sender }: { notification: Notification, sender: User | null }) {
+  const { supabase } = useDevapp();
 
   const timeAgo = notification.createdAt
     ? formatDistanceToNow(new Date(notification.createdAt.seconds * 1000), { addSuffix: true })
     : 'just now';
 
   const markAsRead = async () => {
-    if (!firestore || notification.read) return;
-    const notifRef = doc(firestore, 'notifications', notification.id);
-    await updateDoc(notifRef, { read: true });
+    if (!supabase || notification.read) return;
+    await supabase.from('notifications').update({ read: true }).eq('id', notification.id);
   };
   
   const getLink = () => {
@@ -88,20 +67,50 @@ function NotificationItem({ notification }: { notification: Notification }) {
 
 
 export default function NotificationsPage() {
-    const { userWallet, firestore } = useDevapp();
+    const { userWallet, supabase } = useDevapp();
+    const [notifications, setNotifications] = useState<Notification[]>([]);
+    const [senders, setSenders] = useState<Record<string, User | null>>({});
+    const [isLoading, setIsLoading] = useState(true);
 
-    const notificationsQuery = useMemoFirebase(() => {
-        if (!firestore || !userWallet) return null;
-        return query(
-            collection(firestore, 'notifications'),
-            where('recipientWallet', '==', userWallet),
-            orderBy('createdAt', 'desc')
-        );
-    }, [firestore, userWallet]);
+    useEffect(() => {
+        const fetchNotifications = async () => {
+            if (!userWallet) {
+                setIsLoading(false);
+                return;
+            };
 
-    const { data: notifications, isLoading } = useCollection<Notification>(notificationsQuery);
+            setIsLoading(true);
+
+            const { data: notifs, error } = await supabase
+                .from('notifications')
+                .select('*')
+                .eq('recipient_wallet', userWallet)
+                .order('created_at', { ascending: false });
+
+            if (notifs) {
+                setNotifications(notifs as Notification[]);
+                const senderIds = notifs.map(n => n.sender_wallet).filter(Boolean) as string[];
+                if (senderIds.length > 0) {
+                    const { data: senderData, error: senderError } = await supabase
+                        .from('users')
+                        .select('*')
+                        .in('wallet_address', senderIds);
+                    
+                    if (senderData) {
+                        const senderMap = senderData.reduce((acc, user) => {
+                            acc[user.wallet_address] = user as User;
+                            return acc;
+                        }, {} as Record<string, User | null>);
+                        setSenders(senderMap);
+                    }
+                }
+            }
+            setIsLoading(false);
+        }
+        fetchNotifications();
+    }, [supabase, userWallet]);
     
-    if (isLoading && !notifications) {
+    if (isLoading && notifications.length === 0) {
         return (
             <div className="container mx-auto max-w-2xl p-4 space-y-6">
                 <h1 className="text-3xl font-headline flex items-center gap-2"><Bell /> Notifications</h1>
@@ -141,7 +150,7 @@ export default function NotificationsPage() {
             {notifications && notifications.length > 0 ? (
                 <div className="space-y-4">
                     {notifications.map(notif => (
-                        <NotificationItem key={notif.id} notification={notif} />
+                        <NotificationItem key={notif.id} notification={notif} sender={senders[notif.senderWallet || ''] || null} />
                     ))}
                 </div>
             ) : (

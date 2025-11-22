@@ -1,3 +1,4 @@
+
 'use client';
 import { useState } from 'react';
 import { z } from 'zod';
@@ -9,7 +10,6 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { PlusSquare, Loader2, DollarSign, List, FileText, Type } from 'lucide-react';
 import { useDevapp } from '@/hooks/use-devapp';
-import { addDoc, collection, serverTimestamp } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -35,7 +35,7 @@ const productSchema = z.object({
 type ProductFormValues = z.infer<typeof productSchema>;
 
 export default function NewListingPage() {
-  const { userWallet, firestore } = useDevapp();
+  const { userWallet, supabase } = useDevapp();
   const router = useRouter();
   const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -55,23 +55,22 @@ export default function NewListingPage() {
   const category = form.watch('category');
 
   async function onSubmit(values: ProductFormValues) {
-    if (!userWallet || !firestore) {
+    if (!userWallet || !supabase) {
       toast({ variant: 'destructive', title: 'Error', description: 'You must be logged in to create a listing.' });
       return;
     }
     setIsSubmitting(true);
     try {
-      await addDoc(collection(firestore, 'marketplace_products'), {
-        sellerId: userWallet,
+      await supabase.from('marketplace_products').insert({
+        seller_id: userWallet,
         name: values.name,
         description: values.description,
         price: values.price,
-        imageUrl: values.imageUrl || `https://picsum.photos/seed/${Math.random()}/400`,
+        image_url: values.imageUrl || `https://picsum.photos/seed/${Math.random()}/400`,
         category: values.category,
         subcategory: values.subcategory || '',
         status: 'active',
         stock: 1, // Defaulting stock to 1
-        createdAt: serverTimestamp(),
       });
       toast({ title: 'Success!', description: 'Your product has been listed.' });
       router.push('/marketplace');

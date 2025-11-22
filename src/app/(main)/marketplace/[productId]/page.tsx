@@ -1,7 +1,6 @@
+
 'use client';
-import { useDoc, useFirestore, useMemoFirebase } from '@/firebase';
 import { useDevapp } from '@/hooks/use-devapp';
-import { doc } from 'firebase/firestore';
 import { notFound, useRouter } from 'next/navigation';
 import type { MarketplaceProduct, User } from '@/lib/types';
 import { Button } from '@/components/ui/button';
@@ -11,6 +10,7 @@ import Image from 'next/image';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { ArrowLeft, ShoppingCart, User as UserIcon } from 'lucide-react';
 import Link from 'next/link';
+import { useEffect, useState } from 'react';
 
 const LoadingSkeleton = () => (
   <div className="container mx-auto p-4 sm:p-6 lg:p-8">
@@ -31,25 +31,45 @@ const LoadingSkeleton = () => (
 
 export default function ProductDetailPage({ params }: { params: { productId: string } }) {
   const { productId } = params;
-  const firestore = useFirestore();
   const router = useRouter();
-  const { userWallet: currentUserWallet } = useDevapp();
+  const { supabase, userWallet: currentUserWallet } = useDevapp();
+  const [product, setProduct] = useState<MarketplaceProduct | null>(null);
+  const [seller, setSeller] = useState<User | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
 
-  const productRef = useMemoFirebase(() => {
-    if (!firestore || !productId) return null;
-    return doc(firestore, 'marketplace_products', productId);
-  }, [firestore, productId]);
+  useEffect(() => {
+    const fetchProduct = async () => {
+      setIsLoading(true);
+      const { data: productData, error: productError } = await supabase
+        .from('marketplace_products')
+        .select('*')
+        .eq('id', productId)
+        .single();
+      
+      if (productError || !productData) {
+        setIsLoading(false);
+        notFound();
+        return;
+      }
+      setProduct(productData as MarketplaceProduct);
 
-  const { data: product, isLoading: isProductLoading } = useDoc<MarketplaceProduct>(productRef);
+      if (productData.seller_id) {
+        const { data: sellerData, error: sellerError } = await supabase
+          .from('users')
+          .select('*')
+          .eq('wallet_address', productData.seller_id)
+          .single();
+        if (sellerData) {
+          setSeller(sellerData as User);
+        }
+      }
+      setIsLoading(false);
+    }
+    fetchProduct();
+  }, [supabase, productId]);
 
-  const sellerRef = useMemoFirebase(() => {
-    if (!firestore || !product?.sellerId) return null;
-    return doc(firestore, 'users', product.sellerId);
-  }, [firestore, product?.sellerId]);
 
-  const { data: seller, isLoading: isSellerLoading } = useDoc<User>(sellerRef);
-
-  if (isProductLoading || isSellerLoading) {
+  if (isLoading) {
     return <LoadingSkeleton />;
   }
 

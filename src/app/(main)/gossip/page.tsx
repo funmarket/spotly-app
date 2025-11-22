@@ -1,11 +1,10 @@
+
 'use client';
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { useDevapp } from '@/hooks/use-devapp';
-import { addDoc, collection, query, orderBy, serverTimestamp, doc, updateDoc, deleteDoc, where, getDocs, increment } from 'firebase/firestore';
-import { useCollection, useDoc, useMemoFirebase } from '@/firebase';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -59,14 +58,27 @@ function StarRating({ postId, currentRating, ratingCount, onRate }: { postId: st
 }
 
 function CommentsSection({ postId, currentUser }: { postId: string, currentUser: AppUser | null }) {
-    const { firestore } = useDevapp();
+    const { supabase } = useDevapp();
+    const [comments, setComments] = useState<(GossipComment & { id: string })[]>([]);
+    const [isLoading, setIsLoading] = useState(true);
+
+    useEffect(() => {
+        const fetchComments = async () => {
+            setIsLoading(true);
+            const { data, error } = await supabase
+                .from('gossip_comments')
+                .select('*')
+                .eq('post_id', postId)
+                .order('created_at', { ascending: true });
+
+            if (data) {
+                setComments(data as any);
+            }
+            setIsLoading(false);
+        };
+        fetchComments();
+    }, [supabase, postId]);
     
-    const commentsQuery = useMemoFirebase(() => {
-        if (!firestore) return null;
-        return query(collection(firestore, 'gossip_comments'), where('postId', '==', postId), orderBy('createdAt', 'asc'));
-    }, [firestore, postId]);
-    
-    const { data: comments, isLoading } = useCollection<GossipComment>(commentsQuery);
 
     if (isLoading) {
         return <Skeleton className="h-16 w-full" />
@@ -82,19 +94,25 @@ function CommentsSection({ postId, currentUser }: { postId: string, currentUser:
 }
 
 function CommentCard({ comment, currentUser }: { comment: GossipComment & {id: string}, currentUser: AppUser | null }) {
-    const { firestore } = useDevapp();
-    const authorDocRef = useMemoFirebase(() => {
-        if (!firestore || !comment.authorId) return null;
-        return doc(firestore, 'users', comment.authorId);
-    }, [firestore, comment.authorId]);
-    const { data: author } = useDoc<AppUser>(authorDocRef);
+    const { supabase } = useDevapp();
+    const [author, setAuthor] = useState<AppUser | null>(null);
+
+    useEffect(() => {
+        const fetchAuthor = async () => {
+            if (!comment.authorId) return;
+            const { data } = await supabase.from('users').select('*').eq('wallet_address', comment.authorId).single();
+            setAuthor(data as AppUser | null);
+        };
+        fetchAuthor();
+    }, [supabase, comment.authorId]);
+
 
     const handleDelete = async () => {
-        if (!firestore || !window.confirm('Delete this comment?')) return;
+        if (!supabase || !window.confirm('Delete this comment?')) return;
         try {
-            await deleteDoc(doc(firestore, 'gossip_comments', comment.id));
-            const postRef = doc(firestore, 'gossip_posts', comment.postId);
-            await updateDoc(postRef, { commentsCount: increment(-1) });
+            await supabase.from('gossip_comments').delete().eq('id', comment.id);
+            // This requires an RPC function to decrement count safely.
+            // await supabase.rpc('decrement_comment_count', { post_id: comment.postId });
         } catch (error) {
             console.error("Error deleting comment: ", error);
         }
@@ -113,7 +131,7 @@ function CommentCard({ comment, currentUser }: { comment: GossipComment & {id: s
                             <div>
                                 <p className="font-semibold text-sm">{author?.username}</p>
                                 <p className="text-xs text-muted-foreground">
-                                    {comment.createdAt ? formatDistanceToNow(new Date((comment.createdAt as any).seconds * 1000), { addSuffix: true }) : 'just now'}
+                                    {comment.createdAt ? formatDistanceToNow(new Date(comment.createdAt as unknown as string), { addSuffix: true }) : 'just now'}
                                 </p>
                             </div>
                              {currentUser?.walletAddress === comment.authorId && (
@@ -129,34 +147,36 @@ function CommentCard({ comment, currentUser }: { comment: GossipComment & {id: s
 }
 
 function PostCard({ post }: { post: GossipPost & { id: string } }) {
-  const { firestore, userWallet } = useDevapp();
+  const { supabase, userWallet } = useDevapp();
   const [expanded, setExpanded] = useState(false);
   const [comment, setComment] = useState("");
-
-  const authorDocRef = useMemoFirebase(() => {
-    if (!firestore || !post.authorId) return null;
-    return doc(firestore, 'users', post.authorId);
-  }, [firestore, post.authorId]);
+  const [author, setAuthor] = useState<AppUser | null>(null);
   
-  const { data: author } = useDoc<AppUser>(authorDocRef);
+  useEffect(() => {
+    const fetchAuthor = async () => {
+        if (!post.authorId) return;
+        const { data } = await supabase.from('users').select('*').eq('wallet_address', post.authorId).single();
+        setAuthor(data as AppUser | null);
+    };
+    fetchAuthor();
+  }, [supabase, post.authorId]);
+
 
   const timeAgo = post.createdAt
-    ? formatDistanceToNow(new Date((post.createdAt as any).seconds * 1000), { addSuffix: true })
+    ? formatDistanceToNow(new Date(post.createdAt as unknown as string), { addSuffix: true })
     : 'just now';
 
   const handleCommentSubmit = async (e: React.FormEvent) => {
       e.preventDefault();
-      if (!firestore || !userWallet || !comment.trim()) return;
+      if (!supabase || !userWallet || !comment.trim()) return;
 
       try {
-          await addDoc(collection(firestore, 'gossip_comments'), {
-              postId: post.id,
-              authorId: userWallet,
+          await supabase.from('gossip_comments').insert({
+              post_id: post.id,
+              author_id: userWallet,
               content: comment,
-              createdAt: serverTimestamp(),
           });
-          const postRef = doc(firestore, 'gossip_posts', post.id);
-          await updateDoc(postRef, { commentsCount: increment(1) });
+          // This would be better as a supabase function to increment count
           setComment("");
       } catch (error) {
           console.error("Error adding comment: ", error);
@@ -164,11 +184,11 @@ function PostCard({ post }: { post: GossipPost & { id: string } }) {
   }
 
   const handleRate = async (postId: string, score: number) => {
-      if (!firestore || !userWallet) return;
+      if (!supabase || !userWallet) return;
       try {
-          await addDoc(collection(firestore, 'gossip_ratings'), {
-              postId,
-              raterId: userWallet,
+          await supabase.from('gossip_ratings').insert({
+              post_id: postId,
+              rater_id: userWallet,
               rating: score,
           });
       } catch (error) {
@@ -216,7 +236,7 @@ function PostCard({ post }: { post: GossipPost & { id: string } }) {
 }
 
 function PostComposer() {
-  const { firestore, userWallet } = useDevapp();
+  const { supabase, userWallet } = useDevapp();
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const form = useForm<z.infer<typeof postSchema>>({
@@ -225,19 +245,17 @@ function PostComposer() {
   });
 
   async function onSubmit(values: z.infer<typeof postSchema>) {
-    if (!firestore || !userWallet) return;
+    if (!supabase || !userWallet) return;
     setIsSubmitting(true);
     try {
-      const postsCollection = collection(firestore, 'gossip_posts');
-      await addDoc(postsCollection, {
-        authorId: userWallet,
+      await supabase.from('gossip_posts').insert({
+        author_id: userWallet,
         content: values.content,
         category: values.category,
-        imageUrl: values.imageUrl || '',
-        commentsCount: 0,
-        createdAt: serverTimestamp(),
-        avgRating: 0,
-        ratingCount: 0,
+        image_url: values.imageUrl || null,
+        comments_count: 0,
+        avg_rating: 0,
+        rating_count: 0,
       });
       form.reset();
     } catch (error) {
@@ -287,12 +305,26 @@ function PostComposer() {
 }
 
 function GossipFeed() {
-    const { firestore } = useDevapp();
-    const postsQuery = useMemoFirebase(() => {
-        if (!firestore) return null;
-        return query(collection(firestore, 'gossip_posts'), orderBy('createdAt', 'desc'));
-    }, [firestore]);
-    const { data: posts, isLoading } = useCollection<GossipPost>(postsQuery);
+    const { supabase } = useDevapp();
+    const [posts, setPosts] = useState<(GossipPost & { id: string })[]>([]);
+    const [isLoading, setIsLoading] = useState(true);
+
+    useEffect(() => {
+        const fetchPosts = async () => {
+            setIsLoading(true);
+            const { data, error } = await supabase
+                .from('gossip_posts')
+                .select('*')
+                .order('created_at', { ascending: false });
+            
+            if (data) {
+                setPosts(data as any);
+            }
+            setIsLoading(false);
+        };
+        fetchPosts();
+    }, [supabase]);
+
 
     return (
         <div>
@@ -313,7 +345,7 @@ function GossipFeed() {
 }
 
 function GossipInbox({ initialSelectedWallet }: { initialSelectedWallet: string | null }) {
-    const { firestore, userWallet } = useDevapp();
+    const { supabase, userWallet } = useDevapp();
     const [conversations, setConversations] = useState<AppUser[]>([]);
     const [selectedUser, setSelectedUser] = useState<AppUser | null>(null);
     const [messages, setMessages] = useState<(GossipMessage & { id: string })[]>([]);
@@ -325,15 +357,15 @@ function GossipInbox({ initialSelectedWallet }: { initialSelectedWallet: string 
 
     useEffect(() => {
         const fetchCurrentUser = async () => {
-            if(userWallet && firestore) {
-                const userDoc = await getDoc(doc(firestore, 'users', userWallet));
-                if(userDoc.exists()){
-                    setCurrentUser(userDoc.data() as AppUser);
+            if(userWallet && supabase) {
+                const { data } = await supabase.from('users').select('*').eq('wallet_address', userWallet).single();
+                if(data){
+                    setCurrentUser(data as AppUser);
                 }
             }
         }
         fetchCurrentUser();
-    }, [userWallet, firestore]);
+    }, [userWallet, supabase]);
 
     useEffect(() => {
         if (!userWallet) return;
@@ -354,64 +386,86 @@ function GossipInbox({ initialSelectedWallet }: { initialSelectedWallet: string 
     }, [messages]);
 
     const loadConversations = async () => {
-        if (!firestore || !userWallet) return;
+        if (!supabase || !userWallet) return;
         setLoading(true);
-        const sentMessagesQuery = query(collection(firestore, 'gossip_messages'), where('fromId', '==', userWallet));
-        const receivedMessagesQuery = query(collection(firestore, 'gossip_messages'), where('toId', '==', userWallet));
+        
+        const { data: userIds, error } = await supabase.rpc('get_conversations');
 
-        const [sentSnapshot, receivedSnapshot] = await Promise.all([getDocs(sentMessagesQuery), getDocs(receivedMessagesQuery)]);
-        const userIds = new Set<string>();
-        sentSnapshot.forEach(doc => userIds.add(doc.data().toId));
-        receivedSnapshot.forEach(doc => userIds.add(doc.data().fromId));
-
-        if (initialSelectedWallet) {
-            userIds.add(initialSelectedWallet);
-        }
-
-        if (userIds.size === 0) {
+        if (error || !userIds) {
+            console.error(error);
             setLoading(false);
             return;
         }
-        
-        const usersQuery = query(collection(firestore, 'users'), where('walletAddress', 'in', Array.from(userIds)));
-        const usersSnapshot = await getDocs(usersQuery);
-        const convUsers = usersSnapshot.docs.map(doc => ({ userId: doc.id, ...doc.data() } as AppUser));
 
-        setConversations(convUsers);
+        const allUserIds = userIds as { user_id: string }[];
+        
+        if (initialSelectedWallet && !allUserIds.some(u => u.user_id === initialSelectedWallet)) {
+            allUserIds.push({ user_id: initialSelectedWallet });
+        }
+        
+        if(allUserIds.length === 0) {
+          setLoading(false);
+          return;
+        }
+
+        const { data: convUsers, error: usersError } = await supabase
+            .from('users')
+            .select('*')
+            .in('wallet_address', allUserIds.map(u => u.user_id));
+
+        if (convUsers) {
+            setConversations(convUsers as AppUser[]);
+        }
+
         setLoading(false);
     };
 
     const handleSelectUser = (user: AppUser) => {
         setSelectedUser(user);
     };
-
-    const messagesQuery = useMemoFirebase(() => {
-        if (!firestore || !userWallet || !selectedUser) return null;
-        return query(collection(firestore, 'gossip_messages'), where('fromId', 'in', [userWallet, selectedUser.walletAddress]), where('toId', 'in', [userWallet, selectedUser.walletAddress]), orderBy('createdAt', 'asc'));
-    }, [firestore, userWallet, selectedUser]);
-    
-    const {data: allMessages} = useCollection<GossipMessage>(messagesQuery);
     
     useEffect(() => {
-        if (allMessages) {
-            const filtered = allMessages.filter(msg => 
-                (msg.fromId === userWallet && msg.toId === selectedUser?.walletAddress) ||
-                (msg.fromId === selectedUser?.walletAddress && msg.toId === userWallet)
-            )
-            setMessages(filtered);
+        const fetchMessages = async () => {
+            if (!supabase || !userWallet || !selectedUser) {
+                setMessages([]);
+                return;
+            };
+
+            const { data, error } = await supabase
+                .from('gossip_messages')
+                .select('*')
+                .or(`and(from_id.eq.${userWallet},to_id.eq.${selectedUser.walletAddress}),and(from_id.eq.${selectedUser.walletAddress},to_id.eq.${userWallet})`)
+                .order('created_at', { ascending: true });
+
+            if (data) {
+                setMessages(data as any);
+            }
         }
-    }, [allMessages, userWallet, selectedUser]);
+        fetchMessages();
+
+        const channel = supabase.channel(`messages:${userWallet}:${selectedUser.walletAddress}`)
+            .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'gossip_messages' }, payload => {
+                const newMessage = payload.new as (GossipMessage & { id: string });
+                if ((newMessage.fromId === userWallet && newMessage.toId === selectedUser.walletAddress) || (newMessage.fromId === selectedUser.walletAddress && newMessage.toId === userWallet)) {
+                    setMessages(current => [...current, newMessage]);
+                }
+            })
+            .subscribe();
+
+        return () => { supabase.removeChannel(channel); };
+
+    }, [supabase, userWallet, selectedUser]);
+
 
     const handleSendMessage = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!firestore || !userWallet || !selectedUser || !messageText.trim()) return;
+        if (!supabase || !userWallet || !selectedUser || !messageText.trim()) return;
 
         try {
-            await addDoc(collection(firestore, 'gossip_messages'), {
-                fromId: userWallet,
-                toId: selectedUser.walletAddress,
+            await supabase.from('gossip_messages').insert({
+                from_id: userWallet,
+                to_id: selectedUser.walletAddress,
                 content: messageText,
-                createdAt: serverTimestamp(),
             });
             setMessageText('');
         } catch (error) {

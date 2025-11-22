@@ -2,7 +2,6 @@
 'use client';
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { doc, serverTimestamp, updateDoc, getDoc } from 'firebase/firestore';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -17,7 +16,6 @@ import { ChevronDown, ChevronUp, Loader2, Plus, Trash2 } from 'lucide-react';
 import { useDevapp } from '@/hooks/use-devapp';
 import type { User } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
-import { errorEmitter, FirestorePermissionError } from '@/firebase';
 
 const TALENT_CATEGORIES = {
   music: {
@@ -92,7 +90,7 @@ const profileSchema = z.object({
 type ProfileFormValues = z.infer<typeof profileSchema>;
 
 export default function EditProfilePage() {
-  const { firestore, userWallet } = useDevapp();
+  const { supabase, userWallet } = useDevapp();
   const router = useRouter();
   const { toast } = useToast();
   
@@ -121,49 +119,45 @@ export default function EditProfilePage() {
   
    useEffect(() => {
     async function fetchProfile() {
-      if (userWallet && firestore) {
+      if (userWallet && supabase) {
         setIsLoading(true);
-        const docRef = doc(firestore, 'users', userWallet);
-        const docSnap = await getDoc(docRef);
-        if (docSnap.exists()) {
-          const userData = docSnap.data() as User;
+        const { data: userData, error } = await supabase.from('users').select('*').eq('wallet_address', userWallet).single();
+        
+        if (userData) {
           form.reset({
             username: userData.username || '',
             bio: userData.bio || '',
-            profilePhotoUrl: userData.profilePhotoUrl || '',
-            bannerPhotoUrl: userData.bannerPhotoUrl || '',
+            profilePhotoUrl: userData.profile_photo_url || '',
+            bannerPhotoUrl: userData.banner_photo_url || '',
             isArtist: userData.role === 'artist',
             isBusiness: userData.role === 'business',
-            talentCategory: userData.talentCategory || '',
-            talentSubcategories: typeof userData.talentSubcategories === 'string' ? JSON.parse(userData.talentSubcategories) : (userData.talentSubcategories || []),
-            subRole: userData.subRole || '',
+            talentCategory: userData.talent_category || '',
+            talentSubcategories: userData.talent_subcategories || [],
+            subRole: userData.sub_role || '',
             tags: userData.tags || '',
             location: userData.location || '',
-            socialLinks: typeof userData.socialLinks === 'string' ? JSON.parse(userData.socialLinks) : (userData.socialLinks || {}),
-            extraLinks: typeof userData.extraLinks === 'string' ? JSON.parse(userData.extraLinks) : (userData.extraLinks || []),
+            socialLinks: userData.social_links || {},
+            extraLinks: userData.extra_links || [],
           });
         } else {
-            // If no profile exists, redirect to onboarding
             router.push('/onboarding');
         }
         setIsLoading(false);
       } else if(userWallet === undefined) {
-          // still loading wallet
           setIsLoading(true);
       } else {
-          // no wallet connected, push to onboarding
           router.push('/onboarding');
       }
     }
     fetchProfile();
-  }, [userWallet, firestore, form, router]);
+  }, [userWallet, supabase, form, router]);
 
   const { watch, setValue } = form;
   const isArtist = watch('isArtist');
   const talentCategory = watch('talentCategory');
   
-  const onSubmit = (values: ProfileFormValues) => {
-    if (!firestore || !userWallet) {
+  const onSubmit = async (values: ProfileFormValues) => {
+    if (!supabase || !userWallet) {
         toast({variant: 'destructive', title: 'Not Logged In', description: 'You must be logged in to edit your profile.'});
         return;
     }
@@ -181,38 +175,31 @@ export default function EditProfilePage() {
     setIsSubmitting(true);
     let role: 'fan' | 'artist' | 'business' | 'regular' = watch('isArtist') ? 'artist' : (watch('isBusiness') ? 'business' : 'fan');
     
-    const userDocRef = doc(firestore, 'users', userWallet);
-
     const profileData = {
       username: values.username,
       bio: values.bio || '',
       tags: values.tags || '',
       location: values.location || '',
-      profilePhotoUrl: values.profilePhotoUrl || `https://picsum.photos/seed/${userWallet}/400`,
-      bannerPhotoUrl: values.bannerPhotoUrl || `https://picsum.photos/seed/banner-${userWallet}/1200/400`,
-      socialLinks: JSON.stringify(values.socialLinks || {}),
-      extraLinks: JSON.stringify(values.extraLinks || []),
+      profile_photo_url: values.profilePhotoUrl || `https://picsum.photos/seed/${userWallet}/400`,
+      banner_photo_url: values.bannerPhotoUrl || `https://picsum.photos/seed/banner-${userWallet}/1200/400`,
+      social_links: values.socialLinks || {},
+      extra_links: values.extraLinks || [],
       role: role,
-      subRole: values.isArtist ? (values.subRole || '') : '',
-      talentCategory: values.isArtist ? (values.talentCategory || '') : '',
-      talentSubcategories: values.isArtist ? JSON.stringify(values.talentSubcategories || []) : '[]',
-      updatedAt: serverTimestamp(),
+      sub_role: values.isArtist ? (values.subRole || '') : '',
+      talent_category: values.isArtist ? (values.talentCategory || '') : '',
+      talent_subcategories: values.isArtist ? (values.talentSubcategories || []) : [],
     };
 
-    updateDoc(userDocRef, profileData)
-      .then(() => {
+    const { error } = await supabase.from('users').update(profileData).eq('wallet_address', userWallet);
+    
+    setIsSubmitting(false);
+
+    if (error) {
+        toast({ title: 'Error Updating Profile', description: error.message, variant: 'destructive' });
+    } else {
         toast({ title: 'Profile Updated!', description: 'Your changes have been saved.' });
         router.push(`/profile/${userWallet}`);
-      })
-      .catch(error => {
-        const permissionError = new FirestorePermissionError({
-          path: userDocRef.path,
-          operation: 'update',
-          requestResourceData: profileData
-        });
-        errorEmitter.emit('permission-error', permissionError);
-      })
-      .finally(() => setIsSubmitting(false));
+    }
   };
 
   const addExtraLink = () => {

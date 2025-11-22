@@ -1,8 +1,6 @@
+
 'use client';
 import { useDevapp } from '@/hooks/use-devapp';
-import { useMemoFirebase } from '@/firebase';
-import { collection, query, where, orderBy } from 'firebase/firestore';
-import { useCollection } from '@/firebase/firestore/use-collection';
 import {
   Card,
   CardContent,
@@ -26,21 +24,34 @@ import {
 import { Badge } from '@/components/ui/badge';
 import type { Referral } from '@/lib/types';
 import { format } from 'date-fns';
+import { useEffect, useState } from 'react';
 
 export default function ReferralsPage() {
-  const { userWallet, firestore } = useDevapp();
+  const { userWallet, supabase } = useDevapp();
   const { toast } = useToast();
+  const [referrals, setReferrals] = useState<Referral[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
 
-  const referralsQuery = useMemoFirebase(() => {
-    if (!firestore || !userWallet) return null;
-    return query(
-      collection(firestore, 'referrals'),
-      where('referrerWallet', '==', userWallet),
-      orderBy('createdAt', 'desc')
-    );
-  }, [firestore, userWallet]);
-
-  const { data: referrals, isLoading } = useCollection<Referral>(referralsQuery);
+  useEffect(() => {
+    const fetchReferrals = async () => {
+      if (!userWallet) {
+        setIsLoading(false);
+        return;
+      }
+      setIsLoading(true);
+      const { data, error } = await supabase
+        .from('referrals')
+        .select('*')
+        .eq('referrer_wallet', userWallet)
+        .order('created_at', { ascending: false });
+      
+      if (data) {
+        setReferrals(data as Referral[]);
+      }
+      setIsLoading(false);
+    }
+    fetchReferrals();
+  }, [supabase, userWallet]);
 
   const referralCode = userWallet ? userWallet.slice(0, 8) : '';
   const referralLink =
@@ -153,7 +164,7 @@ export default function ReferralsPage() {
                   <TableRow key={ref.id}>
                     <TableCell>
                       {format(
-                        new Date(ref.createdAt.seconds * 1000),
+                        new Date((ref.createdAt as unknown as string)),
                         'MMM d, yyyy'
                       )}
                     </TableCell>

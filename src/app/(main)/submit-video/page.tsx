@@ -24,7 +24,6 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { PlusSquare, Loader2, AlertCircle } from 'lucide-react';
 import { useDevapp } from '@/hooks/use-devapp';
-import { addDoc, collection, serverTimestamp, doc, getDoc } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -40,7 +39,7 @@ const videoSchema = z.object({
 });
 
 export default function SubmitVideoPage() {
-  const { userWallet, firestore } = useDevapp();
+  const { userWallet, supabase } = useDevapp();
   const { toast } = useToast();
   const router = useRouter();
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -63,12 +62,11 @@ export default function SubmitVideoPage() {
   useEffect(() => {
     const fetchUserProfile = async () => {
       setIsProfileLoading(true);
-      if (userWallet && firestore) {
+      if (userWallet && supabase) {
         try {
-          const userDocRef = doc(firestore, 'users', userWallet);
-          const docSnap = await getDoc(userDocRef);
-          if (docSnap.exists()) {
-            setUserProfile(docSnap.data() as User);
+          const { data, error } = await supabase.from('users').select('*').eq('wallet_address', userWallet).single();
+          if (data) {
+            setUserProfile(data as User);
           } else {
             setUserProfile(null);
           }
@@ -84,7 +82,7 @@ export default function SubmitVideoPage() {
       }
     };
     fetchUserProfile();
-  }, [userWallet, firestore]);
+  }, [userWallet, supabase]);
 
   async function onSubmit(values: z.infer<typeof videoSchema>) {
     if (!userWallet || !userProfile) {
@@ -112,29 +110,28 @@ export default function SubmitVideoPage() {
     }
 
     setIsSubmitting(true);
-    const videosCollection = collection(firestore, 'videos');
-
+    
     try {
-      await addDoc(videosCollection, {
-        artistId: userWallet,
-        rawVideoInput: values.rawVideoInput,
+      const { error } = await supabase.from('videos').insert({
+        artist_id: userWallet,
+        raw_video_input: values.rawVideoInput,
         description: values.description,
-        videoCategory: values.videoCategory.toLowerCase().trim(),
-        videoUrl: finalParseResult.embedUrl,
+        video_category: values.videoCategory.toLowerCase().trim(),
+        video_url: finalParseResult.embedUrl,
         status: 'active',
-        isBanned: false,
-        hiddenFromFeed: false,
-        topCount: 0,
-        flopCount: 0,
-        shareCount: 0,
-        commentCount: 0,
-        bookCount: 0,
-        adoptCount: 0,
-        rankingScore: 0,
-        adminFlag: false,
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp(),
+        is_banned: false,
+        hidden_from_feed: false,
+        top_count: 0,
+        flop_count: 0,
+        share_count: 0,
+        comment_count: 0,
+        book_count: 0,
+        adopt_count: 0,
+        ranking_score: 0,
+        admin_flag: false,
       });
+      
+      if (error) throw error;
 
       toast({
         title: 'Video Submitted!',

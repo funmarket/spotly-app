@@ -7,8 +7,6 @@ import { Avatar, AvatarFallback, AvatarImage } from '../ui/avatar';
 import { Badge } from '../ui/badge';
 import Link from 'next/link';
 import { useDevapp } from '@/hooks/use-devapp';
-import { doc, updateDoc, arrayUnion, arrayRemove } from 'firebase/firestore';
-import { useFirestore } from '@/firebase';
 import { getAuth, signOut } from 'firebase/auth';
 
 const socialIcons: { [key: string]: React.ReactNode } = {
@@ -31,31 +29,32 @@ const StatItem = ({ icon: Icon, value, label }: { icon: React.ElementType, value
 );
 
 export function ProfileHeader({ user, isOwnProfile, stats }: { user: User, isOwnProfile: boolean, stats: { points: number, videos: number, views: number }}) {
-  const { userWallet } = useDevapp();
-  const firestore = useFirestore();
-  const socialLinks = typeof user.socialLinks === 'string' && user.socialLinks ? JSON.parse(user.socialLinks) : {};
-  const tags = user.talentSubcategories && typeof user.talentSubcategories === 'string' ? JSON.parse(user.talentSubcategories) : (user.talentSubcategories || []);
+  const { userWallet, supabase } = useDevapp();
+  const socialLinks = user.socialLinks || {};
+  const tags = user.talentSubcategories || [];
 
   const isFollowing = user.followers?.includes(userWallet || '');
 
   const handleFollowToggle = async () => {
-      if (!userWallet || !firestore || isOwnProfile) return;
+      if (!userWallet || isOwnProfile) return;
       
-      const currentUserRef = doc(firestore, 'users', userWallet);
-      const targetUserRef = doc(firestore, 'users', user.walletAddress);
+      const rpcName = isFollowing ? 'unfollow_user' : 'follow_user';
 
-      if (isFollowing) {
-          await updateDoc(currentUserRef, { following: arrayRemove(user.walletAddress) });
-          await updateDoc(targetUserRef, { followers: arrayRemove(userWallet) });
+      const { error } = await supabase.rpc(rpcName, {
+          p_follower_id: userWallet,
+          p_following_id: user.walletAddress
+      });
+
+      if (error) {
+        console.error('Follow/Unfollow error:', error);
       } else {
-          await updateDoc(currentUserRef, { following: arrayUnion(user.walletAddress) });
-          await updateDoc(targetUserRef, { followers: arrayUnion(userWallet) });
+        // Force a refresh or optimistically update UI
+        window.location.reload();
       }
   }
 
   const handleLogout = async () => {
-    const auth = getAuth();
-    await signOut(auth);
+    await supabase.auth.signOut();
     window.location.href = '/';
   }
 

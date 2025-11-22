@@ -1,8 +1,6 @@
+
 'use client';
 import { useDevapp } from '@/hooks/use-devapp';
-import { useMemoFirebase } from '@/firebase';
-import { collection, query, where, getDocs, doc } from 'firebase/firestore';
-import { useCollection } from '@/firebase/firestore/use-collection';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Heart, Loader2 } from 'lucide-react';
 import type { Favorite, Video, User } from '@/lib/types';
@@ -21,7 +19,7 @@ const FavoriteVideoCard = ({ video }: { video: Video }) => {
       <Card className="overflow-hidden">
         <div className="aspect-w-9 aspect-h-16 relative">
           <Image
-            src={`https://picsum.photos/seed/${video.videoId}/300/500`}
+            src={`https://picsum.photos/seed/${video.id}/300/500`}
             alt={video.description}
             fill
             className="object-cover group-hover:scale-105 transition-transform duration-300"
@@ -38,53 +36,95 @@ const FavoriteVideoCard = ({ video }: { video: Video }) => {
 };
 
 export default function FavoritesPage() {
-  const { userWallet, firestore } = useDevapp();
+  const { userWallet, supabase } = useDevapp();
   const [enrichedFavorites, setEnrichedFavorites] = useState<EnrichedFavorite[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
-  const favoritesQuery = useMemoFirebase(() => {
-    if (!firestore || !userWallet) return null;
-    return query(
-      collection(firestore, 'favorites'),
-      where('userId', '==', userWallet),
-      where('itemType', '==', 'video')
-    );
-  }, [firestore, userWallet]);
-
-  const { data: favorites } = useCollection<Favorite>(favoritesQuery);
-
   useEffect(() => {
     const enrichFavorites = async () => {
-      if (!favorites || !firestore) {
-         if(userWallet === undefined) setIsLoading(false);
+      if (!userWallet) {
+        setIsLoading(false);
         return;
       }
       setIsLoading(true);
-      const enriched = await Promise.all(
-        favorites.map(async (fav) => {
-          if (fav.itemType === 'video') {
-            const videoRef = doc(firestore, 'videos', fav.itemId);
-            const videoSnap = await getDocs(query(collection(firestore, 'videos'), where('__name__', '==', fav.itemId)));
-            if (!videoSnap.empty) {
-               const videoData = { id: videoSnap.docs[0].id, ...videoSnap.docs[0].data() } as Video & {id: string};
-              
-              const userRef = doc(firestore, 'users', videoData.artistId);
-               const userSnap = await getDocs(query(collection(firestore, 'users'), where('__name__', '==', videoData.artistId)));
 
-              const artist = !userSnap.empty ? { userId: userSnap.docs[0].id, ...userSnap.docs[0].data() } as User : null;
+      const { data: favorites, error: favError } = await supabase
+        .from('favorites')
+        .select('*')
+        .eq('user_id', userWallet)
+        .eq('item_type', 'video');
 
-              return { ...fav, item: { ...videoData, videoId: videoData.id, user: artist } };
-            }
-          }
-          return { ...fav, item: null };
-        })
-      );
+      if (favError || !favorites) {
+        console.error('Error fetching favorites:', favError);
+        setIsLoading(false);
+        return;
+      }
+
+      const videoIds = favorites.map(fav => fav.item_id);
+      if (videoIds.length === 0) {
+        setEnrichedFavorites([]);
+        setIsLoading(false);
+        return;
+      }
+
+      const { data: videos, error: videosError } = await supabase
+        .from('videos')
+        .select('*, users(*)')
+        .in('id', videoIds);
+
+      if (videosError) {
+        console.error('Error fetching favorite videos:', videosError);
+        setIsLoading(false);
+        return;
+      }
+      
+      const videosMap = new Map(videos.map(v => [v.id, v]));
+
+      const enriched = favorites.map(fav => {
+        const videoData = videosMap.get(fav.item_id);
+        if (videoData) {
+            const user = videoData.users ? {
+                userId: videoData.users.user_id,
+                walletAddress: videoData.users.wallet_address,
+                username: videoData.users.username,
+                profilePhotoUrl: videoData.users.profile_photo_url,
+                bannerPhotoUrl: videoData.users.banner_photo_url,
+                bio: videoData.users.bio,
+                role: videoData.users.role,
+            } : null;
+
+            const item: Video & { user: User | null } = {
+                id: videoData.id,
+                videoId: videoData.id,
+                artistId: videoData.artist_id,
+                videoUrl: videoData.video_url,
+                description: videoData.description,
+                topCount: videoData.top_count,
+                flopCount: videoData.flop_count,
+                shareCount: videoData.share_count,
+                commentCount: videoData.comment_count,
+                status: videoData.status,
+                isBanned: videoData.is_banned,
+                bookCount: videoData.book_count,
+                adoptCount: videoData.adopt_count,
+                rankingScore: videoData.ranking_score,
+                rawVideoInput: videoData.raw_video_input,
+                videoCategory: videoData.video_category,
+                hiddenFromFeed: videoData.hidden_from_feed,
+                createdAt: { seconds: new Date(videoData.created_at).getTime() / 1000, nanoseconds: 0 },
+                user: user,
+            };
+            return { ...fav, id: fav.id, item };
+        }
+        return { ...fav, id: fav.id, item: null };
+      });
+      
       setEnrichedFavorites(enriched.filter(ef => ef.item) as EnrichedFavorite[]);
       setIsLoading(false);
     };
 
     enrichFavorites();
-  }, [favorites, firestore, userWallet]);
+  }, [supabase, userWallet]);
 
   if (isLoading) {
     return (

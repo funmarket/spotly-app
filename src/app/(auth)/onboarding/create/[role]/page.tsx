@@ -2,7 +2,6 @@
 'use client';
 import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { doc, setDoc, serverTimestamp, collection, updateDoc, getDoc } from 'firebase/firestore';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -18,7 +17,6 @@ import { useDevapp } from '@/hooks/use-devapp';
 import { WalletMultiButton } from '@solana/wallet-adapter-react-ui';
 import type { User } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
-import { errorEmitter, FirestorePermissionError } from '@/firebase';
 
 const TALENT_CATEGORIES = {
   music: {
@@ -93,7 +91,7 @@ const profileSchema = z.object({
 type ProfileFormValues = z.infer<typeof profileSchema>;
 
 export default function CreateProfilePage() {
-  const { firestore, userWallet } = useDevapp();
+  const { supabase, userWallet } = useDevapp();
   const router = useRouter();
   const params = useParams();
   const { toast } = useToast();
@@ -130,32 +128,31 @@ export default function CreateProfilePage() {
   
    useEffect(() => {
     async function fetchProfile() {
-      if (userWallet && firestore) {
-        const docRef = doc(firestore, 'users', userWallet);
-        const docSnap = await getDoc(docRef);
-        if (docSnap.exists()) {
-          const userData = docSnap.data() as User;
-          setExistingProfile(userData);
+      if (userWallet && supabase) {
+        const { data: userData, error } = await supabase.from('users').select('*').eq('wallet_address', userWallet).single();
+        
+        if (userData) {
+          setExistingProfile(userData as User);
           form.reset({
             username: userData.username || '',
             bio: userData.bio || '',
-            profilePhotoUrl: userData.profilePhotoUrl || '',
-            bannerPhotoUrl: userData.bannerPhotoUrl || '',
+            profilePhotoUrl: userData.profile_photo_url || '',
+            bannerPhotoUrl: userData.banner_photo_url || '',
             isArtist: userData.role === 'artist',
             isBusiness: userData.role === 'business',
-            talentCategory: userData.talentCategory || '',
-            talentSubcategories: typeof userData.talentSubcategories === 'string' ? JSON.parse(userData.talentSubcategories) : (userData.talentSubcategories || []),
-            subRole: userData.subRole || '',
+            talentCategory: userData.talent_category || '',
+            talentSubcategories: userData.talent_subcategories || [],
+            subRole: userData.sub_role || '',
             tags: userData.tags || '',
             location: userData.location || '',
-            socialLinks: typeof userData.socialLinks === 'string' ? JSON.parse(userData.socialLinks) : (userData.socialLinks || {}),
-            extraLinks: typeof userData.extraLinks === 'string' ? JSON.parse(userData.extraLinks) : (userData.extraLinks || []),
+            socialLinks: userData.social_links || {},
+            extraLinks: userData.extra_links || [],
           });
         }
       }
     }
     fetchProfile();
-  }, [userWallet, firestore, form]);
+  }, [userWallet, supabase, form]);
 
   useEffect(() => {
     form.reset({
@@ -170,7 +167,7 @@ export default function CreateProfilePage() {
   const talentCategory = watch('talentCategory');
   
   const onSubmit = async (values: ProfileFormValues) => {
-    if (!firestore) return;
+    if (!supabase) return;
     
     const needsWallet = accountType === 'artist' || accountType === 'business';
 
@@ -199,68 +196,52 @@ export default function CreateProfilePage() {
     if (values.isArtist) role = 'artist';
     else if (values.isBusiness) role = 'business';
 
-    const docId = userWallet ? userWallet : doc(collection(firestore, 'users')).id;
-    const userDocRef = doc(firestore, 'users', docId);
-
+    const docId = userWallet || `guest_${Date.now()}`;
+    
     const profileData = {
       username: values.username,
       bio: values.bio || '',
       tags: values.tags || '',
       location: values.location || '',
-      profilePhotoUrl: values.profilePhotoUrl || `https://picsum.photos/seed/${docId}/400`,
-      bannerPhotoUrl: values.bannerPhotoUrl || `https://picsum.photos/seed/banner-${docId}/1200/400`,
-      socialLinks: JSON.stringify(values.socialLinks || {}),
-      extraLinks: JSON.stringify(values.extraLinks || []),
+      profile_photo_url: values.profilePhotoUrl || `https://picsum.photos/seed/${docId}/400`,
+      banner_photo_url: values.bannerPhotoUrl || `https://picsum.photos/seed/banner-${docId}/1200/400`,
+      social_links: values.socialLinks || {},
+      extra_links: values.extraLinks || [],
       role: role,
-      subRole: values.isArtist ? (values.subRole || '') : '',
-      talentCategory: values.isArtist ? (values.talentCategory || '') : '',
-      talentSubcategories: values.isArtist ? JSON.stringify(values.talentSubcategories || []) : '[]',
-      updatedAt: serverTimestamp(),
+      sub_role: values.isArtist ? (values.subRole || '') : '',
+      talent_category: values.isArtist ? (values.talentCategory || '') : '',
+      talent_subcategories: values.isArtist ? (values.talentSubcategories || []) : [],
     };
 
     if (existingProfile) {
-        updateDoc(userDocRef, profileData)
-          .then(() => {
+        const { error } = await supabase.from('users').update(profileData).eq('wallet_address', userWallet);
+        if (error) {
+            toast({ title: 'Update Failed', description: error.message, variant: 'destructive' });
+        } else {
             toast({ title: 'Profile Updated!', description: 'Your changes have been saved.' });
             router.push(`/profile/${userWallet}`);
-          })
-          .catch(error => {
-            const permissionError = new FirestorePermissionError({
-              path: userDocRef.path,
-              operation: 'update',
-              requestResourceData: profileData
-            });
-            errorEmitter.emit('permission-error', permissionError);
-          })
-          .finally(() => setIsSubmitting(false));
+        }
     } else {
         const creationData = {
             ...profileData,
-            walletAddress: docId,
-            skills: '',
-            rankingScore: 0,
-            escrowBalance: 0,
-            createdAt: serverTimestamp(),
+            wallet_address: docId,
+            ranking_score: 0,
+            escrow_balance: 0,
         };
-        setDoc(userDocRef, creationData, { merge: true })
-          .then(() => {
-             toast({ title: 'Profile Created!', description: 'Welcome to TalentVerse!' });
-              if (role === 'artist') {
-                  setStep(2);
-              } else {
-                  router.push('/');
-              }
-          })
-          .catch(error => {
-              const permissionError = new FirestorePermissionError({
-                path: userDocRef.path,
-                operation: 'create',
-                requestResourceData: creationData
-              });
-              errorEmitter.emit('permission-error', permissionError);
-          })
-          .finally(() => setIsSubmitting(false));
+        const { error } = await supabase.from('users').insert(creationData);
+
+        if (error) {
+            toast({ title: 'Creation Failed', description: error.message, variant: 'destructive' });
+        } else {
+            toast({ title: 'Profile Created!', description: 'Welcome to TalentVerse!' });
+            if (role === 'artist') {
+                setStep(2);
+            } else {
+                router.push('/');
+            }
+        }
     }
+    setIsSubmitting(false);
   };
 
   const addExtraLink = () => {

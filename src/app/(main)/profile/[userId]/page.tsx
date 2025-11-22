@@ -8,9 +8,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import Image from 'next/image';
 import Link from 'next/link';
 import { BarChart, Eye, ThumbsUp, Wallet, Video as VideoIcon, Trash2 } from 'lucide-react';
-import { useCollection, useFirestore, useMemoFirebase, useDoc, errorEmitter, FirestorePermissionError } from '@/firebase';
 import { useDevapp } from '@/hooks/use-devapp';
-import { collection, query, where, orderBy, doc, deleteDoc } from 'firebase/firestore';
 import type { Video, User } from '@/lib/types';
 import { Skeleton } from '@/components/ui/skeleton';
 import { AiInsights } from '@/components/profile/ai-insights';
@@ -31,29 +29,27 @@ const StatCard = ({ icon: Icon, title, value, color, isLoading }: { icon: React.
 
 
 function ProfileVideos({ userId, canEdit }: { userId: string, canEdit: boolean }) {
-  const firestore = useFirestore();
+  const { supabase } = useDevapp();
   const [deletingVideo, setDeletingVideo] = useState<Video | null>(null);
+  const [videos, setVideos] = useState<(Video & { id: string })[] | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
 
-  const videosQuery = useMemoFirebase(() => {
-    if (!firestore) return null;
-    return query(
-      collection(firestore, 'videos'),
-      where('artistId', '==', userId)
-    );
-  }, [firestore, userId]);
-
-  const { data: unsortedVideos, isLoading } = useCollection<Video>(videosQuery);
-
-  const videos = useMemo(() => {
-    if (!unsortedVideos) return null;
-    // Perform client-side sorting
-    return [...unsortedVideos].sort((a, b) => {
-        const dateA = a.createdAt as any;
-        const dateB = b.createdAt as any;
-        return (dateB?.seconds ?? 0) - (dateA?.seconds ?? 0);
-    });
-  }, [unsortedVideos]);
-
+  useEffect(() => {
+    const fetchVideos = async () => {
+      setIsLoading(true);
+      const { data, error } = await supabase
+        .from('videos')
+        .select('*')
+        .eq('artist_id', userId)
+        .order('created_at', { ascending: false });
+      
+      if (data) {
+        setVideos(data as (Video & { id: string })[]);
+      }
+      setIsLoading(false);
+    };
+    fetchVideos();
+  }, [supabase, userId]);
 
   const handleDeleteClick = (e: React.MouseEvent, video: Video) => {
     e.preventDefault();
@@ -61,20 +57,13 @@ function ProfileVideos({ userId, canEdit }: { userId: string, canEdit: boolean }
     setDeletingVideo(video);
   }
 
-  const confirmDeleteVideo = () => {
-    if (!deletingVideo || !firestore || !deletingVideo.id) return;
-    const docRef = doc(firestore, 'videos', deletingVideo.id);
-    deleteDoc(docRef)
-      .then(() => {
-        setDeletingVideo(null);
-      })
-      .catch(error => {
-        const permissionError = new FirestorePermissionError({
-          path: docRef.path,
-          operation: 'delete',
-        });
-        errorEmitter.emit('permission-error', permissionError);
-      });
+  const confirmDeleteVideo = async () => {
+    if (!deletingVideo || !deletingVideo.id) return;
+    
+    await supabase.from('videos').delete().eq('id', deletingVideo.id);
+
+    setVideos(currentVideos => currentVideos?.filter(v => v.id !== deletingVideo.id) || null);
+    setDeletingVideo(null);
   }
 
   if (isLoading) {
@@ -152,24 +141,38 @@ function ProfileVideos({ userId, canEdit }: { userId: string, canEdit: boolean }
 export default function ProfilePage() {
   const params = useParams();
   const userId = params.userId as string;
-  const { userWallet } = useDevapp();
-  const firestore = useFirestore();
+  const { userWallet, supabase } = useDevapp();
+  const [viewingUser, setViewingUser] = useState<User | null>(null);
+  const [videos, setVideos] = useState<Video[] | null>(null);
+  const [isProfileLoading, setIsProfileLoading] = useState(true);
+  const [videosLoading, setVideosLoading] = useState(true);
 
-  const userDocRef = useMemoFirebase(() => {
-      if (!firestore || !userId) return null;
-      return doc(firestore, 'users', userId);
-  }, [firestore, userId]);
-  const { data: viewingUser, isLoading: isProfileLoading } = useDoc<User>(userDocRef);
-  
-  const videosQuery = useMemoFirebase(() => {
-    if (!firestore || !viewingUser?.walletAddress) return null;
-    return query(
-      collection(firestore, 'videos'),
-      where('artistId', '==', viewingUser.walletAddress)
-    );
-  }, [firestore, viewingUser?.walletAddress]);
 
-  const { data: videos, isLoading: videosLoading } = useCollection<Video>(videosQuery);
+  useEffect(() => {
+    const fetchUser = async () => {
+      if (!userId) return;
+      setIsProfileLoading(true);
+      const { data, error } = await supabase.from('users').select('*').eq('wallet_address', userId).single();
+      if(data) {
+        setViewingUser(data as User);
+      }
+      setIsProfileLoading(false);
+    }
+    fetchUser();
+  }, [supabase, userId]);
+
+  useEffect(() => {
+    const fetchVideos = async () => {
+        if (!viewingUser) return;
+        setVideosLoading(true);
+        const { data, error } = await supabase.from('videos').select('*').eq('artist_id', viewingUser.walletAddress);
+        if (data) {
+            setVideos(data as Video[]);
+        }
+        setVideosLoading(false);
+    }
+    fetchVideos();
+  }, [supabase, viewingUser]);
 
   const stats = useMemo(() => {
     if (!videos) return { totalViews: 0, totalTops: 0, totalVideos: 0, points: 0 };
@@ -239,5 +242,3 @@ export default function ProfilePage() {
     </div>
   );
 }
-
-    

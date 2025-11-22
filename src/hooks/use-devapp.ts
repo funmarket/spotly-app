@@ -1,5 +1,5 @@
+
 'use client';
-import { useAuth } from '@/firebase/provider';
 import { supabase } from '@/lib/supabaseClient';
 import { User } from '@supabase/supabase-js';
 import { useWallet } from '@solana/wallet-adapter-react';

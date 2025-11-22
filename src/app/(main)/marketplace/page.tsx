@@ -1,9 +1,8 @@
+
 'use client';
 
-import { useMemo, useState } from 'react';
-import { useCollection, useFirestore, useMemoFirebase } from '@/firebase';
-import { collection, query, orderBy } from 'firebase/firestore';
-import type { MarketplaceProduct, User } from '@/lib/types';
+import { useMemo, useState, useEffect } from 'react';
+import type { MarketplaceProduct } from '@/lib/types';
 import { Card, CardContent, CardHeader, CardTitle, CardFooter, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -12,6 +11,7 @@ import Link from 'next/link';
 import { ShoppingCart, Store, Plus } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { useDevapp } from '@/hooks/use-devapp';
 
 const CATEGORY_OPTIONS = {
   music: ['Instruments', 'DJ Gear', 'Studio Gear', 'Outfits/Stagewear', 'Music (Digital)', 'CDs', 'Vinyl', 'Vintage Gear', 'Accessories', 'Other'],
@@ -72,22 +72,33 @@ const LoadingSkeleton = () => (
 );
 
 export default function MarketplacePage() {
-  const firestore = useFirestore();
+  const { supabase } = useDevapp();
   const router = useRouter();
+  const [allProducts, setAllProducts] = useState<MarketplaceProduct[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [activeCategory, setActiveCategory] = useState('all');
   const [activeSubcategory, setActiveSubcategory] = useState('all');
   const [sortBy, setSortBy] = useState('createdAt_desc');
 
-  const productsQuery = useMemoFirebase(() => {
-    if (!firestore) return null;
-    const [sortField, sortDirection] = sortBy.split('_');
-    return query(
-      collection(firestore, 'marketplace_products'),
-      orderBy(sortField, sortDirection as 'asc' | 'desc')
-    );
-  }, [firestore, sortBy]);
+  useEffect(() => {
+    const fetchProducts = async () => {
+      setIsLoading(true);
+      const [sortField, sortDirection] = sortBy.split('_');
+      
+      let query = supabase
+        .from('marketplace_products')
+        .select('*')
+        .order(sortField === 'createdAt' ? 'created_at' : sortField, { ascending: sortDirection === 'asc' });
 
-  const { data: allProducts, isLoading } = useCollection<MarketplaceProduct>(productsQuery);
+      const { data, error } = await query;
+      
+      if (data) {
+        setAllProducts(data as MarketplaceProduct[]);
+      }
+      setIsLoading(false);
+    }
+    fetchProducts();
+  }, [supabase, sortBy]);
 
   const products = useMemo(() => {
     if (!allProducts) return [];
