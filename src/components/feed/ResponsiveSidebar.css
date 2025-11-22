@@ -4,11 +4,11 @@
 .rzu-sidebar {
   position: absolute;
   top: 50%;
-  right: 16px;
+  right: 15px;
   transform: translateY(-50%);
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 10px;
   z-index: 999;
 }
 
@@ -20,22 +20,24 @@
   flex-direction: column;
   align-items: center;
   justify-content: center;
-
-  padding: 6px 12px;
-  width: fit-content;   /* <— VERY IMPORTANT FOR REAL RIZZUP FEEL */
-
+  padding: 8px 10px;
+  width: 70px;
   border-radius: 14px;
-  background: rgba(0, 0, 0, 0.55);
+  background: rgba(0, 0, 0, 0.65);
   backdrop-filter: blur(4px);
-
-  border: 1px solid rgba(255,255,255,0.15);
+  border: 1px solid;
   transition: 0.15s ease;
   cursor: pointer;
+  color: white;
 }
 
 .rzu-btn:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 0 8px currentColor;
+  transform: scale(1.05);
+  box-shadow: 0 0 12px 0px currentColor;
+}
+
+.rzu-btn:active {
+  transform: scale(0.97);
 }
 
 /* ============================================
@@ -44,8 +46,7 @@
 .rzu-icon {
   width: 22px;
   height: 22px;
-  margin-bottom: 3px;
-  color: white;
+  margin-bottom: 4px;
 }
 
 /* ============================================
@@ -53,39 +54,33 @@
    ============================================ */
 
 /* SAVE */
-.rzu-save { color: #ffd742; border-color: #ffd742; }
-.rzu-save .rzu-icon { color: #ffd742; }
+.rzu-save { border-color: rgba(255, 255, 255, 0.4); color: white; }
 
 /* UP */
-.rzu-up { color: #3bff7a; border-color: #3bff7a; }
-.rzu-up .rzu-icon { color: #3bff7a; }
+.rzu-up { border-color: #00ff66; color: #00ff66; }
 
 /* FLOP */
-.rzu-flop { color: #ff5050; border-color: #ff5050; }
-.rzu-flop .rzu-icon { color: #ff5050; }
+.rzu-flop { border-color: #ff4444; color: #ff4444; }
 
 /* DOWN */
-.rzu-down { color: #3bff7a; border-color: #3bff7a; }
-.rzu-down .rzu-icon { color: #3bff7a; }
+.rzu-down { border-color: rgba(0, 255, 102, 0.5); color: rgba(255, 255, 255, 0.5); }
+.rzu-down .rzu-icon { transform: rotate(90deg); }
 
 /* TIP */
-.rzu-tip { color: #ffdf4e; border-color: #ffdf4e; }
-.rzu-tip .rzu-icon { color: #ffdf4e; }
+.rzu-tip { border-color: #00ff66; color: #00ff66; }
 
 /* BOOK */
-.rzu-book { color: #55c9ff; border-color: #55c9ff; }
-.rzu-book .rzu-icon { color: #55c9ff; }
+.rzu-book { border-color: #33bbff; color: #33bbff; }
 
 /* ADOPT */
-.rzu-adopt { color: #b56dff; border-color: #b56dff; }
-.rzu-adopt .rzu-icon { color: #b56dff; }
+.rzu-adopt { border-color: #aa55ff; color: #aa55ff; }
 
 /* ============================================
    LABEL
    ============================================ */
 .rzu-label {
   font-size: 11px;
-  font-weight: 400;
+  font-weight: 600;
   color: white;
   text-shadow: 0 0 4px rgba(0,0,0,0.7);
 }
@@ -96,28 +91,45 @@
 .rzu-left-btn {
   position: absolute;
   top: 50%;
-  left: 16px;
-  transform: translateY(-50%);
+  left: 15px;
+  /* This needs manual adjustment based on final sidebar layout. 
+     Goal is to align with the 'Down' button.
+     Let's start with a transform and adjust if needed.
+     (1 button height + 1 gap) * 3 = (58+10)*3 = 204.
+     50% - (total_height/2) + button_offset
+     Let's simplify and align with the 4th item (Down button)
+  */
+  transform: translateY(calc(-50% + (58px + 10px) * 3));
 
-  padding: 6px 12px;
-  width: fit-content;
+  padding: 8px 10px;
+  width: 70px;
+  height: 58px; /* Match button height */
+  display: flex;
+  align-items: center;
+  justify-content: center;
 
   border-radius: 14px;
-  background: rgba(0,0,0,0.55);
-  border: 1px solid #3bff7a;
+  background: rgba(0, 0, 0, 0.65);
+  border: 1px solid #00ff66;
   backdrop-filter: blur(4px);
-
+  color: #00ff66;
   cursor: pointer;
   transition: 0.15s ease;
-  color: #3bff7a;
 }
 
-.rzu-left-btn:hover {
-  transform: translateY(calc(-50% - 2px));
-  box-shadow: 0 0 8px #3bff7a;
-}
 .rzu-left-btn .rzu-icon {
-  color: #3bff7a;
+   margin: 0;
+   transform: rotate(-90deg);
+}
+
+
+.rzu-left-btn:hover {
+  transform: translateY(calc(-50% + (58px + 10px) * 3)) scale(1.05);
+  box-shadow: 0 0 12px 0px #00ff66;
+}
+
+.rzu-left-btn:active {
+    transform: translateY(calc(-50% + (58px + 10px) * 3)) scale(0.97);
 }
 
 
@@ -127,24 +139,27 @@
 @media (max-width: 768px) {
   .rzu-sidebar {
     right: 8px;
-    gap: 10px;
+    gap: 8px;
   }
 
   .rzu-btn {
-    padding: 6px 10px;
+    width: 58px;
+    padding: 6px 8px;
   }
 
   .rzu-icon {
-    width: 18px;
-    height: 18px;
+    width: 20px;
+    height: 20px;
   }
 
   .rzu-label {
-    font-size: 9px;
+    font-size: 10px;
   }
 
   .rzu-left-btn {
-    padding: 6px 10px;
+    width: 58px;
+    height: auto;
+    padding: 10px;
     left: 8px;
   }
 }

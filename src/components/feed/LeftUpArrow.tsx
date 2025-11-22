@@ -4,8 +4,8 @@ import "./ResponsiveSidebar.css";
 export default function LeftUpArrow({ onClick }: { onClick: () => void }) {
   return (
     <button className="rzu-left-btn" onClick={onClick}>
-      <svg className="rzu-icon" viewBox="0 0 24 24" fill="currentColor">
-        <path d="M12 4l6 8h-4v8h-4v-8H6z" />
+      <svg className="rzu-icon" viewBox="0 0 24 24" stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round">
+        <path d="M12 5v14m-7-7h14"></path>
       </svg>
     </button>
   );
