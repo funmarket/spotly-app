@@ -69,6 +69,9 @@ export function VideoPlayer({ src, isPlaying }: VideoPlayerProps) {
       if ((window as any).__audioUnlocked) {
         postMessageToPlayer('unMute');
         setIsMuted(false);
+      } else {
+        postMessageToPlayer('mute');
+        setIsMuted(true);
       }
     } else {
       postMessageToPlayer('pauseVideo');
@@ -102,7 +105,7 @@ export function VideoPlayer({ src, isPlaying }: VideoPlayerProps) {
         src={src}
         className={`w-full h-full object-cover transition-opacity duration-300 ${showLoading || error ? 'opacity-0' : 'opacity-100'}`}
         frameBorder="0"
-        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
         allowFullScreen
         title="SPOTLY Video"
       />
