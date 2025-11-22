@@ -29,7 +29,7 @@ export const parseVideoUrl = (input: string) => {
     const match = urlToParse.match(pattern);
     if (match && match[1]) {
       const videoId = match[1];
-      const embedUrl = `https://www.youtube.com/embed/${videoId}?autoplay=1&mute=1&controls=0&modestbranding=1&rel=0&enablejsapi=1&playsinline=1`;
+      const embedUrl = `https://www.youtube.com/embed/${videoId}?autoplay=1&mute=1&enablejsapi=1&playsinline=1&controls=0&modestbranding=1&rel=0`;
       return { type: 'youtube', id: videoId, embedUrl, error: null };
     }
   }

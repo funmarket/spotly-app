@@ -169,8 +169,8 @@ export function VideoFeed({ videos, activeFeedTab, setActiveFeedTab, isLoading, 
         if (userWallet) {
             const existingVoteQuery = query(
                 collection(firestore, 'user_votes'),
-                where('videoId', '==', video.id),
                 where('userWallet', '==', userWallet),
+                where('videoId', '==', video.id),
                 limit(1)
             );
             const existingVoteSnap = await getDocs(existingVoteQuery);
