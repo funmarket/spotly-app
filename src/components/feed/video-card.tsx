@@ -77,7 +77,7 @@ export function VideoCard({ video, onVote, onFavorite, guestVoteCount, onGuestVo
   }
   
   const handleTip = async (amount: number) => {
-    if (!wallet.publicKey || !wallet.signAndSendTransaction) {
+    if (!wallet.publicKey || !wallet.sendTransaction) {
         toast({ title: "Please connect your wallet to tip.", variant: "destructive" });
         return;
     }
@@ -123,7 +123,7 @@ export function VideoCard({ video, onVote, onFavorite, guestVoteCount, onGuestVo
 };
 
 const handleBook = async (payload: { date: string; time: string; budget: number; notes: string; }) => {
-    if (!wallet.publicKey || !wallet.signAndSendTransaction) {
+    if (!wallet.publicKey || !wallet.sendTransaction) {
         toast({ title: "Please connect your wallet to book.", variant: "destructive" });
         return;
     }
@@ -173,7 +173,7 @@ const handleBook = async (payload: { date: string; time: string; budget: number;
 };
 
 const handleAdopt = async (payload: { tier: string; amount: number; recurring: boolean; message: string; }) => {
-    if (!wallet.publicKey || !wallet.signAndSendTransaction) {
+    if (!wallet.publicKey || !wallet.sendTransaction) {
         toast({ title: "Please connect your wallet to adopt.", variant: "destructive" });
         return;
     }
@@ -303,5 +303,7 @@ const handleAdopt = async (payload: { tier: string; amount: number; recurring: b
     </div>
   );
 }
+
+    
 
     
