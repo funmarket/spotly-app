@@ -18,6 +18,7 @@ import { useDevapp } from '@/hooks/use-devapp';
 import { WalletMultiButton } from '@solana/wallet-adapter-react-ui';
 import type { User } from '@/lib/types';
 import { useToast } from '@/hooks/use-toast';
+import { errorEmitter, FirestorePermissionError } from '@/firebase';
 
 const TALENT_CATEGORIES = {
   music: {
@@ -193,56 +194,72 @@ export default function CreateProfilePage() {
     }
 
     setIsSubmitting(true);
-    try {
-        let role: 'fan' | 'artist' | 'business' | 'regular' = 'fan';
-        if (values.isArtist) role = 'artist';
-        else if (values.isBusiness) role = 'business';
+    
+    let role: 'fan' | 'artist' | 'business' | 'regular' = 'fan';
+    if (values.isArtist) role = 'artist';
+    else if (values.isBusiness) role = 'business';
 
-        const docId = userWallet ? userWallet : doc(collection(firestore, 'users')).id;
-        const userDocRef = doc(firestore, 'users', docId);
+    const docId = userWallet ? userWallet : doc(collection(firestore, 'users')).id;
+    const userDocRef = doc(firestore, 'users', docId);
 
-        const profileData = {
-          username: values.username,
-          bio: values.bio || '',
-          tags: values.tags || '',
-          location: values.location || '',
-          profilePhotoUrl: values.profilePhotoUrl || `https://picsum.photos/seed/${docId}/400`,
-          bannerPhotoUrl: values.bannerPhotoUrl || `https://picsum.photos/seed/banner-${docId}/1200/400`,
-          socialLinks: JSON.stringify(values.socialLinks || {}),
-          extraLinks: JSON.stringify(values.extraLinks || []),
-          role: role,
-          subRole: values.isArtist ? (values.subRole || '') : '',
-          talentCategory: values.isArtist ? (values.talentCategory || '') : '',
-          talentSubcategories: values.isArtist ? JSON.stringify(values.talentSubcategories || []) : '[]',
-          updatedAt: serverTimestamp(),
-        };
+    const profileData = {
+      username: values.username,
+      bio: values.bio || '',
+      tags: values.tags || '',
+      location: values.location || '',
+      profilePhotoUrl: values.profilePhotoUrl || `https://picsum.photos/seed/${docId}/400`,
+      bannerPhotoUrl: values.bannerPhotoUrl || `https://picsum.photos/seed/banner-${docId}/1200/400`,
+      socialLinks: JSON.stringify(values.socialLinks || {}),
+      extraLinks: JSON.stringify(values.extraLinks || []),
+      role: role,
+      subRole: values.isArtist ? (values.subRole || '') : '',
+      talentCategory: values.isArtist ? (values.talentCategory || '') : '',
+      talentSubcategories: values.isArtist ? JSON.stringify(values.talentSubcategories || []) : '[]',
+      updatedAt: serverTimestamp(),
+    };
 
-        if (existingProfile) {
-            await updateDoc(userDocRef, profileData);
+    if (existingProfile) {
+        updateDoc(userDocRef, profileData)
+          .then(() => {
             toast({ title: 'Profile Updated!', description: 'Your changes have been saved.' });
             router.push(`/profile/${userWallet}`);
-        } else {
-            const creationData = {
-                ...profileData,
-                walletAddress: docId,
-                skills: '',
-                rankingScore: 0,
-                escrowBalance: 0,
-                createdAt: serverTimestamp(),
-            };
-            await setDoc(userDocRef, creationData, { merge: true });
-            toast({ title: 'Profile Created!', description: 'Welcome to TalentVerse!' });
-            if (role === 'artist') {
-                setStep(2);
-            } else {
-                router.push('/');
-            }
-        }
-    } catch (error) {
-        console.error("Error saving profile:", error);
-        toast({ variant: "destructive", title: "Uh oh! Something went wrong.", description: "Could not save your profile." });
-    } finally {
-        setIsSubmitting(false);
+          })
+          .catch(error => {
+            const permissionError = new FirestorePermissionError({
+              path: userDocRef.path,
+              operation: 'update',
+              requestResourceData: profileData
+            });
+            errorEmitter.emit('permission-error', permissionError);
+          })
+          .finally(() => setIsSubmitting(false));
+    } else {
+        const creationData = {
+            ...profileData,
+            walletAddress: docId,
+            skills: '',
+            rankingScore: 0,
+            escrowBalance: 0,
+            createdAt: serverTimestamp(),
+        };
+        setDoc(userDocRef, creationData, { merge: true })
+          .then(() => {
+             toast({ title: 'Profile Created!', description: 'Welcome to TalentVerse!' });
+              if (role === 'artist') {
+                  setStep(2);
+              } else {
+                  router.push('/');
+              }
+          })
+          .catch(error => {
+              const permissionError = new FirestorePermissionError({
+                path: userDocRef.path,
+                operation: 'create',
+                requestResourceData: creationData
+              });
+              errorEmitter.emit('permission-error', permissionError);
+          })
+          .finally(() => setIsSubmitting(false));
     }
   };
 
@@ -557,3 +574,5 @@ export default function CreateProfilePage() {
     </div>
   );
 }
+
+    

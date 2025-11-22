@@ -8,7 +8,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import Image from 'next/image';
 import Link from 'next/link';
 import { BarChart, Eye, ThumbsUp, Wallet, Video as VideoIcon, Trash2 } from 'lucide-react';
-import { useCollection, useFirestore, useMemoFirebase, useDoc } from '@/firebase';
+import { useCollection, useFirestore, useMemoFirebase, useDoc, errorEmitter, FirestorePermissionError } from '@/firebase';
 import { useDevapp } from '@/hooks/use-devapp';
 import { collection, query, where, orderBy, doc, deleteDoc } from 'firebase/firestore';
 import type { Video, User } from '@/lib/types';
@@ -36,7 +36,6 @@ function ProfileVideos({ userId, canEdit }: { userId: string, canEdit: boolean }
 
   const videosQuery = useMemoFirebase(() => {
     if (!firestore) return null;
-    // Removed orderBy to prevent index error. Sorting will be done on the client.
     return query(
       collection(firestore, 'videos'),
       where('artistId', '==', userId)
@@ -47,11 +46,10 @@ function ProfileVideos({ userId, canEdit }: { userId: string, canEdit: boolean }
 
   const videos = useMemo(() => {
     if (!unsortedVideos) return null;
-    // Sort videos by creation date, newest first.
     return [...unsortedVideos].sort((a, b) => {
         const dateA = a.createdAt as any;
         const dateB = b.createdAt as any;
-        return dateB.seconds - dateA.seconds;
+        return (dateB?.seconds ?? 0) - (dateA?.seconds ?? 0);
     });
   }, [unsortedVideos]);
 
@@ -62,14 +60,20 @@ function ProfileVideos({ userId, canEdit }: { userId: string, canEdit: boolean }
     setDeletingVideo(video);
   }
 
-  const confirmDeleteVideo = async () => {
-    if (!deletingVideo || !firestore) return;
-    try {
-      await deleteDoc(doc(firestore, 'videos', deletingVideo.id!));
-      setDeletingVideo(null);
-    } catch (error) {
-      console.error('Failed to delete video:', error);
-    }
+  const confirmDeleteVideo = () => {
+    if (!deletingVideo || !firestore || !deletingVideo.id) return;
+    const docRef = doc(firestore, 'videos', deletingVideo.id);
+    deleteDoc(docRef)
+      .then(() => {
+        setDeletingVideo(null);
+      })
+      .catch(error => {
+        const permissionError = new FirestorePermissionError({
+          path: docRef.path,
+          operation: 'delete',
+        });
+        errorEmitter.emit('permission-error', permissionError);
+      });
   }
 
   if (isLoading) {
@@ -234,3 +238,5 @@ export default function ProfilePage() {
     </div>
   );
 }
+
+    

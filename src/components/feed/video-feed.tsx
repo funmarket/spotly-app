@@ -1,3 +1,4 @@
+
 'use client';
 import { useState, useRef, useEffect, useCallback } from 'react';
 import type { EnrichedVideo, User } from '@/lib/types';
@@ -9,7 +10,7 @@ import Link from 'next/link';
 import { useDevapp } from '@/hooks/use-devapp';
 import { collection, doc, writeBatch, increment, serverTimestamp, query, where, getDocs, limit, deleteDoc, addDoc } from 'firebase/firestore';
 import { useToast } from '@/hooks/use-toast';
-import { useCollection, useMemoFirebase } from '@/firebase';
+import { useCollection, useMemoFirebase, errorEmitter, FirestorePermissionError } from '@/firebase';
 
 function TopCategoryMenu({ activeFeedTab, setActiveFeedTab }: { activeFeedTab: string, setActiveFeedTab: (tab: string) => void }) {
   const { userWallet, firestore } = useDevapp();
@@ -141,8 +142,8 @@ export function VideoFeed({ videos, activeFeedTab, setActiveFeedTab, isLoading, 
     setGuestVoteCount(newCount);
   }
 
-  const handleVoteInternal = async (isTop: boolean) => {
-    if (!currentVideos[currentIndex]) return;
+  const handleVoteInternal = (isTop: boolean) => {
+    if (!currentVideos[currentIndex] || !firestore) return;
 
     if (!userWallet) {
         if (guestVoteCount >= 10) {
@@ -161,70 +162,55 @@ export function VideoFeed({ videos, activeFeedTab, setActiveFeedTab, isLoading, 
         i === currentIndex ? { ...v, [field]: (v[field] || 0) + 1, rankingScore: (v.rankingScore || 0) + scoreChange } : v
     ));
 
-    try {
-        if (!firestore) throw new Error("Firestore not available");
-        const batch = writeBatch(firestore);
-        const videoRef = doc(firestore, 'videos', video.id);
+    const batch = writeBatch(firestore);
+    const videoRef = doc(firestore, 'videos', video.id);
 
-        if (userWallet) {
-            const existingVoteQuery = query(
-                collection(firestore, 'user_votes'),
-                where('userWallet', '==', userWallet),
-                where('videoId', '==', video.id),
-                limit(1)
-            );
-            const existingVoteSnap = await getDocs(existingVoteQuery);
+    const videoUpdateData = {
+        [field]: increment(1),
+        rankingScore: increment(scoreChange)
+    };
+    batch.update(videoRef, videoUpdateData);
 
-            if (!existingVoteSnap.empty) {
-                console.log("User has already voted. In a real app, you might prevent this or handle vote changes.");
-            }
-        }
-        
-        batch.update(videoRef, {
-            [field]: increment(1),
-            rankingScore: increment(scoreChange)
-        });
+    if (userWallet) {
+        const userVoteRef = doc(collection(firestore, 'user_votes'));
+        const userVoteData = {
+            userWallet,
+            videoId: video.id,
+            category: video.videoCategory,
+            isPositive: isTop,
+            createdAt: serverTimestamp()
+        };
+        batch.set(userVoteRef, userVoteData);
+    }
+    
+    batch.commit().catch(error => {
+      // Revert Optimistic Update on failure
+      setCurrentVideos(prev => prev.map((v, i) =>
+          i === currentIndex ? { ...v, [field]: (v[field] || 1) - 1, rankingScore: (v.rankingScore || 0) - scoreChange } : v
+      ));
 
-        if (userWallet) {
-            const userVoteRef = doc(collection(firestore, 'user_votes'));
-            batch.set(userVoteRef, {
-                userWallet,
-                videoId: video.id,
-                category: video.videoCategory,
-                isPositive: isTop,
-                createdAt: serverTimestamp()
-            });
-        }
-        
-        await batch.commit();
+      const permissionError = new FirestorePermissionError({
+        path: videoRef.path, // Assuming this is the primary operation
+        operation: 'write', // 'write' covers updates and sets
+        requestResourceData: { videoUpdate: videoUpdateData }
+      });
+      errorEmitter.emit('permission-error', permissionError);
+    });
 
-        if (!isTop) {
-            setTimeout(() => nextVideo(), 300);
-        } else {
-             setTimeout(() => nextVideo(), 300);
-        }
-
-    } catch (error) {
-        console.error('Error voting:', error);
-        toast({ title: 'Failed to vote', variant: 'destructive' });
-        // Revert Optimistic Update
-        setCurrentVideos(prev => prev.map((v, i) =>
-            i === currentIndex ? { ...v, [field]: (v[field] || 1) - 1, rankingScore: (v.rankingScore || 0) - scoreChange } : v
-        ));
+    if (!isTop) {
+        setTimeout(() => nextVideo(), 300);
+    } else {
+         setTimeout(() => nextVideo(), 300);
     }
 };
 
-const onVote = async (isTop: boolean) => {
+const onVote = (isTop: boolean) => {
     if (voteLocked) return;
     setVoteLocked(true);
-
-    try {
-        await handleVoteInternal(isTop);
-    } finally {
-        setTimeout(() => {
-            setVoteLocked(false);
-        }, 700);
-    }
+    handleVoteInternal(isTop);
+    setTimeout(() => {
+        setVoteLocked(false);
+    }, 700);
 };
 
    const nextVideo = useCallback(() => {
@@ -280,27 +266,45 @@ const onVote = async (isTop: boolean) => {
     }, [nextVideo, prevVideo, touchStartY]);
 
 
-   const handleFavorite = useCallback(async (videoId: string) => {
+   const handleFavorite = useCallback((videoId: string) => {
     if (!userWallet || !firestore) {
       toast({ title: "Please log in to save favorites.", variant: "destructive" });
       return;
     }
     
     const favQuery = query(collection(firestore, 'favorites'), where('userId', '==', userWallet), where('itemId', '==', videoId), limit(1));
-    const existing = await getDocs(favQuery);
-
-    if (existing.empty) {
-      await addDoc(collection(firestore, 'favorites'), {
-        userId: userWallet,
-        itemId: videoId,
-        itemType: 'video',
-        createdAt: serverTimestamp()
-      });
-      toast({ title: "Added to favorites!" });
-    } else {
-      await deleteDoc(doc(firestore, 'favorites', existing.docs[0].id));
-      toast({ title: "Removed from favorites." });
-    }
+    
+    getDocs(favQuery).then(existing => {
+      if (existing.empty) {
+        const favoriteData = {
+          userId: userWallet,
+          itemId: videoId,
+          itemType: 'video',
+          createdAt: serverTimestamp()
+        };
+        addDoc(collection(firestore, 'favorites'), favoriteData)
+          .then(() => toast({ title: "Added to favorites!" }))
+          .catch(error => {
+              const permissionError = new FirestorePermissionError({
+                path: 'favorites',
+                operation: 'create',
+                requestResourceData: favoriteData
+              });
+              errorEmitter.emit('permission-error', permissionError);
+          });
+      } else {
+        const docRef = doc(firestore, 'favorites', existing.docs[0].id);
+        deleteDoc(docRef)
+          .then(() => toast({ title: "Removed from favorites." }))
+          .catch(error => {
+             const permissionError = new FirestorePermissionError({
+                path: docRef.path,
+                operation: 'delete',
+              });
+              errorEmitter.emit('permission-error', permissionError);
+          });
+      }
+    });
   }, [firestore, userWallet, toast]);
   
   const currentVideo = currentVideos[currentIndex];
@@ -345,3 +349,5 @@ const onVote = async (isTop: boolean) => {
     </div>
   );
 }
+
+    
