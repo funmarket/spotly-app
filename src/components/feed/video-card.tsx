@@ -1,7 +1,7 @@
 'use client';
-import { useRef, useState, useEffect, useCallback } from 'react';
+import { useRef, useState, useCallback } from 'react';
 import type { EnrichedVideo, User, Favorite } from '@/lib/types';
-import { VideoPlayer } from './video-player';
+import VideoPlayer from './video-player';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
 import {
@@ -12,6 +12,7 @@ import {
   DollarSign,
   Briefcase,
   UserPlus,
+  ArrowDown,
 } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from '../ui/avatar';
 import { useDevapp } from '@/hooks/use-devapp';
@@ -22,35 +23,72 @@ import { useCollection } from '@/firebase/firestore/use-collection';
 import { collection, query, where } from 'firebase/firestore';
 import { useMemoFirebase } from '@/firebase';
 
+type RightSidebarProps = {
+  onSave?: () => void;
+  onUp?: () => void;
+  onFlop?: () => void;
+  onDown?: () => void;
+  onTip?: () => void;
+  onBook?: () => void;
+  onAdopt?: () => void;
+  isVoteLocked?: boolean;
+  isBusiness?: boolean;
+};
 
-const ActionButton = ({
-  icon: Icon,
-  label,
-  onClick,
-  isActive,
-  isDisabled,
-  className = '',
-  iconClassName = '',
-}: {
-  icon: React.ElementType;
-  label?: string;
-  onClick?: () => void;
-  isActive?: boolean;
-  isDisabled?: boolean;
-  className?: string;
-  iconClassName?: string;
-}) => (
-  <button
-    onClick={onClick}
-    disabled={isDisabled}
-    className={`flex flex-col items-center justify-center gap-1 text-white group disabled:opacity-50 disabled:cursor-not-allowed ${className}`}
-  >
-    <div className={`flex items-center justify-center h-12 w-12 rounded-full bg-black/40 backdrop-blur-sm transition-all group-hover:bg-black/60 group-hover:scale-110 ${isActive ? 'bg-primary/80' : ''}`}>
-        <Icon className={`h-7 w-7 transition-all ${iconClassName}`} />
+const RightSidebar: React.FC<RightSidebarProps> = ({
+  onSave,
+  onUp,
+  onFlop,
+  onDown,
+  onTip,
+  onBook,
+  onAdopt,
+  isVoteLocked,
+  isBusiness,
+}) => {
+  return (
+    <div className="rzu-sidebar">
+      <button className="rzu-sidebar-btn" onClick={onSave}>
+        <span className="rzu-icon">🔖</span>
+        <span className="rzu-label">Save</span>
+      </button>
+
+      <button className="rzu-sidebar-btn" onClick={onUp} disabled={isVoteLocked}>
+        <span className="rzu-icon">👍</span>
+        <span className="rzu-label">Up</span>
+      </button>
+
+      <button className="rzu-sidebar-btn" onClick={onFlop} disabled={isVoteLocked}>
+        <span className="rzu-icon">👎</span>
+        <span className="rzu-label">Flop</span>
+      </button>
+
+      <button className="rzu-sidebar-btn" onClick={onDown}>
+        <span className="rzu-icon">⬇</span>
+        <span className="rzu-label">Down</span>
+      </button>
+
+      <button className="rzu-sidebar-btn" onClick={onTip}>
+        <span className="rzu-icon">$</span>
+        <span className="rzu-label">Tip</span>
+      </button>
+
+      {isBusiness && (
+        <>
+          <button className="rzu-sidebar-btn" onClick={onBook}>
+            <span className="rzu-icon">🎁</span>
+            <span className="rzu-label">Book</span>
+          </button>
+
+          <button className="rzu-sidebar-btn" onClick={onAdopt}>
+            <span className="rzu-icon">👤＋</span>
+            <span className="rzu-label">Adopt</span>
+          </button>
+        </>
+      )}
     </div>
-    {label && <span className="text-xs font-semibold drop-shadow-md">{label}</span>}
-  </button>
-);
+  );
+};
 
 
 export function VideoCard({ video, onVote, onFavorite, guestVoteCount, onGuestVote, currentUser, nextVideo, prevVideo, voteLocked, isPlaying }: { video: EnrichedVideo, onVote: (isTop: boolean) => Promise<void>, onFavorite: (videoId:string) => Promise<void>, guestVoteCount: number, onGuestVote: () => void, currentUser: User | null, nextVideo: () => void, prevVideo: () => void, voteLocked: boolean, isPlaying: boolean }) {
@@ -139,10 +177,10 @@ export function VideoCard({ video, onVote, onFavorite, guestVoteCount, onGuestVo
             </DialogContent>
         </Dialog>
 
-      <VideoPlayer src={video.videoUrl} isPlaying={isPlaying} />
+      <VideoPlayer videoUrl={video.rawVideoInput} isActive={isPlaying} />
       <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-black/30 pointer-events-none" />
 
-      <div className="absolute bottom-4 left-5 right-[100px] text-white">
+      <div className="absolute bottom-20 left-5 right-5 text-white">
         <Link href={`/profile/${video.user.walletAddress}`} className="flex items-center gap-3 mb-3 group">
           <Avatar className="h-12 w-12 border-2 border-primary">
             <AvatarImage src={video.user.profilePhotoUrl} alt={video.user.username} />
@@ -156,20 +194,17 @@ export function VideoCard({ video, onVote, onFavorite, guestVoteCount, onGuestVo
         <p className="text-sm text-white drop-shadow-md line-clamp-2">{video.description}</p>
       </div>
       
-      {/* Right Action Bar */}
-      <div className="absolute right-3 sm:right-4 top-1/2 -translate-y-1/2 flex flex-col gap-4 z-20">
-          <ActionButton icon={Bookmark} label="Save" onClick={handleFavoriteClick} isActive={isFavorited} iconClassName={isFavorited ? 'fill-white' : ''} />
-          <ActionButton icon={ThumbsUp} label={`${video.topCount || 0}`} onClick={() => handleVoteClick(true)} isDisabled={voteLocked} iconClassName="text-green-400" />
-          <ActionButton icon={ThumbsDown} label={`${video.flopCount || 0}`} onClick={() => handleVoteClick(false)} isDisabled={voteLocked} iconClassName="text-red-400" />
-          <ActionButton icon={DollarSign} label="Tip" onClick={handleTip} iconClassName="text-green-400" />
-          {currentUser?.role === 'business' && (
-              <>
-                  <ActionButton icon={Briefcase} label="Book" onClick={handleHireOrAdopt} iconClassName="text-cyan-400" />
-                  <ActionButton icon={UserPlus} label="Adopt" onClick={handleHireOrAdopt} iconClassName="text-purple-400" />
-              </>
-          )}
-           <ActionButton icon={Share2} label="Share" onClick={() => toast({title: 'Share not implemented'})} />
-      </div>
+      <RightSidebar
+        onSave={handleFavoriteClick}
+        onUp={() => handleVoteClick(true)}
+        onFlop={() => handleVoteClick(false)}
+        onDown={nextVideo}
+        onTip={handleTip}
+        onBook={handleHireOrAdopt}
+        onAdopt={handleHireOrAdopt}
+        isVoteLocked={voteLocked}
+        isBusiness={currentUser?.role === 'business'}
+      />
 
     </div>
   );

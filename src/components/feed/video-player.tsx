@@ -1,152 +1,164 @@
 'use client';
-
-import { useRef, useEffect, useState } from 'react';
-import { Volume2, VolumeX, Loader2, AlertTriangle } from 'lucide-react';
-import { Button } from '../ui/button';
+import React, { useEffect, useRef, useState, useCallback } from 'react';
 
 type VideoPlayerProps = {
-  src: string;
-  isPlaying: boolean;
+  /** Full YouTube watch URL or share URL */
+  videoUrl: string;
+  /** Is this the currently active video in the feed? */
+  isActive: boolean;
 };
 
-export function VideoPlayer({ src, isPlaying }: VideoPlayerProps) {
-  const iframeRef = useRef<HTMLIFrameElement>(null);
+declare global {
+  interface Window {
+    __audioUnlocked?: boolean;
+  }
+}
+
+/**
+ * Helper: turn a YouTube URL into a JS-API-enabled embed URL.
+ * Ensures: autoplay=1, mute=1, playsinline=1, enablejsapi=1 etc.
+ */
+function makeYoutubeEmbedUrl(rawUrl: string): string | null {
+  try {
+    const url = new URL(rawUrl.trim());
+
+    let videoId = '';
+    if (url.hostname === 'youtu.be') {
+      videoId = url.pathname.replace('/', '');
+    } else if (
+      url.hostname.includes('youtube.com') ||
+      url.hostname.includes('www.youtube.com')
+    ) {
+      if (url.pathname === '/watch') {
+        videoId = url.searchParams.get('v') || '';
+      } else if (url.pathname.startsWith('/embed/')) {
+        videoId = url.pathname.replace('/embed/', '');
+      } else if (url.pathname.startsWith('/shorts/')) {
+        videoId = url.pathname.replace('/shorts/', '');
+      }
+    }
+
+    if (!videoId) return null;
+
+    const params = new URLSearchParams({
+      autoplay: '1',
+      mute: '1',
+      playsinline: '1',
+      enablejsapi: '1',
+      rel: '0',
+      controls: '0',
+      modestbranding: '1',
+      // IMPORTANT for postMessage control:
+      origin: window.location.origin,
+    });
+
+    return `https://www.youtube.com/embed/${videoId}?${params.toString()}`;
+  } catch {
+    return null;
+  }
+}
+
+const VideoPlayer: React.FC<VideoPlayerProps> = ({ videoUrl, isActive }) => {
+  const iframeRef = useRef<HTMLIFrameElement | null>(null);
+  const [embedUrl, setEmbedUrl] = useState<string | null>(null);
   const [isMuted, setIsMuted] = useState(true);
   const [isApiReady, setIsApiReady] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
-  // Function to post messages to the YouTube iframe
-  const postMessageToPlayer = (func: string, args?: any) => {
-    iframeRef.current?.contentWindow?.postMessage(
+  // Build embed URL whenever the video changes
+  useEffect(() => {
+    setEmbedUrl(makeYoutubeEmbedUrl(videoUrl));
+    setIsMuted(true);
+    setIsApiReady(false);
+  }, [videoUrl]);
+
+  // Called when iframe fires onLoad – we consider API ready after a short delay
+  const handleIframeLoad = useCallback(() => {
+    // give the iframe a tiny moment to bootstrap the player
+    setTimeout(() => setIsApiReady(true), 200);
+  }, []);
+
+  const sendCommand = useCallback((func: string, args: any[] = []) => {
+    if (!iframeRef.current || !iframeRef.current.contentWindow) return;
+    iframeRef.current.contentWindow.postMessage(
       JSON.stringify({
         event: 'command',
-        func: func,
-        args: args || [],
+        func,
+        args,
       }),
       '*'
     );
-  };
+  }, []);
 
-  useEffect(() => {
-    // Reset state when src changes
-    setIsApiReady(false);
-    setError(null);
-    setIsMuted(true);
-    
-    const handlePlayerStateChange = (event: MessageEvent) => {
-      if (event.source !== iframeRef.current?.contentWindow) return;
-      try {
-        const data = JSON.parse(event.data);
-        if (data.event === 'onStateChange') {
-          if (data.info === -1) { // unstarted
-             setError(null);
-          }
-          if (data.info === 0) { // ended
-            postMessageToPlayer('playVideo');
-          }
-        }
-        if (data.event === 'onReady') {
-           setIsApiReady(true);
-           setError(null);
-        }
-        if (data.event === 'onError') {
-           setError(`Video unavailable. Error code: ${data.info}`);
-        }
-      } catch (e) {
-        // Not a JSON message from our player, ignore
-      }
-    };
-    
-    window.addEventListener('message', handlePlayerStateChange);
-
-    return () => {
-      window.removeEventListener('message', handlePlayerStateChange);
-    };
-
-  }, [src]);
-
+  /**
+   * Core playback effect:
+   * - When this card is active AND API is ready → play
+   * - When inactive → pause
+   * - If window.__audioUnlocked is true, auto-unmute after 500ms
+   */
   useEffect(() => {
     if (!isApiReady) return;
 
-    if (isPlaying) {
-      postMessageToPlayer('playVideo');
-      // Unmute only if user has interacted before
-      if ((window as any).__audioUnlocked) {
+    if (isActive) {
+      // always start muted + playing
+      sendCommand('mute');
+      sendCommand('playVideo');
+
+      if (typeof window !== 'undefined' && window.__audioUnlocked) {
         setTimeout(() => {
-            postMessageToPlayer('unMute');
-            setIsMuted(false);
+          sendCommand('unMute');
+          setIsMuted(false);
         }, 500);
       } else {
-        postMessageToPlayer('mute');
         setIsMuted(true);
       }
     } else {
-      postMessageToPlayer('pauseVideo');
+      // not active → pause & mute
+      sendCommand('pauseVideo');
+      sendCommand('mute');
+      setIsMuted(true);
     }
-  }, [isPlaying, isApiReady]);
+  }, [isActive, isApiReady, sendCommand]);
 
-  useEffect(() => {
-    if (!isApiReady) return;
-    if (isMuted) {
-      postMessageToPlayer('mute');
-    } else {
-      postMessageToPlayer('unMute');
+  const handleTapToUnmute = useCallback(() => {
+    sendCommand('unMute');
+    if (typeof window !== 'undefined') {
+      window.__audioUnlocked = true; // unlock future auto-unmute
     }
-  }, [isMuted, isApiReady]);
+    setIsMuted(false);
+  }, [sendCommand]);
 
-
-  const handleToggleMute = (e: React.MouseEvent) => {
-    e.stopPropagation();
-    if (isMuted && typeof window !== 'undefined' && !(window as any).__audioUnlocked) {
-      (window as any).__audioUnlocked = true;
-    }
-    setIsMuted(!isMuted);
-  };
-  
-  const showLoading = !isApiReady && !error;
+  if (!embedUrl) {
+    return (
+      <div className="flex items-center justify-center w-full h-full text-sm text-neutral-400">
+        Invalid video URL
+      </div>
+    );
+  }
 
   return (
-    <div className="relative h-full w-full bg-black" onClick={handleToggleMute}>
+    <div className="relative w-full h-full bg-black">
       <iframe
         ref={iframeRef}
-        src={src}
-        className={`w-full h-full object-cover transition-opacity duration-300 ${showLoading || error ? 'opacity-0' : 'opacity-100'}`}
-        frameBorder="0"
+        src={embedUrl}
+        title="SPOTLY Video"
+        className="w-full h-full border-0"
         allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
         allowFullScreen
-        title="SPOTLY Video"
+        onLoad={handleIframeLoad}
       />
-      
-      {showLoading && (
-        <div className="absolute inset-0 flex items-center justify-center text-white">
-          <Loader2 className="h-10 w-10 animate-spin" />
-        </div>
-      )}
-      
-      {error && (
-         <div className="absolute inset-0 flex flex-col items-center justify-center text-white bg-black">
-          <AlertTriangle className="h-10 w-10 text-destructive mb-4" />
-          <p className="text-lg font-semibold">Video Unavailable</p>
-          <p className="text-sm text-muted-foreground">{error}</p>
-        </div>
-      )}
 
-      {!showLoading && !error && (
-        <div className="absolute inset-0 flex items-center justify-center bg-black/10 opacity-0 hover:opacity-100 transition-opacity duration-300">
-          <Button
-            variant="ghost"
-            size="icon"
-            className="h-20 w-20 text-white/70"
-            aria-label={isMuted ? 'Unmute' : 'Mute'}
-          >
-            {isMuted ? (
-              <VolumeX className="h-12 w-12 drop-shadow-lg" />
-            ) : (
-              <Volume2 className="h-12 w-12 drop-shadow-lg" />
-            )}
-          </Button>
-        </div>
+      {/* Tap-to-unmute overlay */}
+      {isActive && isMuted && (
+        <button
+          type="button"
+          onClick={handleTapToUnmute}
+          className="absolute bottom-6 left-1/2 -translate-x-1/2 px-4 py-2 rounded-full bg-black/70 border border-white/40 text-white text-sm shadow-lg"
+        >
+          🔇 Tap to unmute
+        </button>
       )}
     </div>
   );
-}
+};
+
+export default VideoPlayer;
