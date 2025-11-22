@@ -111,7 +111,7 @@ export function ProfileHeader({ user, isOwnProfile, stats }: { user: User, isOwn
                     {isOwnProfile ? (
                         <>
                            <Button variant="outline" asChild className="flex-1 sm:flex-initial">
-                             <Link href={`/onboarding/create/${user.role}`}>Edit Profile</Link>
+                             <Link href="/profile/edit">Edit Profile</Link>
                            </Button>
                            <Button variant="ghost" onClick={handleLogout} className="flex-1 sm:flex-initial">
                                 <LogOut className="mr-2 h-4 w-4" /> Logout

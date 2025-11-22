@@ -91,17 +91,14 @@ const profileSchema = z.object({
 
 type ProfileFormValues = z.infer<typeof profileSchema>;
 
-export default function CreateProfilePage() {
+export default function EditProfilePage() {
   const { firestore, userWallet } = useDevapp();
   const router = useRouter();
-  const params = useParams();
   const { toast } = useToast();
-  const accountType = params.role as string;
   
-  const [step, setStep] = useState(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showExtraLinks, setShowExtraLinks] = useState(false);
-  const [existingProfile, setExistingProfile] = useState<User | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
 
   const form = useForm<ProfileFormValues>({
     resolver: zodResolver(profileSchema),
@@ -110,8 +107,8 @@ export default function CreateProfilePage() {
       bio: '',
       profilePhotoUrl: '',
       bannerPhotoUrl: '',
-      isArtist: accountType === 'artist',
-      isBusiness: accountType === 'business',
+      isArtist: false,
+      isBusiness: false,
       talentCategory: '',
       talentSubcategories: [],
       subRole: '',
@@ -125,11 +122,11 @@ export default function CreateProfilePage() {
    useEffect(() => {
     async function fetchProfile() {
       if (userWallet && firestore) {
+        setIsLoading(true);
         const docRef = doc(firestore, 'users', userWallet);
         const docSnap = await getDoc(docRef);
         if (docSnap.exists()) {
           const userData = docSnap.data() as User;
-          setExistingProfile(userData);
           form.reset({
             username: userData.username || '',
             bio: userData.bio || '',
@@ -145,64 +142,55 @@ export default function CreateProfilePage() {
             socialLinks: typeof userData.socialLinks === 'string' ? JSON.parse(userData.socialLinks) : (userData.socialLinks || {}),
             extraLinks: typeof userData.extraLinks === 'string' ? JSON.parse(userData.extraLinks) : (userData.extraLinks || []),
           });
+        } else {
+            // If no profile exists, redirect to onboarding
+            router.push('/onboarding');
         }
+        setIsLoading(false);
+      } else if(userWallet === undefined) {
+          // still loading wallet
+          setIsLoading(true);
+      } else {
+          // no wallet connected, push to onboarding
+          router.push('/onboarding');
       }
     }
     fetchProfile();
-  }, [userWallet, firestore, form]);
-
-  useEffect(() => {
-    form.reset({
-        ...form.getValues(),
-        isArtist: accountType === 'artist',
-        isBusiness: accountType === 'business',
-    });
-  }, [accountType, form]);
+  }, [userWallet, firestore, form, router]);
 
   const { watch, setValue } = form;
   const isArtist = watch('isArtist');
   const talentCategory = watch('talentCategory');
   
   const onSubmit = async (values: ProfileFormValues) => {
-    if (!firestore) return;
-    
-    const needsWallet = accountType === 'artist' || accountType === 'business';
-
-    if (needsWallet && !userWallet) {
-        toast({variant: 'destructive', title: "Wallet Required", description:"A wallet connection is required to create this profile type."});
+    if (!firestore || !userWallet) {
+        toast({variant: 'destructive', title: 'Not Logged In', description: 'You must be logged in to edit your profile.'});
         return;
     }
+    
     if (!values.username) {
         toast({variant: 'destructive', title: "Username Required"});
         return;
     }
     
-    if (accountType !== 'fan' && !values.isArtist && !values.isBusiness) {
-        toast({variant: 'destructive', title: "Account Type Required", description:"Please select an account type (Artist or Business)."});
-        return;
-    }
-   
-    if (values.isArtist && !values.talentCategory) {
+    if (watch('isArtist') && !values.talentCategory) {
         toast({variant: 'destructive', title: "Talent Category Required", description:"Please select a talent category for artists."});
         return;
     }
 
     setIsSubmitting(true);
     try {
-        let role: 'fan' | 'artist' | 'business' | 'regular' = 'fan';
-        if (values.isArtist) role = 'artist';
-        else if (values.isBusiness) role = 'business';
-
-        const docId = userWallet ? userWallet : doc(collection(firestore, 'users')).id;
-        const userDocRef = doc(firestore, 'users', docId);
+        let role: 'fan' | 'artist' | 'business' | 'regular' = watch('isArtist') ? 'artist' : (watch('isBusiness') ? 'business' : 'fan');
+        
+        const userDocRef = doc(firestore, 'users', userWallet);
 
         const profileData = {
           username: values.username,
           bio: values.bio || '',
           tags: values.tags || '',
           location: values.location || '',
-          profilePhotoUrl: values.profilePhotoUrl || `https://picsum.photos/seed/${docId}/400`,
-          bannerPhotoUrl: values.bannerPhotoUrl || `https://picsum.photos/seed/banner-${docId}/1200/400`,
+          profilePhotoUrl: values.profilePhotoUrl || `https://picsum.photos/seed/${userWallet}/400`,
+          bannerPhotoUrl: values.bannerPhotoUrl || `https://picsum.photos/seed/banner-${userWallet}/1200/400`,
           socialLinks: JSON.stringify(values.socialLinks || {}),
           extraLinks: JSON.stringify(values.extraLinks || []),
           role: role,
@@ -212,27 +200,10 @@ export default function CreateProfilePage() {
           updatedAt: serverTimestamp(),
         };
 
-        if (existingProfile) {
-            await updateDoc(userDocRef, profileData);
-            toast({ title: 'Profile Updated!', description: 'Your changes have been saved.' });
-            router.push(`/profile/${userWallet}`);
-        } else {
-            const creationData = {
-                ...profileData,
-                walletAddress: docId,
-                skills: '',
-                rankingScore: 0,
-                escrowBalance: 0,
-                createdAt: serverTimestamp(),
-            };
-            await setDoc(userDocRef, creationData, { merge: true });
-            toast({ title: 'Profile Created!', description: 'Welcome to TalentVerse!' });
-            if (role === 'artist') {
-                setStep(2);
-            } else {
-                router.push('/');
-            }
-        }
+        await updateDoc(userDocRef, profileData);
+        toast({ title: 'Profile Updated!', description: 'Your changes have been saved.' });
+        router.push(`/profile/${userWallet}`);
+        
     } catch (error) {
         console.error("Error saving profile:", error);
         toast({ variant: "destructive", title: "Uh oh! Something went wrong.", description: "Could not save your profile." });
@@ -261,55 +232,16 @@ export default function CreateProfilePage() {
       setValue('talentSubcategories', newSubs);
   }
 
-  if ((accountType === 'artist' || accountType === 'business') && !userWallet) {
-    return (
-      <div className="flex min-h-screen items-center justify-center p-4">
-        <Card className="w-full max-w-md text-center">
-          <CardHeader>
-            <CardTitle className="font-headline text-3xl">Connect Your Wallet</CardTitle>
-            <CardDescription>A Solana wallet is required to create an {accountType} profile.</CardDescription>
-          </CardHeader>
-          <CardContent className="flex justify-center">
-            <WalletMultiButton />
-          </CardContent>
-           <CardFooter className="justify-center">
-                <Button variant="link" onClick={() => router.push('/onboarding')}>
-                    Choose a different role
-                </Button>
-           </CardFooter>
-        </Card>
-      </div>
-    );
-  }
-
-  const PageTitle = {
-      fan: "Create Fan Profile",
-      artist: existingProfile ? "Edit Artist/Talent Profile" : "Create Artist/Talent Profile",
-      business: existingProfile ? "Edit Business Profile" : "Create Business Profile"
-  }[accountType] || (existingProfile ? "Edit Profile" : "Create Profile");
-
-  const PageDescription = {
-      fan: "Become a Fan — It's Free!",
-      artist: "Showcase your talent to the world",
-      business: "Discover and hire amazing talent"
-  }[accountType] || "Tell us about yourself";
-
-  if (step === 2) {
+  if (isLoading) {
       return (
-          <div className="flex min-h-screen items-center justify-center p-4">
-              <Card className="w-full max-w-md text-center">
-                  <CardHeader>
-                      <CardTitle className="font-headline text-3xl">Profile Created!</CardTitle>
-                      <CardDescription>You can now upload your first video to get discovered.</CardDescription>
-                  </CardHeader>
-                  <CardContent className="flex flex-col sm:flex-row gap-3">
-                      <Button variant="outline" className="w-full" onClick={() => router.push('/')}>Browse Feed</Button>
-                      <Button className="w-full" onClick={() => router.push('/submit-video')}>Upload Video</Button>
-                  </CardContent>
-              </Card>
+          <div className="flex min-h-screen items-center justify-center">
+              <Loader2 className="h-8 w-8 animate-spin" />
           </div>
       )
   }
+
+  const PageTitle = "Edit Profile";
+  const PageDescription = "Keep your profile information up to date.";
 
   return (
     <div className="flex min-h-screen items-center justify-center p-4">
@@ -322,54 +254,52 @@ export default function CreateProfilePage() {
           <form onSubmit={form.handleSubmit(onSubmit)}>
             <CardContent className="space-y-6">
                 
-                {accountType !== 'fan' && (
-                    <FormItem>
-                        <FormLabel>Account Type*</FormLabel>
-                        <div className="space-y-3 rounded-lg border bg-background p-4">
-                            <FormField
-                                control={form.control}
-                                name="isArtist"
-                                render={({ field }) => (
-                                <FormItem className="flex flex-row items-start space-x-3 space-y-0">
-                                    <FormControl>
-                                    <Checkbox checked={field.value} onCheckedChange={(checked) => {
-                                        field.onChange(checked);
-                                        if(checked) setValue('isBusiness', false);
-                                    }} />
-                                    </FormControl>
-                                    <div className="space-y-1 leading-none">
-                                    <FormLabel>Artist / Talent</FormLabel>
-                                    <FormDescription>
-                                        Showcase your talent and get discovered.
-                                    </FormDescription>
-                                    </div>
-                                </FormItem>
-                                )}
-                            />
-                             <FormField
-                                control={form.control}
-                                name="isBusiness"
-                                render={({ field }) => (
-                                <FormItem className="flex flex-row items-start space-x-3 space-y-0">
-                                    <FormControl>
-                                    <Checkbox checked={field.value} onCheckedChange={(checked) => {
-                                        field.onChange(checked);
-                                        if(checked) setValue('isArtist', false);
-                                    }} />
-                                    </FormControl>
-                                    <div className="space-y-1 leading-none">
-                                    <FormLabel>Business / Producer</FormLabel>
-                                    <FormDescription>
-                                        Discover and hire talent.
-                                    </FormDescription>
-                                    </div>
-                                </FormItem>
-                                )}
-                            />
-                        </div>
-                        <FormMessage>{form.formState.errors.isArtist?.message}</FormMessage>
-                    </FormItem>
-                )}
+                <FormItem>
+                    <FormLabel>Account Type*</FormLabel>
+                    <div className="space-y-3 rounded-lg border bg-background p-4">
+                        <FormField
+                            control={form.control}
+                            name="isArtist"
+                            render={({ field }) => (
+                            <FormItem className="flex flex-row items-start space-x-3 space-y-0">
+                                <FormControl>
+                                <Checkbox checked={field.value} onCheckedChange={(checked) => {
+                                    field.onChange(checked);
+                                    if(checked) setValue('isBusiness', false);
+                                }} />
+                                </FormControl>
+                                <div className="space-y-1 leading-none">
+                                <FormLabel>Artist / Talent</FormLabel>
+                                <FormDescription>
+                                    Showcase your talent and get discovered.
+                                </FormDescription>
+                                </div>
+                            </FormItem>
+                            )}
+                        />
+                         <FormField
+                            control={form.control}
+                            name="isBusiness"
+                            render={({ field }) => (
+                            <FormItem className="flex flex-row items-start space-x-3 space-y-0">
+                                <FormControl>
+                                <Checkbox checked={field.value} onCheckedChange={(checked) => {
+                                    field.onChange(checked);
+                                    if(checked) setValue('isArtist', false);
+                                }} />
+                                </FormControl>
+                                <div className="space-y-1 leading-none">
+                                <FormLabel>Business / Producer</FormLabel>
+                                <FormDescription>
+                                    Discover and hire talent.
+                                </FormDescription>
+                                </div>
+                            </FormItem>
+                            )}
+                        />
+                    </div>
+                    <FormMessage>{form.formState.errors.isArtist?.message}</FormMessage>
+                </FormItem>
 
               <FormField control={form.control} name="username" render={({ field }) => (
                   <FormItem>
@@ -543,7 +473,7 @@ export default function CreateProfilePage() {
               <Button type="button" variant="ghost" onClick={() => router.back()}>Cancel</Button>
               <Button type="submit" disabled={isSubmitting}>
                 {isSubmitting && <Loader2 className="mr-2 animate-spin" />}
-                {existingProfile ? 'Save Changes' : (isArtist && accountType === 'artist' ? 'Continue' : 'Create Profile')}
+                Save Changes
               </Button>
             </CardFooter>
           </form>
