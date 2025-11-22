@@ -8,7 +8,7 @@
   transform: translateY(-50%);
   display: flex;
   flex-direction: column;
-  gap: 10px;
+  gap: 12px;
   z-index: 999;
 }
 
@@ -21,7 +21,7 @@
   align-items: center;
   justify-content: center;
   padding: 8px 10px;
-  width: 70px;
+  width: 68px; /* Slightly wider to fit 'Adopt' */
   border-radius: 14px;
   background: rgba(0, 0, 0, 0.65);
   backdrop-filter: blur(4px);
@@ -54,26 +54,49 @@
    ============================================ */
 
 /* SAVE */
-.rzu-save { border-color: rgba(255, 255, 255, 0.4); color: white; }
+.rzu-save {
+  border-color: rgba(255, 255, 255, 0.4);
+  color: white;
+}
 
-/* UP */
-.rzu-up { border-color: #00ff66; color: #00ff66; }
+/* UP / TOP */
+.rzu-up {
+  border-color: #00ff66;
+  color: #00ff66;
+}
 
 /* FLOP */
-.rzu-flop { border-color: #ff4444; color: #ff4444; }
+.rzu-flop {
+  border-color: #ff4444;
+  color: #ff4444;
+}
 
 /* DOWN */
-.rzu-down { border-color: rgba(0, 255, 102, 0.5); color: rgba(255, 255, 255, 0.5); }
-.rzu-down .rzu-icon { transform: rotate(90deg); }
+.rzu-down {
+  border-color: #00ff66;
+  color: #00ff66;
+}
+.rzu-down .rzu-icon {
+  transform: rotate(90deg);
+}
 
 /* TIP */
-.rzu-tip { border-color: #00ff66; color: #00ff66; }
+.rzu-tip {
+  border-color: #00ff66;
+  color: #00ff66;
+}
 
 /* BOOK */
-.rzu-book { border-color: #33bbff; color: #33bbff; }
+.rzu-book {
+  border-color: #33bbff;
+  color: #33bbff;
+}
 
 /* ADOPT */
-.rzu-adopt { border-color: #aa55ff; color: #aa55ff; }
+.rzu-adopt {
+  border-color: #aa55ff;
+  color: #aa55ff;
+}
 
 /* ============================================
    LABEL
@@ -82,7 +105,7 @@
   font-size: 11px;
   font-weight: 600;
   color: white;
-  text-shadow: 0 0 4px rgba(0,0,0,0.7);
+  text-shadow: 0 0 4px rgba(0, 0, 0, 0.7);
 }
 
 /* ============================================
@@ -92,22 +115,20 @@
   position: absolute;
   top: 50%;
   left: 15px;
-  /* This needs manual adjustment based on final sidebar layout. 
-     Goal is to align with the 'Down' button.
-     Let's start with a transform and adjust if needed.
-     (1 button height + 1 gap) * 3 = (58+10)*3 = 204.
-     50% - (total_height/2) + button_offset
-     Let's simplify and align with the 4th item (Down button)
-  */
-  transform: translateY(calc(-50% + (58px + 10px) * 3));
-
-  padding: 8px 10px;
-  width: 70px;
-  height: 58px; /* Match button height */
+  /* Aligns with the 4th item in the right sidebar (Down button) */
+  /* (button height + gap) * 3 */
+  /* This calculation needs to be based on the final rendered height of rzu-btn */
+  /* Assuming rzu-btn height is approx 58px and gap is 12px: (58+12)*3 = 210px */
+  /* Let's use a temporary value and adjust if needed, or use JS if dynamic. */
+  /* A simpler way is to align with the 'Down' button. 4th item from top. */
+  transform: translateY(calc(-50% + (58px + 12px) * 3));
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
-
+  padding: 8px 10px;
+  width: 68px;
+  height: 58px; /* Match button height */
   border-radius: 14px;
   background: rgba(0, 0, 0, 0.65);
   border: 1px solid #00ff66;
@@ -118,20 +139,17 @@
 }
 
 .rzu-left-btn .rzu-icon {
-   margin: 0;
-   transform: rotate(-90deg);
+  margin: 0 0 3px 0;
 }
 
-
 .rzu-left-btn:hover {
-  transform: translateY(calc(-50% + (58px + 10px) * 3)) scale(1.05);
+  transform: translateY(calc(-50% + (58px + 12px) * 3)) scale(1.05);
   box-shadow: 0 0 12px 0px #00ff66;
 }
 
 .rzu-left-btn:active {
-    transform: translateY(calc(-50% + (58px + 10px) * 3)) scale(0.97);
+  transform: translateY(calc(-50% + (58px + 12px) * 3)) scale(0.97);
 }
-
 
 /* ============================================
    MOBILE — RESPONSIVE RIZZUP VERSION
@@ -145,6 +163,7 @@
   .rzu-btn {
     width: 58px;
     padding: 6px 8px;
+    height: 52px;
   }
 
   .rzu-icon {
@@ -158,8 +177,15 @@
 
   .rzu-left-btn {
     width: 58px;
-    height: auto;
-    padding: 10px;
+    height: 52px;
     left: 8px;
+    transform: translateY(calc(-50% + (52px + 8px) * 3));
+  }
+  .rzu-left-btn:hover {
+    transform: translateY(calc(-50% + (52px + 8px) * 3)) scale(1.05);
+  }
+
+  .rzu-left-btn:active {
+    transform: translateY(calc(-50% + (52px + 8px) * 3)) scale(0.97);
   }
 }
