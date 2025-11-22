@@ -1,5 +1,5 @@
 'use client';
-import { useRef, useState, useCallback } from 'react';
+import { useRef, useState } from 'react';
 import type { EnrichedVideo, User, Favorite } from '@/lib/types';
 import VideoPlayer from './video-player';
 import Link from 'next/link';
