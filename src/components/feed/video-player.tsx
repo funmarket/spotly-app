@@ -72,8 +72,10 @@ export function VideoPlayer({ src, isPlaying }: VideoPlayerProps) {
       postMessageToPlayer('playVideo');
       // Unmute only if user has interacted before
       if ((window as any).__audioUnlocked) {
-        postMessageToPlayer('unMute');
-        setIsMuted(false);
+        setTimeout(() => {
+            postMessageToPlayer('unMute');
+            setIsMuted(false);
+        }, 500);
       } else {
         postMessageToPlayer('mute');
         setIsMuted(true);
