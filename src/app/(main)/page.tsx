@@ -7,37 +7,21 @@ import { collection, query, where, orderBy, getDoc, doc, limit } from 'firebase/
 import type { EnrichedVideo, User, Video } from '@/lib/types';
 import { Loader2 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import { useCollection, useMemoFirebase } from '@/firebase';
+import { useCollection, useMemoFirebase, useDoc } from '@/firebase';
 
 function Feed() {
   const { firestore, userWallet } = useDevapp();
-  const router = useRouter();
-
+  
   const [enrichedVideos, setEnrichedVideos] = useState<EnrichedVideo[]>([]);
   const [isEnriching, setIsEnriching] = useState(true);
   const [activeFeedTab, setActiveFeedTab] = useState('music');
-  const [currentUser, setCurrentUser] = useState<User | null>(null);
-  const [isLoadingUser, setIsLoadingUser] = useState(true);
+  
+  const userDocRef = useMemoFirebase(() => {
+    if (!userWallet || !firestore) return null;
+    return doc(firestore, 'users', userWallet);
+  }, [userWallet, firestore]);
 
-  useEffect(() => {
-    setIsLoadingUser(true);
-    if (userWallet && firestore) {
-      const userDocRef = doc(firestore, 'users', userWallet);
-      getDoc(userDocRef).then((docSnap) => {
-        if (docSnap.exists()) {
-           setCurrentUser({ userId: docSnap.id, ...docSnap.data() } as User);
-        } else {
-            // AuthHandler should create a minimal profile, but handle case where it might not exist yet
-            setCurrentUser(null);
-        }
-        setIsLoadingUser(false);
-      }).catch(() => setIsLoadingUser(false));
-    } else {
-      // No authenticated user, treat as guest.
-      setCurrentUser(null);
-      setIsLoadingUser(false);
-    }
-  }, [userWallet, firestore, router]);
+  const { data: currentUser, isLoading: isLoadingUser } = useDoc<User>(userDocRef);
 
 
   const videosQuery = useMemoFirebase(() => {

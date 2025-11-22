@@ -86,21 +86,3 @@ export function useMemoFirebase<T>(factory: () => T, deps: React.DependencyList)
   
   return memoized;
 }
-
-/**
- * @deprecated useDevapp is now the primary hook for user state. This is kept for compatibility.
- * This hook still tracks Firebase Auth user state if needed for other purposes.
- */
-export const useUser = (): { user: User | null; isUserLoading: boolean } => {
-  const auth = useAuth();
-  const [user, setUser] = useState<User | null>(null);
-  const [isUserLoading, setIsUserLoading] = useState(true);
-   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
-        setUser(firebaseUser);
-        setIsUserLoading(false);
-    });
-    return () => unsubscribe();
-  }, [auth]);
-  return { user, isUserLoading };
-};
