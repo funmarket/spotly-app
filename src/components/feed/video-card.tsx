@@ -56,8 +56,8 @@ const ActionButton = ({
     disabled={isDisabled}
     className={`flex flex-col items-center justify-center gap-1 text-white group disabled:opacity-50 disabled:cursor-not-allowed ${className}`}
   >
-    <div className="flex items-center justify-center h-10 w-10 sm:h-12 sm:w-12 rounded-full bg-black/40 backdrop-blur-sm transition-all hover:bg-black/60 group-hover:scale-110">
-        <Icon className={`h-6 w-6 sm:h-7 sm:w-7 transition-all ${isActive ? 'scale-110' : ''} ${iconClassName}`} />
+    <div className={`flex items-center justify-center h-12 w-12 rounded-full bg-black/40 backdrop-blur-sm transition-all group-hover:bg-black/60 group-hover:scale-110 ${isActive ? 'bg-primary/80' : ''}`}>
+        <Icon className={`h-7 w-7 transition-all ${iconClassName}`} />
     </div>
     {label && <span className="text-xs font-semibold drop-shadow-md">{label}</span>}
   </button>
@@ -97,6 +97,7 @@ export function VideoCard({ video, onVote, onFavorite, guestVoteCount, onGuestVo
   }
 
   const handleVote = (isTop: boolean) => {
+    if (voteLocked) return;
     if (!userWallet) { // Guest user
       if (guestVoteCount >= 10) {
         setShowVoteLimitModal(true);
@@ -177,52 +178,22 @@ export function VideoCard({ video, onVote, onFavorite, guestVoteCount, onGuestVo
         <p className="text-sm text-white drop-shadow-md line-clamp-2">{video.description}</p>
       </div>
       
-      {/* Left Action Bar */}
-       <div className="absolute left-3 sm:left-4 top-1/2 -translate-y-1/2 z-20">
-         <ActionButton icon={ArrowUp} onClick={prevVideo} />
-       </div>
-
       {/* Right Action Bar */}
-        <div className="absolute right-3 sm:right-4 top-1/2 -translate-y-1/2 flex flex-col gap-4 z-20">
-            <ActionButton icon={Bookmark} label={`${isFavorited ? 'Saved' : 'Save'}`} onClick={handleFavoriteClick} isActive={isFavorited} iconClassName={isFavorited ? 'fill-white' : ''} />
-            
-            <button
-                disabled={voteLocked}
-                onClick={() => handleVote(true)}
-                className="flex flex-col items-center justify-center gap-1 text-white group disabled:opacity-50 disabled:cursor-not-allowed transition transform duration-200 active:scale-95"
-            >
-                <div className="flex items-center justify-center h-10 w-10 sm:h-12 sm:w-12 rounded-full bg-black/40 backdrop-blur-sm transition-all hover:bg-black/60 group-hover:scale-110">
-                    <ThumbsUp className={`h-6 w-6 sm:h-7 sm:w-7 transition-all text-green-400 group-hover:drop-shadow-[0_0_8px_rgba(34,197,94,0.8)] ${userVote === 'top' ? 'scale-110' : ''}`} />
-                </div>
-                <span className="text-xs font-semibold drop-shadow-md">Top</span>
-            </button>
-            
-            <button
-                disabled={voteLocked}
-                onClick={() => handleVote(false)}
-                className="flex flex-col items-center justify-center gap-1 text-white group disabled:opacity-50 disabled:cursor-not-allowed transition transform duration-200 active:scale-95"
-            >
-                <div className="flex items-center justify-center h-10 w-10 sm:h-12 sm:w-12 rounded-full bg-black/40 backdrop-blur-sm transition-all hover:bg-black/60 group-hover:scale-110">
-                    <ThumbsDown className={`h-6 w-6 sm:h-7 sm:w-7 transition-all text-red-400 group-hover:drop-shadow-[0_0_8px_rgba(239,68,68,0.8)] ${userVote === 'flop' ? 'scale-110' : ''}`} />
-                </div>
-                <span className="text-xs font-semibold drop-shadow-md">Flop</span>
-            </button>
-            
-            <ActionButton icon={DollarSign} label="Tip" onClick={handleTip} iconClassName="text-yellow-400 group-hover:drop-shadow-[0_0_8px_rgba(234,179,8,0.8)]" />
-            
-            {currentUser?.role === 'business' && (
-                <>
-                    <ActionButton icon={BookIcon} label="Book" onClick={handleHireOrAdopt} iconClassName="text-cyan-400 group-hover:drop-shadow-[0_0_8px_rgba(34,211,238,0.8)]" />
-                    <ActionButton icon={AdoptIcon} label="Adopt" onClick={handleHireOrAdopt} iconClassName="text-purple-400 group-hover:drop-shadow-[0_0_8px_rgba(168,85,247,0.8)]" />
-                </>
-            )}
-            <ActionButton icon={Share2} label="Share" onClick={() => toast({title: 'Share not implemented'})} />
-        </div>
-        
-       {/* Right-side down arrow, aligned with left-side up arrow */}
-       <div className="absolute right-3 sm:right-4 top-1/2 -translate-y-1/2 z-20">
-         <ActionButton icon={ArrowDown} onClick={nextVideo} />
-       </div>
+      <div className="absolute right-3 sm:right-4 top-1/2 -translate-y-1/2 flex flex-col gap-4 z-20">
+          <ActionButton icon={Bookmark} label={`${isFavorited ? 'Saved' : 'Save'}`} onClick={handleFavoriteClick} isActive={isFavorited} iconClassName={isFavorited ? 'fill-white' : ''} />
+          <ActionButton icon={ThumbsUp} label="Up" onClick={() => handleVote(true)} isDisabled={voteLocked} iconClassName={`text-green-400 ${userVote === 'top' ? 'fill-current' : ''}`} />
+          <ActionButton icon={ThumbsDown} label="Flop" onClick={() => handleVote(false)} isDisabled={voteLocked} iconClassName={`text-red-400 ${userVote === 'flop' ? 'fill-current' : ''}`} />
+          <ActionButton icon={ArrowDown} label="Down" onClick={() => nextVideo()} iconClassName="text-white/70" />
+          <ActionButton icon={DollarSign} label="Tip" onClick={handleTip} iconClassName="text-green-400" />
+          
+          {currentUser?.role === 'business' && (
+              <>
+                  <ActionButton icon={Briefcase} label="Book" onClick={handleHireOrAdopt} iconClassName="text-cyan-400" />
+                  <ActionButton icon={UserPlus} label="Adopt" onClick={handleHireOrAdopt} iconClassName="text-purple-400" />
+              </>
+          )}
+           <ActionButton icon={Share2} label="Share" onClick={() => toast({title: 'Share not implemented'})} />
+      </div>
 
     </div>
   );
