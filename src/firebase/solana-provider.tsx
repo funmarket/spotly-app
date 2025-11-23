@@ -1,4 +1,3 @@
-
 'use client';
 
 import { ReactNode, useMemo, useCallback } from 'react';
@@ -13,10 +12,11 @@ import {
 import {
   SolflareWalletAdapter
 } from '@solana/wallet-adapter-solflare';
-import { clusterApiUrl } from '@solana/web3.js';
 import type { WalletError } from '@solana/wallet-adapter-base';
+import { useToast } from '@/hooks/use-toast';
 
 export function SolanaProvider({ children }: { children: ReactNode }) {
+  const { toast } = useToast();
   // Can be set to 'devnet', 'testnet', or 'mainnet-beta'
   const network = 'mainnet-beta';
 
@@ -45,9 +45,11 @@ export function SolanaProvider({ children }: { children: ReactNode }) {
   
   const onError = useCallback((error: WalletError) => {
     console.error('Wallet Error:', error);
-    // You can also add a toast notification here if you want to inform the user
-    // For example: toast({ title: 'Wallet Connection Error', description: error.message, variant: 'destructive' });
-  }, []);
+    // This prevents the app from crashing when a user rejects a wallet connection
+    if (error.name !== 'WalletSendTransactionError' && error.name !== 'WalletSignTransactionError') {
+      toast({ title: 'Wallet Connection Error', description: error.message, variant: 'destructive' });
+    }
+  }, [toast]);
 
   return (
     <ConnectionProvider endpoint={endpoint}>

@@ -1,7 +1,6 @@
-
 'use client';
 import { useRef, useState, useEffect } from 'react';
-import type { EnrichedVideo, User, Favorite } from '@/lib/types';
+import type { EnrichedVideo, User } from '@/lib/types';
 import VideoPlayer from './video-player';
 import Link from 'next/link';
 import { Button } from '@/components/ui/button';
@@ -84,7 +83,8 @@ const handleTip = async (amount: number) => {
         });
 
         if (response.error) throw new Error(response.error.message);
-        if (!response.data.ok) throw new Error("Function returned an error.");
+        if (response.data && response.data.ok === false) throw new Error("Function returned an error.");
+
 
         toast({ title: 'Tip sent!', description: `You sent ${amount} SOL to ${video.user.username}` });
     } catch (err: any) {
@@ -119,7 +119,8 @@ const handleBook = async (payload: { date: string; time: string; budget: number;
         });
 
         if (response.error) throw new Error(response.error.message);
-        if (!response.data.ok) throw new Error("Function returned an error.");
+        if (response.data && response.data.ok === false) throw new Error("Function returned an error.");
+
 
         toast({ title: 'Booking Request Sent!', description: `Your request has been sent to ${video.user.username}` });
     } catch (err: any) {
@@ -154,7 +155,8 @@ const handleAdopt = async (payload: { tier: string; amount: number; recurring: b
         });
         
         if (response.error) throw new Error(response.error.message);
-        if (!response.data.ok) throw new Error("Function returned an error.");
+        if (response.data && response.data.ok === false) throw new Error("Function returned an error.");
+
 
         toast({ title: 'Adoption Confirmed!', description: `You are now sponsoring ${video.user.username}` });
     } catch (err: any) {
