@@ -1,4 +1,3 @@
-
 import type { User } from '@/lib/types';
 import Image from 'next/image';
 import { Button } from '@/components/ui/button';
@@ -7,7 +6,6 @@ import { Avatar, AvatarFallback, AvatarImage } from '../ui/avatar';
 import { Badge } from '../ui/badge';
 import Link from 'next/link';
 import { useDevapp } from '@/hooks/use-devapp';
-import { getAuth, signOut } from 'firebase/auth';
 
 const socialIcons: { [key: string]: React.ReactNode } = {
   twitter: <Twitter className="h-4 w-4" />,
@@ -137,3 +135,5 @@ export function ProfileHeader({ user, isOwnProfile, stats }: { user: User, isOwn
     </div>
   );
 }
+
+    

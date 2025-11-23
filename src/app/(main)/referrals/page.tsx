@@ -1,4 +1,3 @@
-
 'use client';
 import { useDevapp } from '@/hooks/use-devapp';
 import {
@@ -200,3 +199,5 @@ export default function ReferralsPage() {
     </div>
   );
 }
+
+    

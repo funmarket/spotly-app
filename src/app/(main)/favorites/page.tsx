@@ -105,7 +105,7 @@ export default function FavoritesPage() {
                 status: videoData.status,
                 isBanned: videoData.is_banned,
                 bookCount: videoData.book_count,
-                adoptCount: videoData.adopt_count,
+                adoptCount: videoData.adoptCount,
                 rankingScore: videoData.ranking_score,
                 rawVideoInput: videoData.raw_video_input,
                 videoCategory: videoData.video_category,
@@ -191,3 +191,5 @@ export default function FavoritesPage() {
     </div>
   );
 }
+
+    

@@ -68,7 +68,7 @@ function NotificationItem({ notification, sender }: { notification: Notification
 export default function NotificationsPage() {
     const { userWallet, supabase } = useDevapp();
     const [notifications, setNotifications] = useState<Notification[]>([]);
-    const [senders, setSenders] = useState<Record<string, User | null>>({});
+    const [senders, setSenders = useState<Record<string, User | null>>({});
     const [isLoading, setIsLoading] = useState(true);
 
     useEffect(() => {
@@ -166,3 +166,5 @@ export default function NotificationsPage() {
         </div>
     );
 }
+
+    

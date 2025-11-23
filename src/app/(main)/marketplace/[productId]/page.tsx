@@ -1,4 +1,3 @@
-
 'use client';
 import { useDevapp } from '@/hooks/use-devapp';
 import { notFound, useRouter } from 'next/navigation';
@@ -149,3 +148,5 @@ export default function ProductDetailPage({ params }: { params: { productId: str
     </div>
   );
 }
+
+    

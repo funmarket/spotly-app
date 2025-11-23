@@ -59,3 +59,5 @@ export function SolanaProvider({ children }: { children: ReactNode }) {
     </ConnectionProvider>
   );
 }
+
+    

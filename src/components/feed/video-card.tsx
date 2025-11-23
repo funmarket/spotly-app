@@ -148,7 +148,7 @@ const handleAdopt = async (payload: { tier: string; amount: number; recurring: b
                 artistWallet: video.user.walletAddress,
                 videoId: video.id,
                 tier: payload.tier,
-                amountSol: payload.amount,
+                amountSol: amount,
                 monthly: payload.recurring,
                 message: payload.message,
             }
@@ -248,3 +248,5 @@ const handleAdopt = async (payload: { tier: string; amount: number; recurring: b
     </div>
   );
 }
+
+    

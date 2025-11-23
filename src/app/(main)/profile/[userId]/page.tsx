@@ -30,7 +30,7 @@ const StatCard = ({ icon: Icon, title, value, color, isLoading }: { icon: React.
 function ProfileVideos({ userId, canEdit }: { userId: string, canEdit: boolean }) {
   const { supabase } = useDevapp();
   const [deletingVideo, setDeletingVideo] = useState<Video | null>(null);
-  const [videos, setVideos] = useState<(Video & { id: string })[] | null>(null);
+  const [videos, setVideos = useState<(Video & { id: string })[] | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
@@ -141,8 +141,8 @@ export default function ProfilePage() {
   const params = useParams();
   const userId = params.userId as string;
   const { userWallet, supabase } = useDevapp();
-  const [viewingUser, setViewingUser] = useState<User | null>(null);
-  const [videos, setVideos] = useState<Video[] | null>(null);
+  const [viewingUser, setViewingUser = useState<User | null>(null);
+  const [videos, setVideos = useState<Video[] | null>(null);
   const [isProfileLoading, setIsProfileLoading] = useState(true);
   const [videosLoading, setVideosLoading] = useState(true);
 
@@ -241,3 +241,5 @@ export default function ProfilePage() {
     </div>
   );
 }
+
+    
