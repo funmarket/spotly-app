@@ -80,7 +80,7 @@ function Feed() {
         .from('videos')
         .select(`
             *,
-            users ( * )
+            users:artist_id ( * )
         `)
         .eq('status', 'active')
         .eq('is_banned', false)
@@ -148,5 +148,3 @@ export default function HomePage() {
 
   return <Feed />;
 }
-
-    
