@@ -42,7 +42,7 @@ export default function SubmitVideoPage() {
   const { toast } = useToast();
   const router = useRouter();
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [userProfile, setUserProfile = useState<User | null>(null);
+  const [userProfile, setUserProfile] = useState<User | null>(null);
   const [isProfileLoading, setIsProfileLoading] = useState(true);
 
   const form = useForm<z.infer<typeof videoSchema>>({
@@ -313,5 +313,3 @@ export default function SubmitVideoPage() {
     </div>
   );
 }
-
-    
